@@ -1,0 +1,4 @@
+# ~/.config/git/.work — work git identity
+# Automatically applied when inside ~/Developer/work/
+[user]
+    email = satyam@yourcompany.com    # ← update this

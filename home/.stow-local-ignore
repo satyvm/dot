@@ -1,0 +1,4 @@
+# Ignore these when stowing the home/ package
+README.md
+\.git
+\.gitignore

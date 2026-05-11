@@ -1,0 +1,84 @@
+# =============================================================================
+# Brewfile — macOS packages (satyvm/dot)
+# Run: brew bundle --file=macos/Brewfile
+# =============================================================================
+
+tap "homebrew/bundle"
+tap "homebrew/cask-fonts"
+tap "1password/tap"
+
+# ── Core CLI ──────────────────────────────────────────────────────────────────
+brew "git"
+brew "git-delta"
+brew "gh"
+brew "jj"
+brew "stow"
+brew "zsh"
+brew "zsh-autosuggestions"
+brew "zsh-syntax-highlighting"
+brew "starship"
+brew "fzf"
+brew "ripgrep"
+brew "fd"
+brew "bat"
+brew "eza"
+brew "zoxide"
+brew "htop"
+brew "btop"
+brew "tmux"
+brew "wget"
+brew "curl"
+brew "jq"
+brew "yq"
+brew "tree"
+brew "make"
+brew "cmake"
+brew "gcc"
+
+# ── Dev ───────────────────────────────────────────────────────────────────────
+brew "neovim"
+brew "python@3.12"
+brew "node"
+brew "go"
+brew "rustup"
+brew "lua"
+brew "luarocks"
+
+# ── Docker / Container (no UI — pure CLI + Colima runtime) ───────────────────
+brew "docker"               # Docker CLI (daemon provided by Colima)
+brew "docker-compose"       # Compose v2
+brew "colima"               # Lightweight container runtime (replaces Docker Desktop)
+brew "hadolint"             # Dockerfile linter
+brew "lazydocker"           # TUI overview (terminal only, no Electron)
+brew "dive"                 # Inspect image layers
+
+# ── Kubernetes ────────────────────────────────────────────────────────────────
+brew "kubectl"
+brew "kubectx"
+brew "kind"
+brew "helm"
+
+# ── Apps ──────────────────────────────────────────────────────────────────────
+cask "1password-cli"
+cask "raycast"
+cask "notion"
+cask "notion-calendar"
+cask "proton-mail"
+cask "ghostty"
+cask "velja"
+cask "maccy"
+cask "ice"
+cask "helium"
+cask "legcord"
+cask "zotero"
+cask "goodnotes"
+cask "wireguard"
+cask "sessions"
+cask "visual-studio-code"
+cask "tradingview"
+cask "utorrent"
+cask "shottr"
+
+# ── Fonts ─────────────────────────────────────────────────────────────────────
+cask "font-jetbrains-mono-nerd-font"
+cask "font-meslo-lg-nerd-font"
