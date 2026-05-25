@@ -1,0 +1,42 @@
+# .aliases
+
+alias rm='rm -i'
+alias cp='cp -iv'
+alias mv='mv -iv'
+alias mkdir='mkdir -pv'
+alias ..='cd ../'
+alias ...='cd ../../'
+alias edit='$EDITOR'
+alias f='open -a Finder ./'
+alias ~="cd ~"
+alias c='clear'
+
+alias ls="eza --icons --color=always --no-quotes"
+alias ll="eza -la --icons --color=always --no-quotes"
+alias tree="eza --tree --icons"
+alias cd='z'
+alias cat="bat --paging=never"
+alias lg="lazygit"
+
+alias dot='curl -sfL https://raw.githubusercontent.com/satyvm/dot/main/.setup.sh | bash'
+
+alias dc='docker compose'
+alias dcup='dc up -d'
+alias dcdown='dc stop && dc down --remove-orphans'
+alias dce='docker compose exec'
+alias kctl='kubectl'
+
+{{- if eq .chezmoi.os "darwin" }}
+alias flushdns="sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder"
+alias showfiles="defaults write com.apple.finder AppleShowAllFiles -bool true && killall Finder"
+alias hidefiles="defaults write com.apple.finder AppleShowAllFiles -bool false && killall Finder"
+{{- end }}
+
+{{- if eq .chezmoi.os "linux" }}
+alias update="sudo apt update && sudo apt upgrade -y"
+alias ports="sudo ss -tulnp"
+{{- end }}
+
+{{- if eq .profile "work" }}
+{{ join .chezmoi.sourceDir "dot_dotfiles/.work_aliases.age" | include | decrypt }}
+{{- end }}

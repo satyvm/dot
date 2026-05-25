@@ -1,0 +1,14 @@
+{
+  "encryption": "age",
+  "age": {
+    "identity": "~/.config/chezmoi/key.txt",
+    "recipient": "age1YOUR_PUBLIC_KEY_HERE"
+  },
+  "data": {
+    "name": {{ promptString "Your full name" | quote }},
+    "email": {{ promptString "Your email address" | quote }},
+    "profile": {{ promptChoice "Machine profile" (list "personal" "work" "server") | quote }},
+    "setupSshKey": {{ promptBool "Generate a new SSH key for this machine" }},
+    "setupDocker": {{ promptBool "Install Docker" }}
+  }
+}

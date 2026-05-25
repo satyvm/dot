@@ -1,0 +1,21 @@
+# macOS 
+
+.DS_Store
+.Trashes
+.Spotlight-V100
+.localized
+.LSOverride
+.AppleDouble
+*.profraw
+
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# VSCode
+.vscode
+
+# AI
+.claude/settings.local.json

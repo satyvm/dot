@@ -1,0 +1,51 @@
+# zsh-autosuggestions
+if [[ -f /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
+  ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=248'
+  source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+fi
+
+# zsh-history-substring-search
+if [[ -f /opt/homebrew/share/zsh-history-substring-search/zsh-history-substring-search.zsh ]]; then
+  HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_FOUND=''
+  HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_NOT_FOUND=''
+  source /opt/homebrew/share/zsh-history-substring-search/zsh-history-substring-search.zsh
+  bindkey '^[[A' history-substring-search-up
+  bindkey '^[[B' history-substring-search-down
+fi
+
+# FNM
+eval "$(fnm env --use-on-cd)"
+
+# Zoxide
+eval "$(zoxide init zsh)"
+
+# fzf
+function _fzf_defer() {
+  eval "$(fzf --zsh)"
+  add-zsh-hook -d precmd _fzf_defer
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _fzf_defer
+
+{{- if eq .profile "work" }}
+# Pyenv
+pyenv() {
+  unset -f pyenv
+  eval "$(command pyenv init - zsh)"
+  pyenv "$@"
+}
+{{ end }}
+
+# History
+HISTFILE=~/.zsh_history
+SAVEHIST=2000
+HISTSIZE=1999
+HISTDUP=erase
+setopt appendhistory
+setopt share_history
+setopt incappendhistory
+setopt hist_ignore_all_dups
+setopt hist_save_no_dups
+setopt hist_ignore_dups
+setopt hist_find_no_dups 
+setopt hist_verify

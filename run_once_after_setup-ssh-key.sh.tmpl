@@ -1,0 +1,35 @@
+#!/bin/bash
+set -eufo pipefail
+
+{{- if .setupSshKey }}
+
+sshKeyPath="{{ .chezmoi.homeDir }}/.ssh/id_ed25519"
+
+if [ ! -f "$sshKeyPath" ]; then
+  echo "🔑 Generating SSH key..."
+  mkdir -p "{{ .chezmoi.homeDir }}/.ssh"
+  ssh-keygen -t ed25519 -C "{{ .email }}" -f "$sshKeyPath"
+
+  echo "🔑 Adding key to SSH agent..."
+  eval "$(ssh-agent -s)"
+
+  {{- if eq .chezmoi.os "darwin" }}
+  ssh-add --apple-use-keychain "$sshKeyPath"
+  {{- else }}
+  ssh-add "$sshKeyPath"
+  {{- end }}
+
+  echo "🐙 Uploading SSH key to GitHub..."
+  if command -v gh &> /dev/null; then
+    gh auth login
+    gh ssh-key add "$sshKeyPath.pub" --title "$(hostname) - $(date +%Y-%m-%d)"
+    echo "✅ SSH key uploaded to GitHub."
+  else
+    echo "⚠️  gh CLI not found. Manually add your key:"
+    cat "$sshKeyPath.pub"
+  fi
+else
+  echo "ℹ️  SSH key already exists."
+fi
+
+{{ end -}}

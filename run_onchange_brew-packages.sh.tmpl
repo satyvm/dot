@@ -1,0 +1,53 @@
+{{- if eq .chezmoi.os "darwin" -}}
+#!/bin/bash
+set -eufo pipefail
+
+brew bundle --file=/dev/stdin <<EOF
+brew "neovim"
+brew "tmux"
+brew "starship"
+brew "git"
+brew "tree"
+brew "jq"
+brew "gh"
+brew "bat"
+brew "git-delta"
+brew "lazygit"
+brew "eza"
+brew "age"
+brew "tlrc"
+brew "zoxide"
+brew "fzf"
+brew "ripgrep"
+brew "fd"
+brew "tree-sitter-cli"
+brew "zsh-autosuggestions"
+brew "zsh-history-substring-search"
+brew "glow"
+
+brew "fnm"
+
+{{- if eq .profile "work" }}
+{{ join .chezmoi.sourceDir ".work-brew-packages.age" | include | decrypt }}
+{{- end }}
+
+cask "google-chrome"
+cask "helium-browser"
+cask "zen"
+cask "raycast"
+cask "cursor"
+cask "antigravity"
+cask "ghostty"
+cask "yaak"
+cask "discord"
+cask "telegram"
+cask "iina"
+cask "notion"
+cask "notion-calendar"
+cask "1password"
+
+{{- if eq .profile "personal" }}
+brew "opencode"
+{{- end }}
+EOF
+{{ end -}}

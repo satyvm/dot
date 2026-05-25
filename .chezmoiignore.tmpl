@@ -1,0 +1,23 @@
+README.md
+LICENSE
+AGENTS.md
+cursor_extensions.txt
+
+{{- if ne .chezmoi.os "darwin" }}
+private_Library/**
+run_once_after_setup-macos-defaults.sh.tmpl
+run_once_after_setup-login-items.sh.tmpl
+{{- end }}
+
+{{- if ne .chezmoi.os "linux" }}
+run_once_after_setup-linux.sh.tmpl
+run_onchange_apt-packages.sh.tmpl
+{{- end }}
+
+{{- if eq .profile "server" }}
+private_Library/**
+cursor_extensions.txt
+run_onchange_install-cursor-extensions.sh.tmpl
+run_once_after_setup-macos-defaults.sh.tmpl
+run_once_after_setup-login-items.sh.tmpl
+{{- end }}

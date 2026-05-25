@@ -1,0 +1,49 @@
+{{- if and (eq .chezmoi.os "linux") (eq .profile "server") -}}
+#!/bin/bash
+set -eufo pipefail
+
+echo "🐧 Setting up Linux server..."
+
+# --- UFW Firewall ---
+echo "🔥 Configuring UFW..."
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow ssh
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
+echo "✅ UFW enabled."
+
+# --- fail2ban ---
+echo "🛡️ Configuring fail2ban..."
+sudo systemctl enable fail2ban
+sudo systemctl start fail2ban
+
+sudo tee /etc/fail2ban/jail.local > /dev/null <<JAILEOF
+[DEFAULT]
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+
+[sshd]
+enabled = true
+port    = ssh
+filter  = sshd
+logpath = /var/log/auth.log
+JAILEOF
+
+sudo systemctl restart fail2ban
+echo "✅ fail2ban configured."
+
+# --- Set zsh as default shell ---
+if [ "$SHELL" != "$(which zsh)" ]; then
+  echo "🐚 Changing default shell to zsh..."
+  chsh -s "$(which zsh)"
+fi
+
+# --- Python ---
+echo "🐍 Setting up Python..."
+pip3 install --user pipx 2>/dev/null || true
+
+echo "✅ Linux server setup complete."
+{{ end -}}

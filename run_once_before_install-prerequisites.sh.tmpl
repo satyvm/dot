@@ -1,0 +1,30 @@
+#!/bin/bash
+set -eufo pipefail
+
+{{- if eq .chezmoi.os "darwin" }}
+if ! command -v op &> /dev/null; then
+  echo "🔐 Installing 1Password CLI..."
+  brew install 1password-cli
+fi
+{{- end }}
+
+{{- if eq .chezmoi.os "linux" }}
+if ! command -v op &> /dev/null; then
+  echo "🔐 1Password CLI not found. Please install it before continuing."
+  echo "   See: https://developer.1password.com/docs/cli/get-started/#install"
+  exit 1
+fi
+{{- end }}
+
+if ! op account list &> /dev/null 2>&1; then
+  echo "🔐 Please sign into 1Password CLI:"
+  eval $(op signin)
+fi
+
+if [ ! -f "${HOME}/.config/chezmoi/key.txt" ]; then
+  echo "🔑 Generating age encryption key..."
+  mkdir -p "${HOME}/.config/chezmoi"
+  age-keygen -o "${HOME}/.config/chezmoi/key.txt"
+  chmod 600 "${HOME}/.config/chezmoi/key.txt"
+  echo "⚠️  IMPORTANT: Save the public key printed above into your .chezmoi.json.tmpl recipient field."
+fi
