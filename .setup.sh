@@ -44,13 +44,17 @@ fi
 
 echo ""
 echo "🔐 Please sign into 1Password CLI now:"
-eval "$(op signin < /dev/tty)"
+OP_SESSION=$(op signin 2>&1) || {
+    echo "⚠️  1Password sign-in failed. Skipping — encrypted files won't be available."
+    OP_SESSION=""
+}
+[ -n "$OP_SESSION" ] && eval "$OP_SESSION"
 
 if [ -d "$HOME/.local/share/chezmoi/.git" ]; then
     echo "ℹ️  Already initialized. Pulling latest..."
-    chezmoi update < /dev/tty
+    chezmoi update
 else
-    chezmoi init satyvm/dot < /dev/tty
+    chezmoi init --apply satyvm/dot
 fi
 
 echo "✅ Done!"
