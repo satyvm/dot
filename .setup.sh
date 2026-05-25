@@ -44,7 +44,7 @@ fi
 
 echo ""
 echo "🔐 Please sign into 1Password CLI now:"
-eval "$(op signin)" < /dev/tty
+eval "$(op signin < /dev/tty)"
 
 if [ -d "$HOME/.local/share/chezmoi/.git" ]; then
     echo "ℹ️  Already initialized. Pulling latest..."

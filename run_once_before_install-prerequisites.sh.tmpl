@@ -18,13 +18,23 @@ fi
 
 if ! op account list &> /dev/null 2>&1; then
   echo "🔐 Please sign into 1Password CLI:"
-  eval "$(op signin)"
+  eval "$(op signin < /dev/tty)"
 fi
 
 if [ ! -f "${HOME}/.config/chezmoi/key.txt" ]; then
-  echo "🔑 Generating age encryption key..."
+  echo "🔑 Retrieving age private key from 1Password..."
   mkdir -p "${HOME}/.config/chezmoi"
-  age-keygen -o "${HOME}/.config/chezmoi/key.txt"
+  
+  if ! op read "op://Personal/chezmoi-key/notesPlain" > "${HOME}/.config/chezmoi/key.txt" 2>/dev/null; then
+    if ! op read "op://Developer/chezmoi-key/notesPlain" > "${HOME}/.config/chezmoi/key.txt" 2>/dev/null; then
+      echo "❌ Error: Could not retrieve 'chezmoi-key' from 1Password."
+      echo "   Please make sure you have a Secure Note in 1Password named 'chezmoi-key'"
+      echo "   with your age private key pasted in the notes field."
+      rm -f "${HOME}/.config/chezmoi/key.txt"
+      exit 1
+    fi
+  fi
+  
   chmod 600 "${HOME}/.config/chezmoi/key.txt"
-  echo "⚠️  IMPORTANT: Save the public key printed above into your .chezmoi.json.tmpl recipient field."
+  echo "✅ Age private key successfully restored from 1Password."
 fi
