@@ -14,7 +14,7 @@ run_once_after_setup-linux.sh.tmpl
 run_onchange_apt-packages.sh.tmpl
 {{- end }}
 
-{{- if eq .profile "server" }}
+{{- if and (hasKey . "profile") (eq .profile "server") }}
 private_Library/**
 cursor_extensions.txt
 run_onchange_install-cursor-extensions.sh.tmpl

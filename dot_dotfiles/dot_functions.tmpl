@@ -35,6 +35,8 @@ extract () {
    fi
 }
 
-{{- if eq .profile "work" }}
+{{- if and (hasKey . "profile") (eq .profile "work") }}
+{{- if stat (join .chezmoi.sourceDir "dot_dotfiles/.work_functions.age") }}
 {{ join .chezmoi.sourceDir "dot_dotfiles/.work_functions.age" | include | decrypt }}
+{{- end }}
 {{- end }}

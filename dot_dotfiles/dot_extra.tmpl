@@ -27,7 +27,7 @@ function _fzf_defer() {
 autoload -Uz add-zsh-hook
 add-zsh-hook precmd _fzf_defer
 
-{{- if eq .profile "work" }}
+{{- if and (hasKey . "profile") (eq .profile "work") }}
 # Pyenv
 pyenv() {
   unset -f pyenv
