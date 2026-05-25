@@ -1,4 +1,6 @@
-for file in "$DOTFILES"/.{exports,aliases,functions}; do
+DOTFILES="$HOME/.dotfiles"
+
+for file in "$DOTFILES"/.{exports,aliases,functions,extra}; do
   [ -r "$file" ] && source "$file"
 done
 unset file

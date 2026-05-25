@@ -18,7 +18,7 @@ fi
 
 if ! op account list &> /dev/null 2>&1; then
   echo "🔐 Please sign into 1Password CLI:"
-  eval $(op signin)
+  eval "$(op signin)"
 fi
 
 if [ ! -f "${HOME}/.config/chezmoi/key.txt" ]; then

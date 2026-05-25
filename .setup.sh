@@ -44,13 +44,13 @@ fi
 
 echo ""
 echo "🔐 Please sign into 1Password CLI now:"
-eval $(op signin)
+eval "$(op signin)"
 
 if [ -d "$HOME/.local/share/chezmoi/.git" ]; then
     echo "ℹ️  Already initialized. Pulling latest..."
     chezmoi update
 else
-    chezmoi init --repo dot satyvm
+    chezmoi init satyvm/dot
 fi
 
 echo "✅ Done!"
