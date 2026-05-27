@@ -14,7 +14,6 @@ brew "bat"
 brew "git-delta"
 brew "lazygit"
 brew "eza"
-brew "age"
 brew "tlrc"
 brew "zoxide"
 brew "fzf"
@@ -24,32 +23,45 @@ brew "tree-sitter-cli"
 brew "zsh-autosuggestions"
 brew "zsh-history-substring-search"
 brew "glow"
-
 brew "fnm"
-
-{{- if and (hasKey . "profile") (eq .profile "work") }}
-{{- if stat (join .chezmoi.sourceDir ".work-brew-packages.age") }}
-{{ join .chezmoi.sourceDir ".work-brew-packages.age" | include | decrypt }}
-{{- end }}
-{{- end }}
+brew "mas"
+brew "opencode"
+cask "gcloud-cli"
+brew "awscli"
+cask "xquartz"
 
 cask "google-chrome"
 cask "helium-browser"
 cask "zen"
-cask "raycast"
-cask "cursor"
-cask "antigravity"
-cask "ghostty"
-cask "yaak"
+cask "1password"
 cask "discord"
 cask "telegram"
 cask "iina"
 cask "notion"
 cask "notion-calendar"
-cask "1password"
+cask "veracrypt"
 
-{{- if and (hasKey . "profile") (eq .profile "personal") }}
-brew "opencode"
-{{- end }}
-EOF
-{{ end -}}
+cask "cursor"
+cask "antigravity"
+cask "google-gemini"
+cask "ghostty"
+cask "yaak"
+
+cask "raycast"
+cask "handy"
+cask "onyx"
+cask "appcleaner"
+cask "TheBoredTeam/boring-notch/boring-notch"
+cask "jordanbaird-ice"
+cask "maccy"
+cask "font-meslo-lg-nerd-font"
+cask "font-noto-sans"
+
+cask "google-drive"
+cask "proton-drive"
+cask "protonvpn"
+
+mas "TestFlight", id: 899247664
+mas "WireGuard", id: 1441195209
+mas "Velja", id: 1607635639
+mas "GoodNotes", id: 1444383602

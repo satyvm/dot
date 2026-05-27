@@ -1,0 +1,13 @@
+{{- if eq .chezmoi.os "darwin" -}}
+#!/bin/bash
+set -eufo pipefail
+
+# cursor_extensions.txt hash: {{ include "cursor_extensions.txt" | sha256sum }}
+
+if command -v cursor &> /dev/null; then
+  while IFS= read -r ext; do
+    [[ -z "$ext" ]] && continue
+    cursor --install-extension "$ext" || true
+  done < "${HOME}/cursor_extensions.txt"
+fi
+{{ end -}}

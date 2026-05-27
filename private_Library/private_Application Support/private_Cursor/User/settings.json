@@ -1,0 +1,128 @@
+{
+    "telemetry.telemetryLevel": "off",
+    "terminal.external.osxExec": "warp.app",
+    "terminal.integrated.shell.osx": "/bin/zsh",
+    "terminal.integrated.fontFamily": "MesloLGS NF",
+    "hardhat.telemetry": false,
+    "editor.inlineSuggest.enabled": true,
+    "github.copilot.enable": {
+        "*": true,
+        "plaintext": false,
+        "markdown": false,
+        "scminput": false,
+        "yaml": false,
+        "cairo": false,
+        "solidity": true
+    },
+    "emmet.preferences": {},
+    "[html]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[css]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "liveServer.settings.donotShowInfoMsg": true,
+    "editor.unicodeHighlight.allowedLocales": {
+        "es": true
+    },
+    "solidity.telemetry": false,
+    "terminal.integrated.commandsToSkipShell": [
+        "language-julia.interrupt"
+    ],
+    "julia.symbolCacheDownload": true,
+    "julia.enableTelemetry": false,
+    "julia.NumThreads": 6,
+    "editor.unicodeHighlight.allowedCharacters": {
+        "σ": true
+    },
+    "[json]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    },
+    "git.autofetch": true,
+    "supermaven.enable": {
+        "*": false
+    },
+    "remote.SSH.remotePlatform": {
+        "coder-vscode.194.233.74.174--Satyam--crypto-satyam": "linux",
+        "coder-vscode.194.233.74.174--Satyam--qdb-test": "linux",
+        "coder-vscode.194.233.74.174--satyam--crypto-satyam": "linux",
+        "coder-vscode.194.233.74.174--Satyam--dev-satyam": "linux",
+        "coder-vscode.194.233.74.174--satyam--dev-satyam": "linux",
+        "coder-vscode.194.233.74.174--Satyam--JupyterTest": "linux",
+        "coder-vscode.coder.2centscapital.com--shibayanbiswas--Shibayan": "linux",
+        "coder-vscode.coder.2centscapital.com--satyam--test": "linux",
+        "coder-vscode.coder.2centscapital.com--satyam--crypto-satyam": "linux",
+        "coder-vscode.coder.2centscapital.com--satyam--anuj": "linux",
+        "coder-vscode.coder.2centscapital.com--satyam--test2": "linux",
+        "coder-vscode.coder.2centscapital.com--satyam--satyam.main": "linux",
+        "coder-vscode.coder.2centscapital.com--satyam--satyam": "linux",
+        "satyam-pve": "linux",
+        "coder-vscode.coder.twocc.in--satyam--synapsedev": "linux",
+        "main": "linux"
+    },
+    "remote.SSH.connectTimeout": 1800,
+    "workbench.colorTheme": "Vesper",
+    "github.copilot.chat.codesearch.enabled": true,
+    "github.copilot.chat.newWorkspaceCreation.enabled": true,
+    "chat.agent.enabled": true,
+    "workbench.sideBar.location": "right",
+    "containers.containerClient": "com.microsoft.visualstudio.containers.docker",
+    "workbench.iconTheme": "symbols",
+    "editor.minimap.autohide": true,
+    "editor.cursorSmoothCaretAnimation": "on",
+    "editor.cursorBlinking": "phase",
+    "editor.fontSize": 14,
+    "cursor.cpp.disabledLanguages": [
+        "plaintext",
+        "markdown",
+        "scminput",
+        "yaml",
+        "cairo"
+    ],
+    "workbench.activityBar.orientation": "vertical",
+    "cSpell.userWords": [
+        "analyser",
+        "APIKEY",
+        "aquasecurity",
+        "autoincrement",
+        "centscapital",
+        "coolify",
+        "devbuild",
+        "gsub",
+        "gtnv",
+        "healthcheck",
+        "kreuzwerker",
+        "POSTHOG",
+        "Reentrancy",
+        "sarif",
+        "SECKEY",
+        "shadcn",
+        "skel",
+        "turbopack",
+        "useblacksmith",
+        "valura",
+        "VALURACOMPASS",
+        "vanx",
+        "VONAGE",
+        "zagv"
+    ],
+    "git.mergeEditor": true,
+    "builder.serverUrl": "localhost:3001",
+    "builder.command": "pnpm run dev",
+    "builder.openInBrowser": false,
+    "workbench.colorCustomizations": {},
+    "redhat.telemetry.enabled": false,
+    "docker.extension.enableComposeLanguageServer": false,
+    "amazonQ.suppressPrompts": {
+        "amazonQChatDisclaimer": true
+    },
+    "amazonQ.telemetry": false,
+    "git.confirmSync": false,
+    "window.autoDetectColorScheme": false,
+    "update.mode": "manual",
+    "extensions.autoUpdate": false,
+    "[yaml]": {
+        "editor.defaultFormatter": "redhat.vscode-yaml"
+    },
+    "geminicodeassist.project": "celtic-entropy-rhv4c"
+}
