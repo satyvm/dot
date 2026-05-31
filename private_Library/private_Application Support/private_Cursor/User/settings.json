@@ -124,5 +124,6 @@
     "[yaml]": {
         "editor.defaultFormatter": "redhat.vscode-yaml"
     },
-    "geminicodeassist.project": "celtic-entropy-rhv4c"
+    "geminicodeassist.project": "celtic-entropy-rhv4c",
+    "git.openRepositoryInParentFolders": "always"
 }

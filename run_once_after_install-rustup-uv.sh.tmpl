@@ -1,4 +1,3 @@
-{{- if ne .chezmoi.os "linux" -}}
 {{- if ne (env "CODESPACES") "true" -}}
 #!/bin/bash
 set -eufo pipefail
@@ -12,5 +11,4 @@ if ! command -v uv &> /dev/null; then
   echo "🐍 Installing uv..."
   curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
-{{ end -}}
 {{ end -}}

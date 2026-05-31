@@ -3,66 +3,92 @@
 set -eufo pipefail
 
 brew bundle --file=/dev/stdin <<EOF
-brew "neovim"
-brew "tmux"
-brew "starship"
+brew "chezmoi"
+brew "age"
 brew "git"
-brew "tree"
-brew "jq"
-brew "gh"
-brew "bat"
 brew "git-delta"
+brew "gh"
+brew "jj"
 brew "lazygit"
-brew "eza"
-brew "tlrc"
-brew "zoxide"
-brew "fzf"
-brew "ripgrep"
-brew "fd"
-brew "tree-sitter-cli"
+
+brew "starship"
 brew "zsh-autosuggestions"
 brew "zsh-history-substring-search"
+brew "thefuck"
+
+brew "bat"
+brew "eza"
+brew "fd"
+brew "fzf"
+brew "ripgrep"
+brew "jq"
 brew "glow"
-brew "watch"
+brew "tlrc"
+brew "zoxide"
+
+brew "neovim"
+brew "tmux"
+brew "tree-sitter-cli"
+
 brew "fnm"
-brew "mas"
-brew "opencode"
-cask "gcloud-cli"
+brew "mise"
+brew "colima"
+
+brew "btop"
+brew "watch"
+brew "curl"
+brew "wget"
+
 brew "awscli"
-cask "xquartz"
+brew "gcloud-cli"
+brew "kondo"
+brew "shellcheck"
+brew "commitizen"
+
+brew "mas"
 
 cask "google-chrome"
 cask "helium-browser"
 cask "zen"
-cask "1password"
 cask "discord"
 cask "telegram"
-cask "iina"
+cask "whatsapp"
+cask "1password"
+cask "raycast"
 cask "notion"
 cask "notion-calendar"
-cask "veracrypt"
+cask "iina"
+cask "google-gemini"
 
 cask "cursor"
 cask "antigravity"
-cask "google-gemini"
+cask "antigravity-cli"
 cask "ghostty"
 cask "yaak"
+cask "utm"
 
-cask "raycast"
+cask "dockdoor"
 cask "handy"
 cask "onyx"
 cask "appcleaner"
 cask "TheBoredTeam/boring-notch/boring-notch"
 cask "jordanbaird-ice"
-cask "maccy"
-cask "font-meslo-lg-nerd-font"
-cask "font-noto-sans"
+# cask "maccy"
 
-cask "google-drive"
+cask "veracrypt"
 cask "proton-drive"
 cask "protonvpn"
 
+# ── Fonts ──────────────────────────────────────────────────────────
+cask "font-meslo-lg-nerd-font"
+cask "font-noto-sans"
+
+# ══════════════════════════════════════════════════════════════════
+# Mac App Store
+# ══════════════════════════════════════════════════════════════════
 mas "TestFlight", id: 899247664
 mas "WireGuard", id: 1441195209
 mas "Velja", id: 1607635639
 mas "GoodNotes", id: 1444383602
+EOF
+{{ end -}}

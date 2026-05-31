@@ -41,9 +41,5 @@ if [ "$SHELL" != "$(which zsh)" ]; then
   chsh -s "$(which zsh)"
 fi
 
-# --- Python ---
-echo "🐍 Setting up Python..."
-pip3 install --user pipx 2>/dev/null || true
-
 echo "✅ Linux server setup complete."
 {{ end -}}

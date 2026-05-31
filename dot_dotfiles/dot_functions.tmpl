@@ -35,6 +35,22 @@ extract () {
    fi
 }
 
+# search : interactive ripgrep → fzf → editor
+
+function search() {
+  rg --color=always --line-number --no-heading "${@}" |
+    fzf --ansi --delimiter : \
+        --preview 'bat --color=always --highlight-line {2} {1}' \
+        --preview-window '~3:+{2}+3/2' |
+    awk -F: '{print "+"$2, $1}' | xargs -r $EDITOR
+}
+
+# help : colorized --help output via bat
+
+function help() {
+  "$@" --help 2>&1 | bat --plain --language=help
+}
+
 {{- if and (hasKey . "profile") (eq .profile "work") }}
 {{- if stat (join .chezmoi.sourceDir "dot_dotfiles/.work_functions.age") }}
 {{ join .chezmoi.sourceDir "dot_dotfiles/.work_functions.age" | include | decrypt }}
