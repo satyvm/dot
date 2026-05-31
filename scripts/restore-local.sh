@@ -33,6 +33,13 @@ restore() {
 
   if [[ -e "$src" ]]; then
     echo "📦 $label"
+    if [[ -e "$dest" ]]; then
+      local timestamp
+      timestamp=$(date +%Y%m%d_%H%M%S)
+      local backup_dest="${dest}.bak_${timestamp}"
+      echo "   ⚠️  Original exists, backing up to $backup_dest"
+      mv "$dest" "$backup_dest"
+    fi
     echo "   $src → $dest"
     mkdir -p "$(dirname "$dest")"
     rsync -a "$src/" "$dest/"
@@ -58,6 +65,11 @@ restore "Zotero (Data Directory)" "zotero/data" "$HOME/Zotero"
 echo "📦 Velja (preferences plist)"
 VELJA_PLIST="$BACKUP_DIR/velja/VeljaBackup.plist"
 if [[ -f "$VELJA_PLIST" ]]; then
+  if defaults read com.sindresorhus.Velja &>/dev/null; then
+    local_velja_bak="$HOME/Desktop/Velja_backup_$(date +%Y%m%d_%H%M%S).plist"
+    echo "   ⚠️  Existing Velja preferences found, backing up to $local_velja_bak"
+    defaults export com.sindresorhus.Velja "$local_velja_bak"
+  fi
   defaults import com.sindresorhus.Velja "$VELJA_PLIST"
   echo "   ✅ Imported from $VELJA_PLIST"
 else
