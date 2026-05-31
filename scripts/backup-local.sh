@@ -82,31 +82,12 @@ else
   echo "⚠️  Helium Browser — no profile directory found, skipping"
 fi
 
-# ── 3. Raycast ───────────────────────────────────────────────────────
-# Raycast uses its own encrypted export, but we also grab the support dir
-backup "Raycast (Application Support)" \
-  "$HOME/Library/Application Support/com.raycast.macos" \
-  "raycast"
-
-# ── 4. Antigravity / Antigravity IDE ────────────────────────────────
-backup "Antigravity (Application Support)" \
-  "$HOME/Library/Application Support/Antigravity" \
-  "antigravity/app-support"
-
-backup "Antigravity dotfiles (~/.antigravity)" \
-  "$HOME/.antigravity" \
-  "antigravity/dot-antigravity"
-
-backup "Antigravity IDE dotfiles (~/.antigravity-ide)" \
-  "$HOME/.antigravity-ide" \
-  "antigravity/dot-antigravity-ide"
+# ── 4. Antigravity / Gemini ─────────────────────────────────────────
+backup "Gemini / Antigravity (~/.gemini)" \
+  "$HOME/.gemini" \
+  "gemini"
 
 # ── 5. Zotero ────────────────────────────────────────────────────────
-# Profile directory (extensions & UI settings)
-backup "Zotero (Profile — Application Support)" \
-  "$HOME/Library/Application Support/Zotero" \
-  "zotero/profile"
-
 # Data directory — try the default location; user may have moved it
 ZOTERO_DATA="$HOME/Zotero"
 if [[ -d "$ZOTERO_DATA" ]]; then
