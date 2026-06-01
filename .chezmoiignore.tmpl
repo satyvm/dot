@@ -1,3 +1,4 @@
+# ── Repo-only files (never deployed to home) ─────────────────────────────────
 README.md
 LICENSE
 AGENTS.md
@@ -5,19 +6,19 @@ AGENTS.md
 scripts
 cursor-default.code-profile
 
+# ── macOS-only scripts: ignore on Linux ──────────────────────────────────────
 {{- if ne .chezmoi.os "darwin" }}
-run_once_after_setup-macos-defaults.sh.tmpl
-run_once_after_cleanup-macos-apps.sh.tmpl
+run_once_after_setup-macos.sh.tmpl
+run_onchange_brew-packages.sh.tmpl
 {{- end }}
 
+# ── Linux-only scripts: ignore on macOS ──────────────────────────────────────
 {{- if ne .chezmoi.os "linux" }}
 run_once_after_setup-linux.sh.tmpl
 run_onchange_apt-packages.sh.tmpl
 {{- end }}
 
-{{- if and (hasKey . "profile") (eq .profile "server") }}
-run_once_after_setup-macos-defaults.sh.tmpl
-{{- end }}
-
-{{- if and (hasKey . "profile") (ne .profile "dev") }}
+# ── Server profile: skip desktop/GUI scripts ─────────────────────────────────
+{{- if eq .profile "server" }}
+run_once_after_setup-zend.sh.tmpl
 {{- end }}

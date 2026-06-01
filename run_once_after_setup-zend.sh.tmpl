@@ -1,13 +1,24 @@
-{{- if eq .chezmoi.os "darwin" -}}
+{{- if and (eq .chezmoi.os "darwin") (ne .profile "server") -}}
 #!/bin/bash
 set -eufo pipefail
 
+echo "🚀 Finalizing setup..."
+# Open Raycast to trigger settings import prompt
 if [[ -d "/Applications/Raycast.app" ]]; then
   open "raycast://extensions/raycast/raycast/import-settings-data" || true
 fi
 
 if [[ -d "/Applications/Ghostty.app" ]]; then
-  open "ghostty" || true
+  open -a "Ghostty" || true
 fi
+{{- end }}
 
-{{ end -}}
+{{- if and (eq .chezmoi.os "linux") (ne .profile "server") -}}
+#!/bin/bash
+set -eufo pipefail
+
+echo "🚀 Finalizing setup..."
+if command -v ghostty &> /dev/null; then
+  ghostty &
+fi
+{{- end }}

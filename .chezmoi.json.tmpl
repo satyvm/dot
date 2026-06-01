@@ -1,5 +1,13 @@
+{{- $setupSshKey := promptBool "Setup SSH key" -}}
 {
+  "encryption": "age",
+  "age": {
+    "identity": "~/.config/chezmoi/key.txt",
+    "recipient": "age1naksqkvrfy66sr6ezvw3ykf5ga4tuzp67q78dm94weeduydwssrqx7j67x"
+  },
   "data": {
-    "profile": {{ promptChoice "Machine profile" (list "personal" "dev" "server") | quote }}
+    "profile": {{ promptChoice "Machine profile" (list "personal" "dev" "server") | quote }},
+    "setupSshKey": {{ $setupSshKey }},
+    "email": {{ if $setupSshKey }}{{ promptString "Email address for SSH key" | quote }}{{ else }}""{{ end }}
   }
 }

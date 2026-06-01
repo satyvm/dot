@@ -3,14 +3,11 @@
 set -eufo pipefail
 
 sudo apt update
-
-# Always install very basic things to run setup
 if ! command -v chezmoi &> /dev/null; then
   sh -c "$(curl -fsLS get.chezmoi.io)"
 fi
 
 {{- if or (eq .profile "dev") (eq .profile "server") }}
-# ── Core CLI (Dev & Server) ─────────────────────────────────────────
 sudo apt install -y \
   zsh \
   neovim \
@@ -33,7 +30,8 @@ sudo apt install -y \
   shellcheck \
   awscli \
   btop \
-  watch
+  watch \
+  ufw
 
 if ! command -v docker &> /dev/null; then
   echo "🐳 Installing Docker..."
@@ -42,8 +40,6 @@ if ! command -v docker &> /dev/null; then
 fi
 
 sudo apt install -y docker-compose-plugin
-
-# Tools not in apt
 if ! command -v starship &> /dev/null; then
   curl -sS https://starship.rs/install.sh | sh -s -- -y
 fi
@@ -92,30 +88,8 @@ fi
 {{- end }}
 
 {{- if eq .profile "server" }}
-# ── Server specific ─────────────────────────────────────────────────
 sudo apt install -y \
-  ufw \
   fail2ban
-{{- end }}
-
-{{- if or (eq .profile "dev") (eq .profile "personal") }}
-# ── GUIs (Dev & Personal) ───────────────────────────────────────────
-if command -v snap &> /dev/null; then
-  sudo snap install telegram-desktop
-  sudo snap install discord
-else
-  echo "⚠️  Snap not found. Skipping telegram and discord."
-fi
-{{- end }}
-
-{{- if eq .profile "dev" }}
-# ── Dev GUIs (Linux) ────────────────────────────────────────────────
-if ! command -v cursor &> /dev/null; then
-  echo "⚠️  Install Cursor manually for Linux."
-fi
-if ! command -v antigravity &> /dev/null; then
-  echo "⚠️  Install Antigravity manually for Linux."
-fi
 {{- end }}
 
 {{ end -}}

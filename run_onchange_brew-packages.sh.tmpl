@@ -43,6 +43,7 @@ brew "commitizen"
 
 brew "colima"
 brew "docker"
+brew "docker-compose"
 {{- end }}
 
 {{- if or (eq .profile "personal") (eq .profile "dev") }}
@@ -66,12 +67,8 @@ cask "veracrypt"
 cask "proton-drive"
 cask "protonvpn"
 
-cask "font-meslo-lg-nerd-font"
-cask "font-noto-sans"
+cask "font-jetbrains-mono-nerd-font"
 
-mas "GoodNotes", id: 1444383602
-mas "WireGuard", id: 1451685025
-mas "Velja", id: 1607635845
 {{- end }}
 
 {{- if eq .profile "dev" }}

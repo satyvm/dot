@@ -1,0 +1,114 @@
+#!/bin/bash
+set -eufo pipefail
+
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+{{- if and (ne (env "CODESPACES") "true") (ne .profile "personal") }}
+# 🦀 Rustup
+if ! command -v rustup &> /dev/null; then
+  echo "🦀 Installing rustup..."
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  # Source cargo env so rustup/cargo are immediately available
+  source "$HOME/.cargo/env"
+fi
+# 🐍 uv
+if ! command -v uv &> /dev/null; then
+  echo "🐍 Installing uv..."
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  # PATH was already prepended above, uv should now be found
+fi
+# Always ensure python tools are present (separated from uv install check)
+if command -v uv &> /dev/null; then
+  uv python install
+  for tool in pylint black isort; do
+    uv tool install "$tool" 2>/dev/null || true
+  done
+fi
+# 🟢 Node.js via fnm (fnm must be installed first by brew/apt)
+if command -v fnm &> /dev/null; then
+  eval "$(fnm env)"           # ← initializes fnm's PATH shims
+  if ! command -v node &> /dev/null; then
+    echo "🟢 Installing Node.js LTS..."
+    fnm install --lts
+    fnm use --lts
+    corepack enable
+    corepack prepare pnpm@latest --activate
+  fi
+else
+  echo "⚠️ fnm not found, skipping Node.js setup."
+fi
+# 🛠️ Mise tools (Kubernetes toolchain) — only if mise is installed
+if command -v mise &> /dev/null; then
+  echo "🛠️ Installing global tools via mise..."
+  for tool in kubectl helm kustomize k9s kind; do
+    echo "  Installing ${tool}@latest via mise..."
+    mise use -g "${tool}@latest" || echo "⚠️  Failed to install ${tool} via mise. Skipping..."
+  done
+else
+  echo "⚠️ mise not found, skipping Kubernetes tools."
+fi
+{{ end -}}
+
+{{- if eq .chezmoi.os "darwin" -}}
+echo "Removing non-essential stock macOS apps..."
+APPS_TO_REMOVE=(
+  "GarageBand"
+  "iMovie"
+  "Keynote"
+  "Numbers"
+  "Pages"
+)
+for app in "${APPS_TO_REMOVE[@]}"; do
+  app_path="/Applications/${app}.app"
+  sys_path="/System/Applications/${app}.app"
+  if [ -d "$app_path" ]; then
+    echo "  🗑️  Removing $app (user)..."
+    sudo rm -rf "$app_path" 2>/dev/null || true
+  elif [ -d "$sys_path" ]; then
+    echo "  🗑️  Removing $app (system)..."
+    sudo rm -rf "$sys_path" 2>/dev/null || true
+  fi
+done
+echo "macOS app cleanup complete."
+
+{{- if or (eq .profile "personal") (eq .profile "dev") }}
+echo "Checking Mac App Store apps..."
+install_mas_app() {
+  local name="$1"
+  local id="$2"
+  local app_name="${3:-$name}"
+  if [ -d "/Applications/${app_name}.app" ] || [ -d "/Applications/${name}.app" ] || ( mas list 2>/dev/null | awk '{print $1}' | grep -q "^${id}$" ); then
+    echo "  ✅ $name is already installed"
+  else
+    export MAS_NO_AUTO_INDEX=1
+    mas install "$id"
+  fi
+}
+install_mas_app "GoodNotes" "1444383602" "Goodnotes"
+install_mas_app "WireGuard" "1451685025"
+install_mas_app "Velja" "1607635845"
+{{- end }}
+{{- end }}
+
+{{- if eq .chezmoi.os "linux" }}
+{{- if eq .profile "server" }}
+
+{{- end}}
+
+{{- if or (eq .profile "dev") (eq .profile "personal") }}
+if command -v snap &> /dev/null; then
+  sudo snap install telegram-desktop
+  sudo snap install discord
+else
+  echo "⚠️  Snap not found. Skipping telegram and discord."
+fi
+{{- end }}
+
+{{- if eq .profile "dev" }}
+if ! command -v cursor &> /dev/null; then
+  echo "⚠️  Install Cursor manually for Linux."
+fi
+if ! command -v antigravity &> /dev/null; then
+  echo "⚠️  Install Antigravity manually for Linux."
+fi
+{{- end }}
+{{- end }}
