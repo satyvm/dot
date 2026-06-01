@@ -1,6 +1,6 @@
 [user]
-  name = {{ output "git" "config" "--global" "user.name" | trim | quote }}
-  email = {{ output "git" "config" "--global" "user.email" | trim | quote }}
+  name = {{ .name | quote }}
+  email = {{ .email | quote }}
   signingkey = {{ .chezmoi.homeDir }}/.ssh/gh_personal.pub
 
 [gpg]

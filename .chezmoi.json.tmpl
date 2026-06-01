@@ -8,6 +8,7 @@
   "data": {
     "profile": {{ promptChoice "Machine profile" (list "personal" "dev" "server") | quote }},
     "setupSshKey": {{ $setupSshKey }},
-    "email": {{ if $setupSshKey }}{{ promptString "Email address for SSH key" | quote }}{{ else }}""{{ end }}
+    "name": {{ promptString "Git user name" | quote }},
+    "email": {{ promptString "Git email address" | quote }}
   }
 }

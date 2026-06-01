@@ -20,17 +20,15 @@ This will:
 1. Install Xcode CLI tools (macOS) or core packages (Linux)
 2. Install Homebrew (macOS) or chezmoi directly (Linux)
 3. Install `chezmoi` and `age`
-4. Prompt for a **machine profile**, then apply dotfiles
+4. Prompt for **machine profile**, **git name**, and **git email**, then apply dotfiles
 
 ### Already have chezmoi?
 
 ```bash
-git config --global user.name "Your Name"
-git config --global user.email "you@example.com"
 chezmoi init --apply satyvm/dot
 ```
 
-Git name/email are read from your global git config — configure those before the first apply.
+Git `user.name` and `user.email` are set from the values you enter during `chezmoi init`.
 
 ---
 
@@ -125,7 +123,7 @@ chezmoi apply
 
 ```
 ~/.local/share/chezmoi/
-├── .chezmoi.json.tmpl           # chezmoi config (profile prompt only)
+├── .chezmoi.json.tmpl           # chezmoi config (profile, git name/email, SSH key prompts)
 ├── .chezmoiignore.tmpl          # platform/profile ignore rules
 ├── .setup.sh                    # bootstrap script
 ├── cursor-default.code-profile  # Cursor profile (repo-only, dev import)
