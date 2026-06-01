@@ -52,7 +52,7 @@ backup() {
     echo "📦 $label"
     echo "   $src → $dest"
     mkdir -p "$(dirname "$dest")"
-    rsync -a --delete "$src/" "$dest/"
+    rsync -aP --delete "$src/" "$dest/"
     echo "   ✅ Done"
   else
     echo "⚠️  $label — source not found, skipping: $src"
@@ -115,6 +115,8 @@ backup "Downloads Directory" "$HOME/Downloads" "Downloads"
 backup "Pictures Directory" "$HOME/Pictures" "Pictures"
 backup "Study Directory" "$HOME/Study" "Study"
 backup "Work Directory" "$HOME/Work" "Work"
+backup "Documents Directory" "$HOME/Documents" "Documents"
+backup "Desktop Directory" "$HOME/Desktop" "Desktop"
 
 # ── Summary ──────────────────────────────────────────────────────────
 echo ""

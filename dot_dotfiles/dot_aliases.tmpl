@@ -37,9 +37,3 @@ alias hidefiles="defaults write com.apple.finder AppleShowAllFiles -bool false &
 alias update="sudo apt update && sudo apt upgrade -y"
 alias ports="sudo ss -tulnp"
 {{- end }}
-
-{{- if and (hasKey . "profile") (eq .profile "work") }}
-{{- if stat (join .chezmoi.sourceDir "dot_dotfiles/.work_aliases.age") }}
-{{ join .chezmoi.sourceDir "dot_dotfiles/.work_aliases.age" | include | decrypt }}
-{{- end }}
-{{- end }}

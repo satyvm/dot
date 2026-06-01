@@ -1,0 +1,13 @@
+{{- if eq .chezmoi.os "darwin" -}}
+#!/bin/bash
+set -eufo pipefail
+
+if [[ -d "/Applications/Raycast.app" ]]; then
+  open "raycast://extensions/raycast/raycast/import-settings-data" || true
+fi
+
+if [[ -d "/Applications/Ghostty.app" ]]; then
+  open "ghostty" || true
+fi
+
+{{ end -}}

@@ -2,7 +2,7 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "🧹 Removing non-essential stock macOS apps..."
+echo "Removing non-essential stock macOS apps..."
 
 APPS_TO_REMOVE=(
   "GarageBand"
@@ -27,5 +27,11 @@ for app in "${APPS_TO_REMOVE[@]}"; do
   fi
 done
 
-echo "✅ macOS app cleanup complete."
+echo "macOS app cleanup complete."
+
+echo "installing node lts using fnm"
+fnm install --lts
+corepack enable
+corepack prepare pnpm@latest --activate
+
 {{ end -}}

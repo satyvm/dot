@@ -3,6 +3,14 @@
 set -eufo pipefail
 
 sudo apt update
+
+# Always install very basic things to run setup
+if ! command -v chezmoi &> /dev/null; then
+  sh -c "$(curl -fsLS get.chezmoi.io)"
+fi
+
+{{- if or (eq .profile "dev") (eq .profile "server") }}
+# ── Core CLI (Dev & Server) ─────────────────────────────────────────
 sudo apt install -y \
   zsh \
   neovim \
@@ -17,15 +25,16 @@ sudo apt install -y \
   fzf \
   zoxide \
   eza \
-  ufw \
-  fail2ban \
   python3 \
   python3-pip \
   python3-venv \
   unzip \
-  htop
+  htop \
+  shellcheck \
+  awscli \
+  btop \
+  watch
 
-{{- if .setupDocker }}
 if ! command -v docker &> /dev/null; then
   echo "🐳 Installing Docker..."
   curl -fsSL https://get.docker.com | sh
@@ -33,19 +42,80 @@ if ! command -v docker &> /dev/null; then
 fi
 
 sudo apt install -y docker-compose-plugin
-{{- end }}
 
-# Install starship prompt
+# Tools not in apt
 if ! command -v starship &> /dev/null; then
   curl -sS https://starship.rs/install.sh | sh -s -- -y
 fi
 
-# Install lazygit
 if ! command -v lazygit &> /dev/null; then
   LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
   curl -Lo /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
   tar xf /tmp/lazygit.tar.gz -C /tmp lazygit
   sudo install /tmp/lazygit /usr/local/bin
 fi
+
+if ! command -v gh &> /dev/null; then
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+  sudo apt update && sudo apt install -y gh
+fi
+
+if ! command -v delta &> /dev/null; then
+  DELTA_VERSION=$(curl -s "https://api.github.com/repos/dandavison/delta/releases/latest" | grep -Po '"tag_name": "\K[^"]*')
+  curl -Lo /tmp/git-delta.deb "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/git-delta_${DELTA_VERSION#v}_amd64.deb"
+  sudo apt install -y /tmp/git-delta.deb
+fi
+
+if ! command -v fnm &> /dev/null; then
+  curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
+  fnm install --lts
+fi
+
+if ! command -v mise &> /dev/null; then
+  curl https://mise.run | sh
+fi
+
+if ! command -v glow &> /dev/null; then
+  GLOW_VERSION=$(curl -s "https://api.github.com/repos/charmbracelet/glow/releases/latest" | grep -Po '"tag_name": "\K[^"]*')
+  curl -Lo /tmp/glow.tar.gz "https://github.com/charmbracelet/glow/releases/download/${GLOW_VERSION}/glow_${GLOW_VERSION#v}_Linux_x86_64.tar.gz"
+  tar xf /tmp/glow.tar.gz -C /tmp glow
+  sudo install /tmp/glow /usr/local/bin
+fi
+
+if ! command -v tlrc &> /dev/null; then
+  TLRC_VERSION=$(curl -s "https://api.github.com/repos/tldr-pages/tlrc/releases/latest" | grep -Po '"tag_name": "\K[^"]*')
+  curl -Lo /tmp/tlrc.tar.gz "https://github.com/tldr-pages/tlrc/releases/download/${TLRC_VERSION}/tlrc-${TLRC_VERSION#v}-x86_64-unknown-linux-gnu.tar.gz"
+  tar xf /tmp/tlrc.tar.gz -C /tmp
+  sudo install /tmp/tlrc /usr/local/bin
+fi
+{{- end }}
+
+{{- if eq .profile "server" }}
+# ── Server specific ─────────────────────────────────────────────────
+sudo apt install -y \
+  ufw \
+  fail2ban
+{{- end }}
+
+{{- if or (eq .profile "dev") (eq .profile "personal") }}
+# ── GUIs (Dev & Personal) ───────────────────────────────────────────
+if command -v snap &> /dev/null; then
+  sudo snap install telegram-desktop
+  sudo snap install discord
+else
+  echo "⚠️  Snap not found. Skipping telegram and discord."
+fi
+{{- end }}
+
+{{- if eq .profile "dev" }}
+# ── Dev GUIs (Linux) ────────────────────────────────────────────────
+if ! command -v cursor &> /dev/null; then
+  echo "⚠️  Install Cursor manually for Linux."
+fi
+if ! command -v antigravity &> /dev/null; then
+  echo "⚠️  Install Antigravity manually for Linux."
+fi
+{{- end }}
 
 {{ end -}}

@@ -4,18 +4,18 @@ set -eufo pipefail
 
 brew bundle --file=/dev/stdin <<EOF
 brew "chezmoi"
+
+{{- if or (eq .profile "dev") (eq .profile "server") }}
 brew "age"
 brew "git"
 brew "git-delta"
 brew "gh"
 brew "jj"
 brew "lazygit"
-
 brew "starship"
 brew "zsh-autosuggestions"
 brew "zsh-history-substring-search"
 brew "thefuck"
-
 brew "bat"
 brew "eza"
 brew "fd"
@@ -25,38 +25,58 @@ brew "jq"
 brew "glow"
 brew "tlrc"
 brew "zoxide"
-
 brew "neovim"
 brew "tmux"
 brew "tree-sitter-cli"
-
-brew "fnm"
-brew "mise"
-brew "colima"
 
 brew "btop"
 brew "watch"
 brew "curl"
 brew "wget"
+brew "fnm"
+brew "mise"
 
 brew "awscli"
-brew "gcloud-cli"
 brew "kondo"
 brew "shellcheck"
 brew "commitizen"
 
-brew "mas"
+brew "colima"
+brew "docker"
+{{- end }}
 
-cask "google-chrome"
+{{- if or (eq .profile "personal") (eq .profile "dev") }}
+brew "mas"
 cask "helium-browser"
-cask "zen"
 cask "discord"
 cask "telegram"
 cask "whatsapp"
-cask "1password"
 cask "raycast"
 cask "notion"
 cask "notion-calendar"
+
+cask "dockdoor"
+cask "TheBoredTeam/boring-notch/boring-notch"
+cask "jordanbaird-ice"
+cask "shottr"
+
+cask "handy"
+cask "appcleaner"
+cask "veracrypt"
+cask "proton-drive"
+cask "protonvpn"
+
+cask "font-meslo-lg-nerd-font"
+cask "font-noto-sans"
+
+mas "GoodNotes", id: 1444383602
+mas "WireGuard", id: 1451685025
+mas "Velja", id: 1607635845
+{{- end }}
+
+{{- if eq .profile "dev" }}
+cask "google-chrome"
+cask "zen"
 cask "iina"
 cask "google-gemini"
 
@@ -66,29 +86,7 @@ cask "antigravity-cli"
 cask "ghostty"
 cask "yaak"
 cask "utm"
-
-cask "dockdoor"
-cask "handy"
 cask "onyx"
-cask "appcleaner"
-cask "TheBoredTeam/boring-notch/boring-notch"
-cask "jordanbaird-ice"
-# cask "maccy"
-
-cask "veracrypt"
-cask "proton-drive"
-cask "protonvpn"
-
-# ── Fonts ──────────────────────────────────────────────────────────
-cask "font-meslo-lg-nerd-font"
-cask "font-noto-sans"
-
-# ══════════════════════════════════════════════════════════════════
-# Mac App Store
-# ══════════════════════════════════════════════════════════════════
-mas "TestFlight", id: 899247664
-mas "WireGuard", id: 1441195209
-mas "Velja", id: 1607635639
-mas "GoodNotes", id: 1444383602
+{{- end }}
 EOF
 {{ end -}}

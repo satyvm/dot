@@ -3,7 +3,7 @@ set -eufo pipefail
 
 {{- if .setupSshKey }}
 
-sshKeyPath="{{ .chezmoi.homeDir }}/.ssh/id_ed25519"
+sshKeyPath="{{ .chezmoi.homeDir }}/.ssh/gh_personal"
 
 if [ ! -f "$sshKeyPath" ]; then
   echo "🔑 Generating SSH key..."

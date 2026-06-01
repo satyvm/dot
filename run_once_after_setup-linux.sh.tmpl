@@ -1,4 +1,5 @@
-{{- if and (eq .chezmoi.os "linux") (eq .profile "server") -}}
+{{- if eq .chezmoi.os "linux" -}}
+
 #!/bin/bash
 set -eufo pipefail
 
@@ -14,6 +15,7 @@ sudo ufw allow 443/tcp
 sudo ufw --force enable
 echo "✅ UFW enabled."
 
+{{- if eq .profile "server" -}}
 # --- fail2ban ---
 echo "🛡️ Configuring fail2ban..."
 sudo systemctl enable fail2ban
@@ -34,6 +36,7 @@ JAILEOF
 
 sudo systemctl restart fail2ban
 echo "✅ fail2ban configured."
+{{ end -}}
 
 # --- Set zsh as default shell ---
 if [ "$SHELL" != "$(which zsh)" ]; then

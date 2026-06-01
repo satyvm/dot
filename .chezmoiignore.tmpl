@@ -1,15 +1,13 @@
 README.md
 LICENSE
 AGENTS.md
-cursor_extensions.txt
 .setup.sh
+scripts
+cursor-default.code-profile
 
 {{- if ne .chezmoi.os "darwin" }}
-private_Library/**
 run_once_after_setup-macos-defaults.sh.tmpl
-run_once_after_setup-login-items.sh.tmpl
 run_once_after_cleanup-macos-apps.sh.tmpl
-run_onchange_install-cursor-extensions.sh.tmpl
 {{- end }}
 
 {{- if ne .chezmoi.os "linux" }}
@@ -18,10 +16,8 @@ run_onchange_apt-packages.sh.tmpl
 {{- end }}
 
 {{- if and (hasKey . "profile") (eq .profile "server") }}
-private_Library/**
-cursor_extensions.txt
-run_onchange_install-cursor-extensions.sh.tmpl
 run_once_after_setup-macos-defaults.sh.tmpl
-run_once_after_setup-login-items.sh.tmpl
-run_once_after_cleanup-macos-apps.sh.tmpl
+{{- end }}
+
+{{- if and (hasKey . "profile") (ne .profile "dev") }}
 {{- end }}

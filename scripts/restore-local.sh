@@ -29,20 +29,30 @@ restore() {
   local label="$1"
   local src_sub="$2"
   local dest="$3"
+  local merge_only="${4:-false}"
   local src="$BACKUP_DIR/$src_sub"
 
   if [[ -e "$src" ]]; then
     echo "📦 $label"
-    if [[ -e "$dest" ]]; then
+    if [[ -e "$dest" ]] && [[ "$merge_only" != "true" ]]; then
       local timestamp
       timestamp=$(date +%Y%m%d_%H%M%S)
       local backup_dest="${dest}.bak_${timestamp}"
       echo "   ⚠️  Original exists, backing up to $backup_dest"
       mv "$dest" "$backup_dest"
+    elif [[ -e "$dest" ]] && [[ "$merge_only" == "true" ]]; then
+      local contents
+      contents=$(ls -A "$dest" 2>/dev/null | grep -vE '^\.DS_Store$|^\.localized$' || true)
+      if [[ -n "$contents" ]]; then
+        echo "   ⚠️  Directory $dest is not empty. Skipping restore."
+        return 0
+      else
+        echo "   ℹ️  Directory $dest is empty. Restoring into it."
+      fi
     fi
     echo "   $src → $dest"
     mkdir -p "$(dirname "$dest")"
-    rsync -a "$src/" "$dest/"
+    rsync -aP "$src/" "$dest/"
     echo "   ✅ Done"
   else
     echo "⚠️  $label — backup not found, skipping: $src"
@@ -84,11 +94,13 @@ if [[ -d "$HOME/.ssh" ]]; then
   find "$HOME/.ssh" -type f -exec chmod 600 {} \;
 fi
 
-restore "Developer Directory" "Developer" "$HOME/Developer"
-restore "Downloads Directory" "Downloads" "$HOME/Downloads"
-restore "Pictures Directory" "Pictures" "$HOME/Pictures"
-restore "Study Directory" "Study" "$HOME/Study"
-restore "Work Directory" "Work" "$HOME/Work"
+restore "Developer Directory" "Developer" "$HOME/Developer" true
+restore "Downloads Directory" "Downloads" "$HOME/Downloads" true
+restore "Pictures Directory" "Pictures" "$HOME/Pictures" true
+restore "Study Directory" "Study" "$HOME/Study" true
+restore "Work Directory" "Work" "$HOME/Work" true
+restore "Documents Directory" "Documents" "$HOME/Documents" true
+restore "Desktop Directory" "Desktop" "$HOME/Desktop" true
 
 # ── Summary ──────────────────────────────────────────────────────────
 echo ""
