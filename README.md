@@ -80,7 +80,7 @@ These live in the git repo but chezmoi does **not** sync them to your home direc
 |------|---------|
 | `scripts/backup-local.sh` | Back up local app data to external SSD |
 | `scripts/restore-local.sh` | Restore from external SSD backup |
-| `cursor-default.code-profile` | Cursor profile export — imported by `run_onchange_import-cursor-profile` on **dev** macOS |
+| `cursor-default.code-profile` | Cursor profile export — imported on **dev** macOS during setup |
 
 Run backup/restore from the source directory:
 
@@ -93,13 +93,13 @@ Run backup/restore from the source directory:
 
 | Script | When | What |
 |--------|------|------|
-| `run_onchange_brew-packages` | On change | Installs Homebrew packages (profile-aware) |
-| `run_onchange_apt-packages` | On change | Installs apt packages + Docker (profile-aware) |
-| `run_onchange_import-cursor-profile` | On change | Imports `cursor-default.code-profile` (dev macOS) |
-| `run_once_after_install-rustup-uv` | First run | Installs Rust (rustup) and Python (uv) |
-| `run_once_after_setup-macos-defaults` | First run | macOS system preferences + Finder sidebar pins |
-| `run_once_after_cleanup-macos-apps` | First run | Removes stock macOS bloatware |
-| `run_once_after_setup-linux` | First run | UFW, fail2ban, zsh (Linux dev + server) |
+| `run_onchange_brew-packages` | On change | Installs profile-specific Homebrew packages |
+| `run_onchange_apt-packages` | On change | Installs profile-specific apt packages |
+| `run_once_after_install-tools` | First run | Installs language runtimes (`rustup`, `uv`, `fnm`/Node, global `mise` tools) and cleans up non-essential stock macOS apps |
+| `run_once_after_setup-macos` | First run | Applies system defaults (Dock, trackpad, Finder, keyboard) |
+| `run_once_after_setup-linux` | First run | Sets up server firewall, default shell, and security (UFW, `fail2ban`) |
+| `run_once_after_setup-ssh-key` | First run | Generates SSH keys and registers them via GitHub CLI |
+| `run_once_after_setup-zend` | First run | Launches applications (Raycast, Ghostty) for initial setup |
 
 ---
 
