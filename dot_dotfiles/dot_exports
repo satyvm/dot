@@ -35,3 +35,6 @@ export FZF_ALT_C_OPTS="--preview 'eza --tree --icons --color=always {} | head -2
 export HISTFILE="$HOME/.zsh_history"
 export HISTSIZE=50000
 export SAVEHIST=50000
+
+# Mise
+export MISE_LOCKED=0

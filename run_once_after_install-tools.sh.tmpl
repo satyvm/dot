@@ -81,11 +81,15 @@ install_mas_app() {
   else
     export MAS_NO_AUTO_INDEX=1
     mas install "$id"
+    echo "If any errors, app is not purchased."
   fi
 }
 install_mas_app "GoodNotes" "1444383602" "Goodnotes"
 install_mas_app "WireGuard" "1451685025"
 install_mas_app "Velja" "1607635845"
+install_mas_app "Kofe Flow" "6762003285"
+install_mas_app "CleanMyKeyboard" "6468120888"
+
 {{- end }}
 {{- end }}
 
