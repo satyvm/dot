@@ -24,11 +24,11 @@ if [ "$OS" = "Darwin" ]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
     fi
 
-    brew install chezmoi
+    brew install age chezmoi
 
 elif [ "$OS" = "Linux" ]; then
     sudo apt update
-    sudo apt install -y curl git
+    sudo apt install -y curl git age
     sh -c "$(curl -fsLS get.chezmoi.io)"
 fi
 
