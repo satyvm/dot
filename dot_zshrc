@@ -12,6 +12,14 @@ elif [ -d "/home/linuxbrew/.linuxbrew" ]; then
   eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 fi
 
+# Enable zsh autocompletion (compinit)
+if command -v brew >/dev/null 2>&1; then
+  fpath=( "$(brew --prefix)/share/zsh/site-functions" $fpath )
+fi
+autoload -Uz compinit
+compinit
+
+
 # Starship prompt (must be last — replaces PS1)
 if command -v starship &> /dev/null; then
   eval "$(starship init zsh)"

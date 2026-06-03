@@ -13,6 +13,20 @@ done
 unset _zas
 {{- end }}
 
+# ── zsh-syntax-highlighting ──────────────────────────────────────────
+{{- if eq .chezmoi.os "darwin" }}
+if [[ -f /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
+  source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+fi
+{{- else }}
+for _zsh in \
+  /home/linuxbrew/.linuxbrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh \
+  /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh; do
+  if [[ -f "$_zsh" ]]; then source "$_zsh"; break; fi
+done
+unset _zsh
+{{- end }}
+
 # ── zsh-history-substring-search ────────────────────────────────────
 HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_FOUND=''
 HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_NOT_FOUND=''
@@ -61,6 +75,15 @@ if command -v thefuck &> /dev/null; then
   eval "$(thefuck --alias)"
   eval "$(thefuck --alias fk)"
 fi
+
+# ── Zsh Completion Tuning ───────────────────────────────────────────
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*:descriptions' format '%F{cyan}── %d ──%f'
+zstyle ':completion:*:messages' format '%F{purple}%d%f'
+zstyle ':completion:*:warnings' format '%F{red}No matches for: %d%f'
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
 
 # ── History opts ────────────────────────────────────────────────────
 setopt appendhistory
