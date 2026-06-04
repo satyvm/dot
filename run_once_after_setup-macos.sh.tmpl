@@ -3,12 +3,10 @@
 set -eufo pipefail
 
 echo "🍏 Setting macOS defaults..."
-
 osascript -e 'tell application "System Settings" to quit' 2>/dev/null \
   || osascript -e 'tell application "System Preferences" to quit' 2>/dev/null \
   || true
 
-# --- Dock ---
 echo "💈 Dock settings"
 defaults write com.apple.dock autohide -bool true
 defaults write com.apple.dock tilesize -int 48
@@ -16,6 +14,9 @@ defaults write com.apple.dock orientation -string "bottom"
 defaults write com.apple.dock show-recents -bool false
 defaults write com.apple.dock minimize-to-application -bool true
 defaults write com.apple.dock mru-spaces -bool false
+defaults write com.apple.dock show-recents -bool true; defaults write com.apple.dock show-recent-count -int 6;
+defaults write com.apple.dock expose-group-apps -bool true
+killall Dock
 
 echo "🧹 Configuring Dock apps"
 dock_apps=()
@@ -37,7 +38,6 @@ else
   echo "  ⚠️  No target apps installed; leaving Dock unchanged"
 fi
 
-# --- Spotlight ---
 echo "🔍 Tuning Spotlight (keeping indexing enabled)"
 plutil -replace AppleSymbolicHotKeys.64.enabled -bool NO ~/Library/Preferences/com.apple.symbolichotkeys.plist 2>/dev/null || true
 plutil -replace AppleSymbolicHotKeys.65.enabled -bool NO ~/Library/Preferences/com.apple.symbolichotkeys.plist 2>/dev/null || true
@@ -71,7 +71,6 @@ defaults write com.apple.spotlight orderedItems -array \
   '{"enabled" = 0;"name" = "PRESENTATIONS";}' \
   '{"enabled" = 0;"name" = "MENU_SPOTLIGHT_SUGGESTIONS";}' 2>/dev/null || true
 
-# --- Trackpad ---
 echo "🖱️ Trackpad settings"
 defaults write -g com.apple.swipescrolldirection -bool true
 defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadRightClick -bool true
@@ -82,14 +81,12 @@ defaults write NSGlobalDomain com.apple.mouse.tapBehavior -int 1
 defaults -currentHost write NSGlobalDomain com.apple.mouse.tapBehavior -int 1
 defaults write -g com.apple.trackpad.scaling -float 1.0
 
-# --- Keyboard ---
 echo "⌨️ Keyboard settings"
 defaults write NSGlobalDomain AppleKeyboardUIMode -int 2
 defaults write NSGlobalDomain KeyRepeat -int 2
 defaults write NSGlobalDomain InitialKeyRepeat -int 15
 defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
 
-# --- Finder ---
 echo "📁 Finder settings"
 defaults write com.apple.finder AppleShowAllFiles -bool true
 defaults write NSGlobalDomain AppleShowAllExtensions -bool true
@@ -99,7 +96,6 @@ defaults write com.apple.finder ShowStatusBar -bool true
 defaults write com.apple.finder FXDefaultSearchScope -string "SCcf"
 defaults write com.apple.finder _FXSortFoldersFirst -bool true
 
-# --- Screenshots ---
 echo "📸 Screenshot settings"
 defaults write com.apple.screencapture location -string "$HOME/Screenshots"
 defaults write com.apple.screencapture type -string "png"
@@ -109,10 +105,8 @@ mkdir -p "$HOME/Screenshots"
 # --- Show ~/Library ---
 chflags nohidden ~/Library
 
-# --- Restart affected apps ---
 for app in "Dock" "Finder" "SystemUIServer"; do
   killall "$app" &> /dev/null || true
 done
-
 echo "✅ macOS defaults applied."
 {{ end -}}
