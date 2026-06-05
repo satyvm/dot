@@ -190,6 +190,12 @@ disabled = true
 [battery]
 disabled = true
 
+[gcloud]
+disabled = true
+
+[aws]
+disabled = true
+
 # https://github.com/starship/starship/issues/1192
 # https://github.com/starship/starship/discussions/1252#discussioncomment-692829
 # [custom.git_status_simplified]
