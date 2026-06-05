@@ -39,7 +39,7 @@ fi
 # 🛠️ Mise tools (Kubernetes toolchain) — only if mise is installed
 if command -v mise &> /dev/null; then
   echo "🛠️ Installing global tools via mise..."
-  for tool in gcloud aws-cli kubectl helm kustomize k9s kind kubectx kubens; do
+  for tool in gcloud aws-cli kubectl kubectx kubens k9s; do
     echo "  Installing ${tool}@latest via mise..."
     mise use -g "${tool}@latest" || echo "⚠️  Failed to install ${tool} via mise. Skipping..."
   done
