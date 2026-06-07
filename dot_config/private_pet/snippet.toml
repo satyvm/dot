@@ -1,0 +1,6 @@
+
+[[Snippets]]
+  Description = "exludes mise locally"
+  Output = ""
+  Tag = []
+  command = "echo \"mise.toml\" >> .git/info/exclude"
