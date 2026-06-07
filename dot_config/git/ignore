@@ -13,3 +13,4 @@ pnpm-debug.log*
 
 .vscode
 .antigravitycli
+.local
