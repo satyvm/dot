@@ -42,3 +42,7 @@ export MISE_LOCKED=0
 #go
 export GOPATH="$HOME/.go"
 export PATH="$PATH:$GOPATH/bin"
+
+# Bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
