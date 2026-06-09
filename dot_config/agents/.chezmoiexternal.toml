@@ -1,34 +1,119 @@
 ["skills/frontend-design"]
     type = "archive"
     url = "https://github.com/anthropics/claude-code/archive/refs/heads/main.tar.gz"
-    stripComponents = 3
-    include = ["*/plugins/frontend-design/**"]
+    stripComponents = 5
+    include = ["*/plugins/frontend-design/skills/frontend-design/**"]
     refreshPeriod = "168h"
 
 ["skills/next-best-practices"]
     type = "archive"
     url = "https://github.com/vercel-labs/next-skills/archive/refs/heads/main.tar.gz"
-    stripComponents = 2
+    stripComponents = 3
     include = ["*/skills/next-best-practices/**"]
     refreshPeriod = "168h"
 
 ["skills/vercel-react-best-practices"]
     type = "archive"
     url = "https://github.com/vercel-labs/agent-skills/archive/refs/heads/main.tar.gz"
-    stripComponents = 2
+    stripComponents = 3
     include = ["*/skills/react-best-practices/**"]
     refreshPeriod = "168h"
 
 ["skills/web-design-guidelines"]
     type = "archive"
     url = "https://github.com/vercel-labs/agent-skills/archive/refs/heads/main.tar.gz"
-    stripComponents = 2
+    stripComponents = 3
     include = ["*/skills/web-design-guidelines/**"]
     refreshPeriod = "168h"
 
 ["skills/grill-me"]
     type = "archive"
     url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
-    stripComponents = 3
+    stripComponents = 4
     include = ["*/skills/productivity/grill-me/**"]
+    refreshPeriod = "168h"
+
+["skills/caveman"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    stripComponents = 4
+    include = ["*/skills/productivity/caveman/**"]
+    refreshPeriod = "168h"
+
+["skills/diagnose"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    stripComponents = 4
+    include = ["*/skills/engineering/diagnose/**"]
+    refreshPeriod = "168h"
+
+["skills/tdd"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    stripComponents = 4
+    include = ["*/skills/engineering/tdd/**"]
+    refreshPeriod = "168h"
+
+["skills/to-issues"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    stripComponents = 4
+    include = ["*/skills/engineering/to-issues/**"]
+    refreshPeriod = "168h"
+
+["skills/to-prd"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    stripComponents = 4
+    include = ["*/skills/engineering/to-prd/**"]
+    refreshPeriod = "168h"
+
+["skills/teach"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    stripComponents = 4
+    include = ["*/skills/productivity/teach/**"]
+    refreshPeriod = "168h"
+
+["skills/ci-cd-and-automation"]
+    type = "archive"
+    url = "https://github.com/addyosmani/agent-skills/archive/refs/heads/main.tar.gz"
+    stripComponents = 3
+    include = ["*/skills/ci-cd-and-automation/**"]
+    refreshPeriod = "168h"
+
+["skills/documentation-and-adrs"]
+    type = "archive"
+    url = "https://github.com/addyosmani/agent-skills/archive/refs/heads/main.tar.gz"
+    stripComponents = 3
+    include = ["*/skills/documentation-and-adrs/**"]
+    refreshPeriod = "168h"
+
+["agents/code-reviewer.md"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/addyosmani/agent-skills/main/agents/code-reviewer.md"
+    refreshPeriod = "168h"
+
+["agents/test-engineer.md"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/addyosmani/agent-skills/main/agents/test-engineer.md"
+    refreshPeriod = "168h"
+
+["agents/security-auditor.md"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/addyosmani/agent-skills/main/agents/security-auditor.md"
+    refreshPeriod = "168h"
+
+["skills/aws"]
+    type = "archive"
+    url = "https://github.com/itsmostafa/aws-agent-skills/archive/refs/heads/main.tar.gz"
+    stripComponents = 2
+    include = ["*/skills/**"]
+    refreshPeriod = "168h"
+
+["skills/terraform"]
+    type = "archive"
+    url = "https://github.com/antonbabenko/terraform-skill/archive/refs/heads/master.tar.gz"
+    stripComponents = 3
+    include = ["*/skills/terraform-skill/**"]
     refreshPeriod = "168h"
