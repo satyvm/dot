@@ -4,3 +4,9 @@
   Output = ""
   Tag = []
   command = "echo \"mise.toml\" >> .git/info/exclude"
+
+[[Snippets]]
+  Description = "generates random key"
+  Output = ""
+  Tag = []
+  command = "openssl rand -base64 32"
