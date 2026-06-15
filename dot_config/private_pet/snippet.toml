@@ -10,3 +10,9 @@
   Output = ""
   Tag = []
   command = "openssl rand -base64 32"
+
+[[Snippets]]
+  Description = "Sort disk usage by each folder"
+  Output = ""
+  Tag = []
+  command = "du -sh .[^.]* * | sort -hr"
