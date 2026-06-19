@@ -31,8 +31,9 @@ export FZF_ALT_C_OPTS="--preview 'eza --tree --icons --color=always {} | head -2
 # Rust
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 
-# History
-export HISTFILE="$HOME/.zsh_history"
+# History / Cache
+[[ -d "$HOME/.cache/zsh" ]] || mkdir -p "$HOME/.cache/zsh"
+export HISTFILE="$HOME/.cache/zsh/history"
 export HISTSIZE=50000
 export SAVEHIST=50000
 

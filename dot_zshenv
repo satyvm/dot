@@ -1,0 +1,2 @@
+# Disable macOS Terminal session restoration (prevents .zsh_sessions folder creation)
+export SHELL_SESSIONS_DISABLE=1

@@ -16,8 +16,11 @@ fi
 if command -v brew >/dev/null 2>&1; then
   fpath=( "$(brew --prefix)/share/zsh/site-functions" $fpath )
 fi
+export ZSH_COMPDUMP="$HOME/.cache/zsh/zcompdump"
 autoload -Uz compinit
-compinit
+[[ -d "$HOME/.cache/zsh" ]] || mkdir -p "$HOME/.cache/zsh"
+compinit -d "$ZSH_COMPDUMP"
+zstyle ':completion:*' cache-path "$HOME/.cache/zsh/zcompcache"
 
 
 # Starship prompt (must be last — replaces PS1)
