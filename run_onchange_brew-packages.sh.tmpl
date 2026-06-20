@@ -58,7 +58,6 @@ brew "pkg-config"
 brew "kondo"
 brew "shellcheck"
 brew "commitizen"
-cask "basictex"
 
 brew "colima"
 brew "docker"
@@ -88,7 +87,6 @@ cask "proton-drive"
 cask "protonvpn"
 
 cask "font-jetbrains-mono-nerd-font"
-
 {{- end }}
 
 {{- if eq .profile "dev" }}
@@ -101,10 +99,13 @@ cask "cursor"
 cask "antigravity"
 cask "antigravity-ide"
 cask "antigravity-cli"
+brew "pi-coding-agent"
+
 cask "ghostty"
 cask "yaak"
 cask "utm"
 cask "onyx"
+cask "basictex"
 {{- end }}
 EOF
 {{ end -}}
