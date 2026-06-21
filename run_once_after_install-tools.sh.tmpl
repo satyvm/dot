@@ -32,6 +32,7 @@ if command -v fnm &> /dev/null; then
     fnm use --lts
     corepack enable
     corepack prepare pnpm@latest --activate
+    npm install -g --ignore-scripts @earendil-works/pi-coding-agent
   fi
 else
   echo "⚠️ fnm not found, skipping Node.js setup."
