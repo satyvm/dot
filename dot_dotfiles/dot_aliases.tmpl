@@ -15,9 +15,11 @@ alias ve='$VISUAL'
 alias vedit='$VISUAL'
 alias gfast='git add . && git commit -m "update" && git push'
 
-alias ls="eza --icons --color=always --no-quotes"
-alias ll="eza -la --icons --color=always --no-quotes"
-alias tree="eza --tree --icons"
+alias ls='eza -l --group-directories-first --icons --hyperlink'
+alias lsa='ls -a'
+alias lt='eza --tree --level=2 --long --icons --git'
+alias lta='lt -a'
+
 alias cd='z'
 alias cat="bat --paging=never"
 alias lg="lazygit"

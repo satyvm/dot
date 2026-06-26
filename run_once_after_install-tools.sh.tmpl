@@ -113,12 +113,4 @@ else
 fi
 {{- end }}
 
-{{- if eq .profile "dev" }}
-if ! command -v cursor &> /dev/null; then
-  echo "⚠️  Install Cursor manually for Linux."
-fi
-if ! command -v antigravity &> /dev/null; then
-  echo "⚠️  Install Antigravity manually for Linux."
-fi
-{{- end }}
 {{- end }}

@@ -1,0 +1,47 @@
+# ~/.config/alacritty/alacritty.toml
+
+[font]
+size = 13.0
+
+[font.normal]
+family = "JetBrainsMono Nerd Font Mono"
+style = "Regular"
+
+[window]
+opacity = 1.0
+
+[window.padding]
+x = 10
+y = 10
+
+[colors.primary]
+background = "#00111E"
+foreground = "#CBE0F0"
+
+[colors.cursor]
+text = "#011423"
+cursor = "#47FF9C"
+
+[colors.selection]
+text = "#CBE0F0"
+background = "#033259"
+
+[colors.normal]
+black = "#214969"
+red = "#E52E2E"
+green = "#44FFB1"
+yellow = "#FFE073"
+blue = "#0FC5ED"
+magenta = "#a277ff"
+cyan = "#24EAF7"
+white = "#24EAF7"
+
+[colors.bright]
+black = "#214969"
+red = "#E52E2E"
+green = "#44FFB1"
+yellow = "#FFE073"
+blue = "#A277FF"
+magenta = "#a277ff"
+cyan = "#24EAF7"
+white = "#24EAF7"
