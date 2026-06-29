@@ -3,7 +3,15 @@
 #!/bin/bash
 set -eufo pipefail
 
-echo "🐧 Setting up Linux server..."
+{{- if or (eq .profile "dev") (eq .profile "personal") }}
+if command -v snap &> /dev/null; then
+  sudo snap install telegram-desktop
+  sudo snap install discord
+else
+  echo "⚠️  Snap not found. Skipping telegram and discord."
+fi
+{{- end }}
+
 # --- UFW Firewall ---
 echo "🔥 Configuring UFW..."
 sudo ufw default deny incoming

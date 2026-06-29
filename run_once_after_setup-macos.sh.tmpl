@@ -2,6 +2,56 @@
 #!/bin/bash
 set -eufo pipefail
 
+{{- if eq .profile "dev" }}
+if command -v docker-compose &> /dev/null; then
+  echo "🐳 Setting up Docker Compose CLI plugin..."
+  mkdir -p "$HOME/.config/docker/cli-plugins"
+  ln -sfn "$(command -v docker-compose)" "$HOME/.config/docker/cli-plugins/docker-compose"
+fi
+{{- end }}
+
+{{- if or (eq .profile "personal") (eq .profile "dev") }}
+echo "Removing non-essential stock macOS apps..."
+APPS_TO_REMOVE=(
+  "GarageBand"
+  "iMovie"
+  "Keynote"
+  "Numbers"
+  "Pages"
+)
+for app in "${APPS_TO_REMOVE[@]}"; do
+  app_path="/Applications/${app}.app"
+  sys_path="/System/Applications/${app}.app"
+  if [ -d "$app_path" ]; then
+    echo "  🗑️  Removing $app (user)..."
+    sudo rm -rf "$app_path" 2>/dev/null || true
+  elif [ -d "$sys_path" ]; then
+    echo "  🗑️  Removing $app (system)..."
+    sudo rm -rf "$sys_path" 2>/dev/null || true
+  fi
+done
+echo "macOS app cleanup complete."
+
+echo "Checking Mac App Store apps..."
+install_mas_app() {
+  local name="$1"
+  local id="$2"
+  local app_name="${3:-$name}"
+  if [ -d "/Applications/${app_name}.app" ] || [ -d "/Applications/${name}.app" ] || ( mas list 2>/dev/null | awk '{print $1}' | grep -q "^${id}$" ); then
+    echo "  ✅ $name is already installed"
+  else
+    export MAS_NO_AUTO_INDEX=1
+    mas install "$id"
+    echo "If any errors, app is not purchased."
+  fi
+}
+install_mas_app "GoodNotes" "1444383602" "Goodnotes"
+install_mas_app "WireGuard" "1451685025"
+install_mas_app "Velja" "1607635845"
+install_mas_app "Kofe Flow" "6762003285"
+install_mas_app "CleanMyKeyboard" "6468120888"
+{{- end }}
+
 echo "🍏 Setting macOS defaults..."
 osascript -e 'tell application "System Settings" to quit' 2>/dev/null \
   || osascript -e 'tell application "System Preferences" to quit' 2>/dev/null \
@@ -20,7 +70,7 @@ killall Dock
 
 echo "🧹 Configuring Dock apps"
 dock_apps=()
-for app in "Helium" "Zen" "Ghostty" "Cursor" "Antigravity" "Notion"; do
+for app in "Helium" "Zen" "Alacritty" "Ghostty" "Zed" "Notion"; do
   if [[ -d "/Applications/${app}.app" ]]; then
     dock_apps+=("$app")
   else
