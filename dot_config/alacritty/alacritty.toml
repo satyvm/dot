@@ -10,6 +10,7 @@ style = "Regular"
 [window]
 opacity = 1.0
 startup_mode = "Maximized"
+decorations = "Buttonless"
 
 [window.padding]
 x = 10
@@ -46,3 +47,7 @@ blue = "#A277FF"
 magenta = "#a277ff"
 cyan = "#24EAF7"
 white = "#24EAF7"
+
+[terminal.shell]
+program = "/bin/zsh"
+args = ["-l", "-c", "tmux new-session -A -s default"]
