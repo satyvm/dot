@@ -1,7 +1,8 @@
 [user]
   name = {{ .name | quote }}
   email = {{ .email | quote }}
-  signingkey = {{ .chezmoi.homeDir }}/.ssh/gh_personal.pub
+{{- if or .setupSshKey (stat (joinPath .chezmoi.homeDir ".ssh/gh_personal.pub")) }}
+  signingkey = {{ joinPath .chezmoi.homeDir ".ssh/gh_personal.pub" | quote }}
 
 [gpg]
   format = ssh
@@ -11,6 +12,7 @@
 
 [tag]
   gpgsign = true
+{{- end }}
 
 [init]
   defaultBranch = main

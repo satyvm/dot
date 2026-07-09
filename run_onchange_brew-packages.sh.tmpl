@@ -1,7 +1,10 @@
-{{- if eq .chezmoi.os "darwin" -}}
+{{- if or (eq .chezmoi.os "darwin") (eq .chezmoi.os "linux") -}}
 #!/bin/bash
 set -eufo pipefail
 
+export PATH="/home/linuxbrew/.linuxbrew/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+if command -v brew &> /dev/null; then
 brew bundle --file=/dev/stdin <<EOF
 brew "chezmoi"
 
@@ -60,12 +63,14 @@ brew "kondo"
 brew "shellcheck"
 brew "commitizen"
 
+{{- if eq .chezmoi.os "darwin" }}
 brew "colima"
 brew "docker"
 brew "docker-compose"
 {{- end }}
+{{- end }}
 
-{{- if or (eq .profile "personal") (eq .profile "dev") }}
+{{- if and (eq .chezmoi.os "darwin") (or (eq .profile "personal") (eq .profile "dev")) }}
 brew "mas"
 cask "helium-browser"
 cask "discord"
@@ -90,7 +95,7 @@ cask "protonvpn"
 cask "font-jetbrains-mono-nerd-font"
 {{- end }}
 
-{{- if eq .profile "dev" }}
+{{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") }}
 cask "zen"
 cask "iina"
 cask "google-gemini"
@@ -107,4 +112,7 @@ cask "onyx"
 cask "basictex"
 {{- end }}
 EOF
+else
+  echo "⚠️ Homebrew not found. Skipping brew bundle."
+fi
 {{ end -}}

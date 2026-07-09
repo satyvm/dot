@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eufo pipefail
 
-export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/home/linuxbrew/.linuxbrew/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 {{- if and (ne (env "CODESPACES") "true") (ne .profile "personal") }}
 # 🦀 Rustup
 if ! command -v rustup &> /dev/null; then
@@ -52,4 +52,5 @@ if command -v mise &> /dev/null; then
 else
   echo "⚠️ mise not found, skipping Kubernetes tools."
 fi
+
 {{ end -}}

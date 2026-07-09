@@ -1,6 +1,10 @@
 # .exports
 export EDITOR="nvim"
+{{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") }}
 export VISUAL="agy-ide"
+{{- else }}
+export VISUAL="nvim"
+{{- end }}
 export LANG="en_US.UTF-8"
 export LC_ALL="en_US.UTF-8"
 

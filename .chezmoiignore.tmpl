@@ -9,7 +9,6 @@ cursor-default.code-profile
 # ── macOS-only scripts: ignore on Linux ──────────────────────────────────────
 {{- if ne .chezmoi.os "darwin" }}
 run_once_after_setup-macos.sh.tmpl
-run_onchange_brew-packages.sh.tmpl
 {{- end }}
 
 # ── Linux-only scripts: ignore on macOS ──────────────────────────────────────
@@ -21,4 +20,6 @@ run_onchange_apt-packages.sh.tmpl
 # ── Server profile: skip desktop/GUI scripts ─────────────────────────────────
 {{- if eq .profile "server" }}
 run_once_after_setup-zend.sh.tmpl
+.config/alacritty
+.config/ghostty
 {{- end }}

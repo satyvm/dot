@@ -6,7 +6,9 @@ alias mv='mv -iv'
 alias mkdir='mkdir -pv'
 alias ..='cd ../'
 alias ...='cd ../../'
+{{- if eq .chezmoi.os "darwin" }}
 alias f='open -a Finder ./'
+{{- end }}
 alias ~="cd ~"
 alias c='clear'
 alias e='$EDITOR'

@@ -77,4 +77,14 @@ setw -g window-status-current-format " #[fg=#7AA2F7]●#[fg=#C0CAF5] #I:#W "
 set -g message-style bg=#1F2335,fg=#7AA2F7,bold
 
 # Initialize TMUX plugin manager (keep this line at the very bottom of tmux.conf)
-run '/opt/homebrew/opt/tpm/share/tpm/tpm'
+{{- if eq .chezmoi.os "darwin" }}
+{{-   if eq .chezmoi.arch "arm64" }}
+run 'if [ -f /opt/homebrew/opt/tpm/share/tpm/tpm ]; then /opt/homebrew/opt/tpm/share/tpm/tpm; elif [ -f ~/.tmux/plugins/tpm/tpm ]; then ~/.tmux/plugins/tpm/tpm; fi'
+{{-   else }}
+run 'if [ -f /usr/local/opt/tpm/share/tpm/tpm ]; then /usr/local/opt/tpm/share/tpm/tpm; elif [ -f ~/.tmux/plugins/tpm/tpm ]; then ~/.tmux/plugins/tpm/tpm; fi'
+{{-   end }}
+{{- else if eq .chezmoi.os "linux" }}
+run 'if [ -f /home/linuxbrew/.linuxbrew/opt/tpm/share/tpm/tpm ]; then /home/linuxbrew/.linuxbrew/opt/tpm/share/tpm/tpm; elif [ -f ~/.tmux/plugins/tpm/tpm ]; then ~/.tmux/plugins/tpm/tpm; fi'
+{{- else }}
+run 'if [ -f ~/.tmux/plugins/tpm/tpm ]; then ~/.tmux/plugins/tpm/tpm; fi'
+{{- end }}

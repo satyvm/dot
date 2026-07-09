@@ -24,7 +24,6 @@ echo "✅ UFW enabled."
 
 {{- if eq .profile "server" -}}
 # --- fail2ban ---
-echo "🛡️ Configuring fail2ban..."
 sudo systemctl enable fail2ban
 sudo systemctl start fail2ban
 

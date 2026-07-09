@@ -27,9 +27,34 @@ if [ "$OS" = "Darwin" ]; then
     brew install age chezmoi
 
 elif [ "$OS" = "Linux" ]; then
+    echo "🔧 Installing system dependencies..."
     sudo apt update
-    sudo apt install -y curl git age
-    sh -c "$(curl -fsLS get.chezmoi.io)"
+    sudo apt install -y curl git age build-essential procps file
+
+    # 🍺 Install Homebrew if not already installed
+    if [ ! -d "/home/linuxbrew/.linuxbrew" ] && ! command -v brew &> /dev/null; then
+        echo "🍺 Installing Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    fi
+
+    # Activate Linuxbrew environment for this script run
+    if [ -d "/home/linuxbrew/.linuxbrew" ]; then
+        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    fi
+
+    # Ensure ~/.local/bin exists and is on the PATH
+    mkdir -p "$HOME/.local/bin"
+    export PATH="$HOME/.local/bin:$PATH"
+
+    # Install chezmoi if not already installed
+    if ! command -v chezmoi &> /dev/null; then
+        echo "🔧 Installing chezmoi..."
+        if command -v brew &> /dev/null; then
+            brew install chezmoi
+        else
+            sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
+        fi
+    fi
 fi
 
 if [ -d "$HOME/.local/share/chezmoi/.git" ]; then

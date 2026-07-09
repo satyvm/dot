@@ -1,6 +1,8 @@
 #!/bin/bash
 set -eufo pipefail
 
+export PATH="$HOME/.local/bin:/home/linuxbrew/.linuxbrew/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+
 {{- if .setupSshKey }}
 
 sshKeyPath="{{ .chezmoi.homeDir }}/.ssh/gh_personal"
