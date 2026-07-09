@@ -1,10 +1,5 @@
 DOTFILES="$HOME/.dotfiles"
 
-for file in "$DOTFILES"/.{exports,aliases,functions,extra}; do
-  [ -r "$file" ] && source "$file"
-done
-unset file
-
 # Homebrew setup
 if [[ -d "/opt/homebrew" ]]; then
   export HOMEBREW_PREFIX="/opt/homebrew"
@@ -21,6 +16,11 @@ elif [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
 elif command -v brew >/dev/null 2>&1; then
   eval "$(brew shellenv)"
 fi
+
+for file in "$DOTFILES"/.{exports,aliases,functions,extra}; do
+  [ -r "$file" ] && source "$file"
+done
+unset file
 
 # Enable zsh autocompletion (compinit)
 if [[ -n "$HOMEBREW_PREFIX" ]]; then
@@ -39,6 +39,6 @@ fi
 zstyle ':completion:*' cache-path "$HOME/.cache/zsh/zcompcache"
 
 # Starship prompt (must be last — replaces PS1)
-if command -v starship &> /dev/null; then
+if command -v starship >/dev/null 2>&1; then
   eval "$(starship init zsh)"
 fi
