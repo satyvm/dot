@@ -26,53 +26,242 @@
     include = ["*/skills/web-design-guidelines/**"]
     refreshPeriod = "168h"
 
-["skills/grill-me"]
+["skills/ask-matt"]
     type = "archive"
-    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
     stripComponents = 4
-    include = ["*/skills/productivity/grill-me/**"]
+    include = ["*/skills/engineering/ask-matt/**"]
     refreshPeriod = "168h"
 
-["skills/caveman"]
+["skills/code-review"]
     type = "archive"
-    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
     stripComponents = 4
-    include = ["*/skills/productivity/caveman/**"]
+    include = ["*/skills/engineering/code-review/**"]
+    refreshPeriod = "168h"
+
+["skills/codebase-design"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/engineering/codebase-design/**"]
     refreshPeriod = "168h"
 
 ["skills/diagnose"]
     type = "archive"
-    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
     stripComponents = 4
-    include = ["*/skills/engineering/diagnose/**"]
+    include = ["*/skills/engineering/diagnosing-bugs/**"]
+    refreshPeriod = "168h"
+
+["skills/domain-modeling"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/engineering/domain-modeling/**"]
+    refreshPeriod = "168h"
+
+["skills/grill-with-docs"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/engineering/grill-with-docs/**"]
+    refreshPeriod = "168h"
+
+["skills/implement"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/engineering/implement/**"]
+    refreshPeriod = "168h"
+
+["skills/improve-codebase-architecture"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/engineering/improve-codebase-architecture/**"]
+    refreshPeriod = "168h"
+
+["skills/prototype"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/engineering/prototype/**"]
+    refreshPeriod = "168h"
+
+["skills/research"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/engineering/research/**"]
+    refreshPeriod = "168h"
+
+["skills/resolving-merge-conflicts"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/engineering/resolving-merge-conflicts/**"]
+    refreshPeriod = "168h"
+
+["skills/setup-matt-pocock-skills"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/engineering/setup-matt-pocock-skills/**"]
     refreshPeriod = "168h"
 
 ["skills/tdd"]
     type = "archive"
-    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
     stripComponents = 4
     include = ["*/skills/engineering/tdd/**"]
     refreshPeriod = "168h"
 
-["skills/to-issues"]
+["skills/to-spec"]
     type = "archive"
-    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
     stripComponents = 4
-    include = ["*/skills/engineering/to-issues/**"]
+    include = ["*/skills/engineering/to-spec/**"]
     refreshPeriod = "168h"
 
-["skills/to-prd"]
+["skills/to-tickets"]
     type = "archive"
-    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
     stripComponents = 4
-    include = ["*/skills/engineering/to-prd/**"]
+    include = ["*/skills/engineering/to-tickets/**"]
+    refreshPeriod = "168h"
+
+["skills/triage"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/engineering/triage/**"]
+    refreshPeriod = "168h"
+
+["skills/wayfinder"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/engineering/wayfinder/**"]
+    refreshPeriod = "168h"
+
+["skills/claude-handoff"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/in-progress/claude-handoff/**"]
+    refreshPeriod = "168h"
+
+["skills/loop-me"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/in-progress/loop-me/**"]
+    refreshPeriod = "168h"
+
+["skills/wizard"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/in-progress/wizard/**"]
+    refreshPeriod = "168h"
+
+["skills/writing-beats"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/in-progress/writing-beats/**"]
+    refreshPeriod = "168h"
+
+["skills/writing-fragments"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/in-progress/writing-fragments/**"]
+    refreshPeriod = "168h"
+
+["skills/writing-shape"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/in-progress/writing-shape/**"]
+    refreshPeriod = "168h"
+
+["skills/git-guardrails-claude-code"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/misc/git-guardrails-claude-code/**"]
+    refreshPeriod = "168h"
+
+["skills/migrate-to-shoehorn"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/misc/migrate-to-shoehorn/**"]
+    refreshPeriod = "168h"
+
+["skills/scaffold-exercises"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/misc/scaffold-exercises/**"]
+    refreshPeriod = "168h"
+
+["skills/setup-pre-commit"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/misc/setup-pre-commit/**"]
+    refreshPeriod = "168h"
+
+["skills/edit-article"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/personal/edit-article/**"]
+    refreshPeriod = "168h"
+
+["skills/obsidian-vault"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/personal/obsidian-vault/**"]
+    refreshPeriod = "168h"
+
+["skills/grill-me"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/productivity/grill-me/**"]
+    refreshPeriod = "168h"
+
+["skills/grilling"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/productivity/grilling/**"]
+    refreshPeriod = "168h"
+
+["skills/handoff"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/productivity/handoff/**"]
     refreshPeriod = "168h"
 
 ["skills/teach"]
     type = "archive"
-    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.tar.gz"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
     stripComponents = 4
     include = ["*/skills/productivity/teach/**"]
+    refreshPeriod = "168h"
+
+["skills/writing-great-skills"]
+    type = "archive"
+    url = "https://github.com/mattpocock/skills/archive/refs/heads/main.zip"
+    stripComponents = 4
+    include = ["*/skills/productivity/writing-great-skills/**"]
     refreshPeriod = "168h"
 
 ["skills/ci-cd-and-automation"]
