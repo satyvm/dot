@@ -29,7 +29,7 @@ if [ "$OS" = "Darwin" ]; then
 elif [ "$OS" = "Linux" ]; then
     echo "🔧 Installing system dependencies..."
     sudo apt update
-    sudo apt install -y curl git age build-essential procps file
+    sudo apt install -y curl age build-essential procps file
 
     # 🍺 Install Homebrew if not already installed
     if [ ! -d "/home/linuxbrew/.linuxbrew" ] && ! command -v brew &> /dev/null; then

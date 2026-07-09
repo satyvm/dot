@@ -9,8 +9,11 @@ brew bundle --file=/dev/stdin <<EOF
 brew "chezmoi"
 
 {{- if or (eq .profile "dev") (eq .profile "server") }}
-brew "age"
+{{- if eq .chezmoi.os "darwin" }}
 brew "git"
+brew "curl"
+brew "wget"
+{{- end }}
 brew "git-delta"
 brew "gh"
 brew "jj"
@@ -36,8 +39,6 @@ brew "pet"
 
 brew "btop"
 brew "watch"
-brew "curl"
-brew "wget"
 brew "fnm"
 brew "go"
 

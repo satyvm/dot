@@ -29,7 +29,8 @@ if command -v fnm &> /dev/null; then
   if ! command -v node &> /dev/null; then
     echo "🟢 Installing Node.js LTS..."
     fnm install --lts
-    fnm use --lts
+    fnm default lts-latest
+    fnm use default
     corepack enable
     corepack prepare pnpm@latest --activate
     npm install -g --ignore-scripts @earendil-works/pi-coding-agent
