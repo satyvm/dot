@@ -49,7 +49,7 @@ else
     echo "⚠️  UFW not installed. Skipping firewall configuration."
   fi
 
-  {{- if eq .profile "server" -}}
+  {{- if eq .profile "server" }}
   if [ -d /run/systemd/system ]; then
     sudo systemctl enable fail2ban
     sudo systemctl start fail2ban
@@ -72,7 +72,7 @@ JAILEOF
   else
     echo "⚠️  systemd is not running. Skipping fail2ban configuration."
   fi
-  {{ end -}}
+  {{ end }}
 fi
 
 # --- Set zsh as default shell ---
