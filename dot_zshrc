@@ -5,23 +5,38 @@ for file in "$DOTFILES"/.{exports,aliases,functions,extra}; do
 done
 unset file
 
-# Homebrew
-if [ -d "/opt/homebrew" ]; then
-  eval "$(/opt/homebrew/bin/brew shellenv)"
-elif [ -d "/home/linuxbrew/.linuxbrew" ]; then
-  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+# Homebrew setup
+if [[ -d "/opt/homebrew" ]]; then
+  export HOMEBREW_PREFIX="/opt/homebrew"
+  export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
+  export HOMEBREW_REPOSITORY="/opt/homebrew"
+  export PATH="/opt/homebrew/bin:/opt/homebrew/sbin${PATH+:$PATH}"
+  export INFOPATH="/opt/homebrew/share/info:${INFOPATH:-}"
+elif [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
+  export HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
+  export HOMEBREW_CELLAR="$HOMEBREW_PREFIX/Cellar"
+  export HOMEBREW_REPOSITORY="$HOMEBREW_PREFIX"
+  export PATH="$HOMEBREW_PREFIX/bin:$HOMEBREW_PREFIX/sbin${PATH+:$PATH}"
+  export INFOPATH="$HOMEBREW_PREFIX/share/info:${INFOPATH:-}"
+elif command -v brew >/dev/null 2>&1; then
+  eval "$(brew shellenv)"
 fi
 
 # Enable zsh autocompletion (compinit)
-if command -v brew >/dev/null 2>&1; then
-  fpath=( "$(brew --prefix)/share/zsh/site-functions" $fpath )
+if [[ -n "$HOMEBREW_PREFIX" ]]; then
+  fpath=( "$HOMEBREW_PREFIX/share/zsh/site-functions" $fpath )
 fi
 export ZSH_COMPDUMP="$HOME/.cache/zsh/zcompdump"
 autoload -Uz compinit
 [[ -d "$HOME/.cache/zsh" ]] || mkdir -p "$HOME/.cache/zsh"
-compinit -d "$ZSH_COMPDUMP"
-zstyle ':completion:*' cache-path "$HOME/.cache/zsh/zcompcache"
 
+# Only check for new completions once a day to speed up shell startup
+if () { setopt localoptions extendedglob; [[ -n "$ZSH_COMPDUMP"(#qN.m-1) ]] }; then
+  compinit -C -d "$ZSH_COMPDUMP"
+else
+  compinit -d "$ZSH_COMPDUMP"
+fi
+zstyle ':completion:*' cache-path "$HOME/.cache/zsh/zcompcache"
 
 # Starship prompt (must be last — replaces PS1)
 if command -v starship &> /dev/null; then

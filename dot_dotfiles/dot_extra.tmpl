@@ -51,7 +51,9 @@ if command -v fnm &> /dev/null; then
 fi
 
 # ── Mise (global tool manager) ──────────────────────────────────────
-if command -v mise &> /dev/null; then
+if [[ -d "$HOME/.local/share/mise/shims" ]]; then
+  export PATH="$HOME/.local/share/mise/shims:$PATH"
+elif command -v mise &> /dev/null; then
   eval "$(mise activate zsh)"
 fi
 
