@@ -60,6 +60,7 @@ brew "lua"
 brew "pkg-config"
 brew "tpm"
 
+brew "herdr"
 brew "kondo"
 brew "shellcheck"
 brew "commitizen"
@@ -87,18 +88,18 @@ cask "jordanbaird-ice"
 cask "shottr"
 cask "hyperkey"
 
-cask "handy"
+cask "iina"
 cask "appcleaner"
 cask "veracrypt"
-cask "proton-drive"
+cask "google-drive"
 cask "protonvpn"
+cask "handy"
 
 cask "font-jetbrains-mono-nerd-font"
 {{- end }}
 
 {{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") }}
 cask "zen"
-cask "iina"
 cask "google-gemini"
 
 cask "zed"
