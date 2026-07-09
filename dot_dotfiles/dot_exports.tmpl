@@ -5,8 +5,13 @@ export VISUAL="agy-ide"
 {{- else }}
 export VISUAL="nvim"
 {{- end }}
+{{- if eq .chezmoi.os "darwin" }}
 export LANG="en_US.UTF-8"
 export LC_ALL="en_US.UTF-8"
+{{- else }}
+export LANG="C.UTF-8"
+export LC_ALL="C.UTF-8"
+{{- end }}
 
 # XDG
 export XDG_CONFIG_HOME="$HOME/.config"

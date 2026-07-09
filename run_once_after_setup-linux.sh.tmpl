@@ -76,10 +76,12 @@ JAILEOF
 fi
 
 # --- Set zsh as default shell ---
-if [ "${SHELL##*/}" != "zsh" ]; then
+CURRENT_SHELL="${SHELL:-}"
+CURRENT_USER="${USER:-$(id -un)}"
+if [ "${CURRENT_SHELL##*/}" != "zsh" ]; then
   echo "🐚 Changing default shell to zsh..."
   if command -v chsh >/dev/null 2>&1; then
-    sudo chsh -s "$(which zsh)" "$USER" || chsh -s "$(which zsh)" || echo "⚠️  Could not change default shell automatically. Please run: chsh -s $(which zsh)"
+    sudo chsh -s "$(which zsh)" "$CURRENT_USER" || chsh -s "$(which zsh)" || echo "⚠️  Could not change default shell automatically. Please run: chsh -s $(which zsh)"
   else
     echo "⚠️  chsh command not found. Please change default shell to zsh manually."
   fi

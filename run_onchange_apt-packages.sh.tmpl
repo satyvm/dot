@@ -18,7 +18,7 @@ sudo apt install -y \
 if ! command -v docker &> /dev/null; then
   echo "🐳 Installing Docker..."
   curl -fsSL https://get.docker.com | sh
-  sudo usermod -aG docker "$USER"
+  sudo usermod -aG docker "${USER:-$(id -un)}"
 fi
 
 sudo apt install -y docker-compose-plugin
