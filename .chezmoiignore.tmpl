@@ -6,6 +6,12 @@ AGENTS.md
 scripts
 cursor-default.code-profile
 
+# ── Ignore encrypted backup files if the decryption key is missing ──────────
+{{- if not (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
+.backup/cursor-default.code-profile
+{{- end }}
+
+
 # ── macOS-only scripts: ignore on Linux ──────────────────────────────────────
 {{- if ne .chezmoi.os "darwin" }}
 run_once_after_setup-macos.sh.tmpl
