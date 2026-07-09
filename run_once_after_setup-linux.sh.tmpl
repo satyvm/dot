@@ -1,10 +1,9 @@
 {{- if eq .chezmoi.os "linux" -}}
-
 #!/bin/bash
 set -eufo pipefail
 
 {{- if or (eq .profile "dev") (eq .profile "personal") }}
-if command -v snap &> /dev/null; then
+if command -v snap >/dev/null 2>&1; then
   sudo snap install telegram-desktop
   sudo snap install discord
 else
@@ -18,8 +17,8 @@ is_container() {
   if [ -f /proc/1/cgroup ] && grep -qE 'docker|lxc|containerd|kubepods|sandbox' /proc/1/cgroup; then
     return 0
   fi
-  if command -v systemd-detect-virt &>/dev/null; then
-    if systemd-detect-virt --container &>/dev/null; then
+  if command -v systemd-detect-virt >/dev/null 2>&1; then
+    if systemd-detect-virt --container >/dev/null 2>&1; then
       return 0
     fi
   fi
@@ -37,7 +36,7 @@ is_wsl() {
 if is_container || is_wsl; then
   echo "⚠️  Running inside a container or WSL. Skipping firewall (UFW) and fail2ban configuration."
 else
-  if command -v ufw &>/dev/null; then
+  if command -v ufw >/dev/null 2>&1; then
     echo "🔥 Configuring UFW..."
     sudo ufw default deny incoming
     sudo ufw default allow outgoing
@@ -79,7 +78,7 @@ fi
 # --- Set zsh as default shell ---
 if [ "${SHELL##*/}" != "zsh" ]; then
   echo "🐚 Changing default shell to zsh..."
-  if command -v chsh &>/dev/null; then
+  if command -v chsh >/dev/null 2>&1; then
     sudo chsh -s "$(which zsh)" "$USER" || chsh -s "$(which zsh)" || echo "⚠️  Could not change default shell automatically. Please run: chsh -s $(which zsh)"
   else
     echo "⚠️  chsh command not found. Please change default shell to zsh manually."
