@@ -35,7 +35,7 @@ alias dc='docker compose'
 alias dcup='dc up -d'
 alias dcdown='dc stop && dc down --remove-orphans'
 alias dce='docker compose exec'
-alias kctl='kubectl'
+alias k='kubectl'
 
 {{- if eq .chezmoi.os "darwin" }}
 alias flushdns="sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder"
