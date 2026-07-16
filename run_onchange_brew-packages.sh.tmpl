@@ -41,6 +41,7 @@ brew "btop"
 brew "watch"
 brew "fnm"
 brew "go"
+brew "postgresql@18"
 
 # tools for mise
 brew "mise"
@@ -64,6 +65,8 @@ brew "herdr"
 brew "kondo"
 brew "shellcheck"
 brew "commitizen"
+cask "claude-code"
+cask "antigravity-cli"
 
 {{- if eq .chezmoi.os "darwin" }}
 brew "colima"
@@ -79,8 +82,10 @@ cask "discord"
 cask "telegram"
 cask "whatsapp"
 cask "raycast"
-cask "notion"
 cask "notion-calendar"
+
+cask "notion"
+cask "zotero"
 
 cask "dockdoor"
 cask "TheBoredTeam/boring-notch/boring-notch"
@@ -90,7 +95,7 @@ cask "hyperkey"
 
 cask "iina"
 cask "appcleaner"
-cask "veracrypt"
+cask "veracrypt-fuse-t"
 cask "google-drive"
 cask "protonvpn"
 cask "handy"
@@ -103,8 +108,8 @@ cask "zen"
 cask "google-gemini"
 
 cask "zed"
+cask "t3-code"
 cask "antigravity-ide"
-cask "antigravity-cli"
 
 cask "alacritty"
 cask "ghostty"
