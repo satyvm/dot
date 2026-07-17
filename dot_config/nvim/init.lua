@@ -1,3 +1,3 @@
-require("josean.core")
-require("josean.lazy")
-require("josean.lsp")
+require("satyvm.core")
+require("satyvm.lazy")
+require("satyvm.lsp")

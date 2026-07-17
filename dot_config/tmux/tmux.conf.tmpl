@@ -27,6 +27,9 @@ bind M-c attach-session -c "#{pane_current_path}"
 
 set -g mouse on
 
+set -g allow-passthrough on
+set -s set-clipboard on
+
 set-window-option -g mode-keys vi
 
 bind-key -T copy-mode-vi 'v' send -X begin-selection # start selecting text with "v"
