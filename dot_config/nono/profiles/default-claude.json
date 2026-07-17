@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "name": "default-claude",
+    "version": "1.0.0",
+    "description": "Default Nono profile for Claude Code agent extending built-in claude-code profile"
+  },
+  "extends": "claude-code",
+  "filesystem": {
+    "allow": [
+      "$HOME/.claude"
+    ],
+    "read": [
+      "/home",
+      "$HOME/.config/agents/skills/",
+      "$HOME/.local/state/fnm_multishells/",
+      "$HOME/.local/share/fnm/",
+      "$HOME/.local/share/",
+      "$HOME/.fnm/",
+      "$HOME/.nvm/"
+    ]
+  }
+}

@@ -1,0 +1,204 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# ax - Unified Agent Executor CLI for CLI Proxy API & Nono Sandboxing
+
+MODELS_ENV="${HOME}/.config/cli-proxy-api/models.env"
+if [[ -f "$MODELS_ENV" ]]; then
+  # shellcheck source=/dev/null
+  source "$MODELS_ENV"
+fi
+
+show_help() {
+  cat << 'EOF'
+ax — Unified Agent Executor
+
+USAGE:
+  ax [agent] [subsession] [sandbox] [extra_args...]
+  ax --help | -h
+  ax models
+  ax quota | q
+
+POSITIONAL PARAMETERS:
+  agent       Agent binary to run:
+                claude | c  (default)
+                pi     | p
+  subsession  Proxy model routing profile:
+                auto   | a  (default: ChatGPT models with auto-failover to Gemini)
+                gpt    | o  (ChatGPT subscription models)
+                gemini | g  (Gemini subscription models)
+  sandbox     Sandboxing mode:
+                safe   | s  (default: Nono sandboxed run, uses .nono.json if present else default profile)
+                direct | d  (Direct run without sandboxing)
+
+SUBCOMMANDS:
+  --help, -h  Show this help message
+  models      Display active subscription model aliases and live proxy models
+  quota, q    Open CLI Proxy API quota dashboard in browser & display management secret key
+
+EXAMPLES:
+  ax                      Launch Claude, auto subsession, safe mode
+  ax p                    Launch Pi agent in safe mode
+  ax c gpt                Launch Claude on ChatGPT models in safe mode
+  ax c gemini             Launch Claude on Gemini models in safe mode
+  ax c auto direct        Launch Claude with auto-failover directly without sandboxing
+  ax c auto safe --resume Pass extra args (--resume) to Claude
+  ax quota                Open quota dashboard in browser and display management secret key
+EOF
+}
+
+show_models() {
+  echo "Active Subscription Model Mappings (~/.config/cli-proxy-api/models.env):"
+  echo ""
+  echo "ChatGPT / Codex Subscription:"
+  echo "  Opus:    ${GPT_OPUS_MODEL:-gpt-5.6-sol}"
+  echo "  Sonnet:  ${GPT_SONNET_MODEL:-gpt-5.6-terra}"
+  echo "  Haiku:   ${GPT_HAIKU_MODEL:-gpt-5.6-luna}"
+  echo "  Primary: ${GPT_PRIMARY_MODEL:-gpt-5.6-terra}"
+  echo "  Fast:    ${GPT_FAST_MODEL:-gpt-5.6-luna}"
+  echo ""
+  echo "Gemini / Antigravity Subscription:"
+  echo "  Opus:    ${GEMINI_OPUS_MODEL:-claude-opus-4-6-thinking}"
+  echo "  Sonnet:  ${GEMINI_SONNET_MODEL:-gemini-3.1-pro-low}"
+  echo "  Haiku:   ${GEMINI_HAIKU_MODEL:-gemini-3.5-flash-low}"
+  echo "  Primary: ${GEMINI_PRIMARY_MODEL:-gemini-3.5-flash-low}"
+  echo "  Fast:    ${GEMINI_FAST_MODEL:-gemini-3.5-flash-low}"
+  echo ""
+  echo "------------------------------------------------------------"
+  echo "Live Available Models (http://127.0.0.1:8317/v1/models):"
+  echo ""
+
+  local response
+  response=$(curl -s --max-time 2 -H "Authorization: Bearer sk-dummy" http://127.0.0.1:8317/v1/models 2>/dev/null || true)
+
+  if [[ -n "$response" ]] && command -v jq >/dev/null 2>&1 && echo "$response" | jq -e '.data' >/dev/null 2>&1; then
+    echo "$response" | jq -r '.data[] | "  - " + .id + " [Provider: " + (.owned_by // "unknown") + "]"'
+  elif [[ -n "$response" ]]; then
+    echo "  $response"
+  else
+    echo "  (CLI Proxy API server not responding on 127.0.0.1:8317)"
+  fi
+}
+
+show_quota() {
+  local secret_key="justforlocal"
+
+  echo "CLI Proxy API Quota Dashboard:"
+  echo "  Management Secret Key: $secret_key"
+  echo "  URL: http://127.0.0.1:8317/management.html#/quota"
+  echo ""
+
+  if [[ -z "${DRY_RUN:-}" ]]; then
+    open "http://127.0.0.1:8317/management.html#/quota" 2>/dev/null || echo "Please open http://127.0.0.1:8317/management.html#/quota in your browser."
+  fi
+}
+
+# Subcommand handling
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  show_help
+  exit 0
+fi
+
+if [[ "${1:-}" == "models" ]]; then
+  show_models
+  exit 0
+fi
+
+if [[ "${1:-}" == "quota" || "${1:-}" == "q" ]]; then
+  show_quota
+  exit 0
+fi
+
+AGENT="claude"
+SUBSESSION="auto"
+SANDBOX="safe"
+
+parse_agent() {
+  case "${1:-}" in
+    c|claude) AGENT="claude" ;;
+    p|pi)     AGENT="pi" ;;
+    *) return 1 ;;
+  esac
+}
+
+parse_subsession() {
+  case "${1:-}" in
+    a|auto)   SUBSESSION="auto" ;;
+    o|gpt)    SUBSESSION="gpt" ;;
+    g|gemini) SUBSESSION="gemini" ;;
+    *) return 1 ;;
+  esac
+}
+
+parse_sandbox() {
+  case "${1:-}" in
+    s|safe)   SANDBOX="safe" ;;
+    d|direct) SANDBOX="direct" ;;
+    *) return 1 ;;
+  esac
+}
+
+if parse_agent "${1:-}"; then
+  shift
+  if parse_subsession "${1:-}"; then
+    shift
+    parse_sandbox "${1:-}" && shift || true
+  elif parse_sandbox "${1:-}"; then
+    shift
+  fi
+elif parse_subsession "${1:-}"; then
+  shift
+  parse_sandbox "${1:-}" && shift || true
+elif parse_sandbox "${1:-}"; then
+  shift
+fi
+
+export ANTHROPIC_BASE_URL="http://127.0.0.1:8317"
+export ANTHROPIC_AUTH_TOKEN="sk-dummy"
+export CLAUDE_CONFIG_DIR="${HOME}/.claude"
+export GIT_CEILING_DIRECTORIES="${PWD}"
+
+case "$SUBSESSION" in
+  auto|gpt)
+    export ANTHROPIC_DEFAULT_OPUS_MODEL="${GPT_OPUS_MODEL:-gpt-5.6-sol}"
+    export ANTHROPIC_DEFAULT_SONNET_MODEL="${GPT_SONNET_MODEL:-gpt-5.6-terra}"
+    export ANTHROPIC_DEFAULT_HAIKU_MODEL="${GPT_HAIKU_MODEL:-gpt-5.6-luna}"
+    export ANTHROPIC_MODEL="${GPT_PRIMARY_MODEL:-gpt-5.6-terra}"
+    export ANTHROPIC_SMALL_FAST_MODEL="${GPT_FAST_MODEL:-gpt-5.6-luna}"
+    ;;
+  gemini)
+    export ANTHROPIC_DEFAULT_OPUS_MODEL="${GEMINI_OPUS_MODEL:-claude-opus-4-6-thinking}"
+    export ANTHROPIC_DEFAULT_SONNET_MODEL="${GEMINI_SONNET_MODEL:-gemini-3.1-pro-low}"
+    export ANTHROPIC_DEFAULT_HAIKU_MODEL="${GEMINI_HAIKU_MODEL:-gemini-3.5-flash-low}"
+    export ANTHROPIC_MODEL="${GEMINI_PRIMARY_MODEL:-gemini-3.5-flash-low}"
+    export ANTHROPIC_SMALL_FAST_MODEL="${GEMINI_FAST_MODEL:-gemini-3.5-flash-low}"
+    ;;
+esac
+
+AGENT_CMD="$AGENT"
+
+if [[ "$SANDBOX" == "safe" ]]; then
+  if [[ -f "$PWD/.nono.json" ]]; then
+    PROFILE=".nono.json"
+  elif [[ "$AGENT" == "pi" ]]; then
+    PROFILE="default-pi"
+  else
+    PROFILE="default-claude"
+  fi
+  RUN_CMD=(nono run --profile "$PROFILE" --allow-cwd -- "$AGENT_CMD" "$@")
+else
+  RUN_CMD=("$AGENT_CMD" "$@")
+fi
+
+if [[ -n "$DRY_RUN" ]]; then
+  echo "AGENT=$AGENT SUBSESSION=$SUBSESSION SANDBOX=$SANDBOX"
+  echo "ANTHROPIC_BASE_URL=$ANTHROPIC_BASE_URL"
+  echo "ANTHROPIC_DEFAULT_OPUS_MODEL=$ANTHROPIC_DEFAULT_OPUS_MODEL"
+  echo "ANTHROPIC_DEFAULT_SONNET_MODEL=$ANTHROPIC_DEFAULT_SONNET_MODEL"
+  echo "ANTHROPIC_DEFAULT_HAIKU_MODEL=$ANTHROPIC_DEFAULT_HAIKU_MODEL"
+  echo "ANTHROPIC_MODEL=$ANTHROPIC_MODEL"
+  echo "ANTHROPIC_SMALL_FAST_MODEL=$ANTHROPIC_SMALL_FAST_MODEL"
+  echo "EXEC: ${RUN_CMD[*]}"
+  exit 0
+fi
+
+exec "${RUN_CMD[@]}"
