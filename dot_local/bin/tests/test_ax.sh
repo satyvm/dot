@@ -12,7 +12,8 @@ FAKE_BIN="$FIXTURE_ROOT/bin"
 CONFIG_HOME="$FIXTURE_ROOT/config"
 STATE_HOME="$FIXTURE_ROOT/state"
 HOME_DIR="$FIXTURE_ROOT/home"
-mkdir -p "$FAKE_BIN" "$CONFIG_HOME/ax" "$CONFIG_HOME/cli-proxy-api" "$CONFIG_HOME/crush" "$CONFIG_HOME/nono/profiles" "$STATE_HOME" "$HOME_DIR/.local/bin"
+mkdir -p "$FAKE_BIN" "$CONFIG_HOME/agents" "$CONFIG_HOME/ax" "$CONFIG_HOME/cli-proxy-api" "$CONFIG_HOME/crush" "$CONFIG_HOME/nono/profiles" "$STATE_HOME" "$HOME_DIR/.local/bin"
+printf '%s\n' '# Universal test context' >"$CONFIG_HOME/agents/universal_context.md"
 
 cat >"$CONFIG_HOME/ax/models.json" <<'JSON'
 {
@@ -95,6 +96,7 @@ fi
 printf 'agent=%s\n' "$(basename "$0")"
 printf 'model=%s\n' "${AX_MODEL_ROLE:-}:${AX_MODEL_ID:-}"
 printf 'pi_agent_dir=%s\n' "${PI_CODING_AGENT_DIR:-}"
+printf 'universal_context=%s\n' "${AX_UNIVERSAL_CONTEXT:-}"
 if [[ -n "${ANTHROPIC_AUTH_TOKEN:-}" ]]; then
   printf 'anthropic_auth_token=set\n'
 else
@@ -199,6 +201,7 @@ run_ax() {
   HOME="$HOME_DIR" \
     XDG_CONFIG_HOME="$CONFIG_HOME" \
     XDG_STATE_HOME="$STATE_HOME" \
+    HERDR_SOCKET_PATH="${HERDR_SOCKET_PATH:-}" \
     AX_REAL_PATH="$FAKE_BIN:/usr/bin:/bin" \
     PATH="$FAKE_BIN:/usr/bin:/bin" \
     "$AX" "$@"
@@ -209,11 +212,13 @@ printf 'TAP version 13\n'
 OUTPUT="$(run_ax claude --resume 'session id' --flag='two words')"
 assert_contains "$OUTPUT" "nono <run> <--profile> <default-claude> <--allow-cwd> <--> <$FAKE_BIN/claude>" "safe launch selects the Claude profile"
 assert_contains "$OUTPUT" "<--settings> <{\"availableModels\":[\"frontier\",\"balanced\",\"fast\",\"light\"]}>" "Claude receives the canonical role allowlist"
+assert_contains "$OUTPUT" "<--append-system-prompt-file> <$CONFIG_HOME/agents/universal_context.md>" "Claude receives universal context as a system-prompt file"
 assert_contains "$OUTPUT" "<--resume> <session id> <--flag=two words>" "safe launch preserves Claude arguments"
 
 OUTPUT="$(run_ax claude --direct)"
 assert_contains "$OUTPUT" "anthropic_auth_token=set" "Claude receives the gateway credential as a bearer token"
 assert_contains "$OUTPUT" "anthropic_api_key=unset" "Claude avoids interactive API-key approval state"
+assert_contains "$OUTPUT" "universal_context=$CONFIG_HOME/agents/universal_context.md" "direct launches expose the readable universal context path"
 
 OUTPUT="$(HERDR_SOCKET_PATH="$FIXTURE_ROOT/herdr named.sock" run_ax opencode --session 'herdr session')"
 assert_contains "$OUTPUT" "<--allow-unix-socket> <$FIXTURE_ROOT/herdr named.sock>" "Herdr's resolved named-session socket is granted dynamically"
@@ -222,13 +227,15 @@ assert_contains "$OUTPUT" "<--session> <herdr session>" "Herdr restore arguments
 OUTPUT="$(run_ax pi --direct --session 'path with spaces')"
 assert_contains "$OUTPUT" "agent=pi" "direct launch resolves the real Pi binary without shim recursion"
 assert_contains "$OUTPUT" "pi_agent_dir=$HOME_DIR/.pi/agent" "Pi uses its documented global agent directory"
+assert_contains "$OUTPUT" "arg[0]=<--append-system-prompt>" "Pi receives universal context through its system-prompt flag"
+assert_contains "$OUTPUT" "arg[1]=<$CONFIG_HOME/agents/universal_context.md>" "Pi receives the universal context file path"
 if [[ -d "$HOME_DIR/.pi/agent/sessions" ]]; then
   pass "Pi session root exists before the sandbox starts"
 else
   fail "Pi session root exists before the sandbox starts" "missing: $HOME_DIR/.pi/agent/sessions"
 fi
-assert_contains "$OUTPUT" "arg[0]=<--session>" "direct launch preserves the session flag"
-assert_contains "$OUTPUT" "arg[1]=<path with spaces>" "direct launch preserves a spaced session identifier"
+assert_contains "$OUTPUT" "arg[2]=<--session>" "direct launch preserves the session flag"
+assert_contains "$OUTPUT" "arg[3]=<path with spaces>" "direct launch preserves a spaced session identifier"
 
 set +e
 OUTPUT="$(run_ax claude direct 2>&1)"
@@ -278,6 +285,16 @@ assert_contains "$OUTPUT" "frontier" "models live reads the proxy catalog"
 OUTPUT="$(run_ax doctor)"
 assert_contains "$OUTPUT" "proxy: ready" "doctor reports proxy readiness"
 assert_contains "$OUTPUT" "models: valid" "doctor validates the registry"
+assert_contains "$OUTPUT" "universal context: ready" "doctor validates the essential universal context"
+
+mv "$CONFIG_HOME/agents/universal_context.md" "$FIXTURE_ROOT/universal_context.md"
+set +e
+OUTPUT="$(run_ax claude --direct 2>&1)"
+STATUS=$?
+set -e
+assert_status 78 "$STATUS" "launch fails closed when universal context is unavailable"
+assert_contains "$OUTPUT" "essential universal context is missing or unreadable" "missing universal context error is actionable"
+mv "$FIXTURE_ROOT/universal_context.md" "$CONFIG_HOME/agents/universal_context.md"
 
 OUTPUT="$(AX_PLATFORM=Darwin run_ax auth setup)"
 assert_contains "$OUTPUT" "interactive-login=antigravity" "auth setup runs the active provider's interactive login"
@@ -354,6 +371,11 @@ if command -v chezmoi >/dev/null 2>&1; then
   chezmoi execute-template <"$REPO_ROOT/dot_config/crush/crush.json.tmpl" >"$RENDER_ROOT/crush.json"
   chezmoi execute-template <"$REPO_ROOT/dot_config/cli-proxy-api/private_config.yaml.tmpl" >"$RENDER_ROOT/proxy.yaml"
   chezmoi execute-template <"$REPO_ROOT/run_onchange_after_setup-ai-agent-platform.sh.tmpl" >"$RENDER_ROOT/setup-ai-agent-platform.sh"
+  SKILL_SCRIPT_ROOT="$RENDER_ROOT/skill-creator/scripts"
+  mkdir -p "$SKILL_SCRIPT_ROOT"
+  for script_name in generate_report improve_description quick_validate run_eval run_loop utils; do
+    chezmoi cat "$HOME/.config/agents/skills/skill-creator/scripts/$script_name.py" >"$SKILL_SCRIPT_ROOT/$script_name.py"
+  done
   if jq -e . "$RENDER_ROOT"/*.json >/dev/null; then
     pass "all rendered client JSON documents parse"
   else
@@ -368,14 +390,28 @@ if command -v chezmoi >/dev/null 2>&1; then
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"model": "cliproxy/balanced"' "OpenCode receives the canonical balanced default"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"small_model": "cliproxy/light"' "OpenCode keeps background tasks on the canonical light model"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"npm": "@ai-sdk/openai-compatible"' "OpenCode uses the proxy's Chat Completions protocol"
+  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '/.config/agents/universal_context.md"' "OpenCode loads the universal context as an instruction file"
   assert_contains "$(cat "$RENDER_ROOT/pi-settings.json")" '"defaultModel": "balanced"' "Pi receives the canonical balanced default"
   assert_contains "$(cat "$RENDER_ROOT/crush.json")" '"model": "balanced"' "Crush receives the canonical balanced default"
+  assert_contains "$(cat "$RENDER_ROOT/crush.json")" '/.config/agents/universal_context.md"' "Crush loads the universal context through context_paths"
   if bash -n "$RENDER_ROOT/setup-ai-agent-platform.sh"; then
     pass "rendered AI platform setup script parses"
   else
     fail "rendered AI platform setup script parses" "invalid shell syntax"
   fi
-  assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" 'PI_CODING_AGENT_DIR="$HOME/.pi/agent" herdr integration install "$agent"' "Herdr installs Pi integration in Pi's documented agent directory"
+  assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" "PI_CODING_AGENT_DIR=\"\$HOME/.pi/agent\" herdr integration install \"\$agent\"" "Herdr installs Pi integration in Pi's documented agent directory"
+  assert_contains "$(chezmoi target-path "$REPO_ROOT/dot_config/agents/skills/skill-creator/scripts/literal_run_eval.py")" "/run_eval.py" "chezmoi preserves the run_eval.py payload basename"
+  assert_contains "$(chezmoi target-path "$REPO_ROOT/dot_config/agents/skills/skill-creator/scripts/literal_run_loop.py")" "/run_loop.py" "chezmoi preserves the run_loop.py payload basename"
+  if (cd "$FIXTURE_ROOT" && PYTHONDONTWRITEBYTECODE=1 python3 "$SKILL_SCRIPT_ROOT/run_eval.py" --help >/dev/null); then
+    pass "rendered run_eval.py resolves its sibling scripts package"
+  else
+    fail "rendered run_eval.py resolves its sibling scripts package" "run_eval.py --help failed"
+  fi
+  if (cd "$FIXTURE_ROOT" && PYTHONDONTWRITEBYTECODE=1 python3 "$SKILL_SCRIPT_ROOT/run_loop.py" --help >/dev/null); then
+    pass "rendered run_loop.py resolves its sibling scripts package"
+  else
+    fail "rendered run_loop.py resolves its sibling scripts package" "run_loop.py --help failed"
+  fi
 else
   fail "chezmoi render tests" "chezmoi is not installed"
 fi
@@ -393,6 +429,7 @@ if command -v nono >/dev/null 2>&1; then
   assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.ssh\"" "effective policy denies SSH material"
   assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/Library/Keychains\"" "effective policy denies macOS Keychain data"
   assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.cargo/credentials.toml\"" "effective policy denies Cargo registry credentials"
+  assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.config/agents/universal_context.md\"" "effective policy grants read-only universal context access"
   if [[ "$EFFECTIVE_PROFILE" != *"\"\$HOME/.local/share\""* ]]; then
     pass "effective policy avoids a broad ~/.local/share grant"
   else

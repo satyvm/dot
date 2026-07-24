@@ -1,5 +1,10 @@
 {
   "$schema": "https://charm.land/crush.json",
+  "options": {
+    "context_paths": [
+      "{{ .chezmoi.homeDir }}/.config/agents/universal_context.md"
+    ]
+  },
   "providers": {
     "cliproxy": {
       "type": "openai-compat",

@@ -10,7 +10,7 @@ Use this skill when the user asks to "set up sandbox", "initialize nono", "confi
 ## Workflow
 
 ### 1. Inspect Project Toolchains
-Analyze files in the current working directory (`$PWD`) to identify project stack and runtime requirements:
+Read `AGENTS.md`, `.local/CONTEXT.md`, and relevant `.local/adr/` records when present. Then analyze files in the current working directory (`$PWD`) to identify project stack and runtime requirements:
 - **Node.js / Web**: `package.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lockb`
 - **Rust**: `Cargo.toml`, `Cargo.lock`
 - **Go**: `go.mod`, `go.sum`
@@ -32,6 +32,8 @@ Base the configuration on the `default-claude` profile (`"extends": "default-cla
 
 ### 3. Generate `.nono.json`
 Write the generated JSON configuration to `$PWD/.nono.json`.
+
+`.nono.json` is runtime configuration, not skill state, so it intentionally remains at the project root rather than under `.local/`.
 
 Example template:
 ```json

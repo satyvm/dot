@@ -337,6 +337,12 @@ doctor() {
     printf 'models: invalid\n'
     failures=$((failures + 1))
   fi
+  if [[ -r "$config_home/agents/universal_context.md" ]]; then
+    printf 'universal context: ready\n'
+  else
+    printf 'universal context: missing or unreadable (run: chezmoi apply)\n'
+    failures=$((failures + 1))
+  fi
 
   if read_proxy_key; then
     printf 'proxy authentication: configured\n'
@@ -465,6 +471,10 @@ launch_agent() {
 
   load_models
   validate_models "$models_file" || die "$AX_EXIT_CONFIG" "rendered model registry is invalid: $models_file"
+  local universal_context="$config_home/agents/universal_context.md"
+  [[ -r "$universal_context" ]] ||
+    die "$AX_EXIT_CONFIG" "essential universal context is missing or unreadable: $universal_context; run: chezmoi apply"
+  export AX_UNIVERSAL_CONTEXT="$universal_context"
   local model_override=false
   [[ -n "${AX_MODEL+x}" ]] && model_override=true
   local requested="${AX_MODEL:-$(jq -r --arg agent "$agent" '.agents[$agent].defaultRole' "$models_file")}"
@@ -488,6 +498,16 @@ launch_agent() {
   configure_environment "$agent" "$role" "$model_id" "$base_url"
 
   local crush_override_file=""
+  if [[ -n "${AX_UNIVERSAL_CONTEXT:-}" ]]; then
+    case "$agent" in
+      claude)
+        set -- --append-system-prompt-file "$AX_UNIVERSAL_CONTEXT" "$@"
+        ;;
+      pi)
+        set -- --append-system-prompt "$AX_UNIVERSAL_CONTEXT" "$@"
+        ;;
+    esac
+  fi
   if [[ "$agent" == "claude" ]]; then
     set -- --settings "{\"availableModels\":$AX_REQUIRED_ROLES}" "$@"
   fi

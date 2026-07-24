@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # What Skill
 
-You don't remember every skill, so ask. This is the central directory and router for all 33 skills configured in this environment.
+You don't remember every skill, so ask. This is the central directory and router for the skills configured in this environment.
 
 ---
 
@@ -16,8 +16,8 @@ Most of your engineering and writing tasks run along structured paths. Use the c
 
 ### The Main Engineering Flow: Idea → Ship
 The standard route for building features or refactoring a codebase:
-1. **`/grill-with-docs`** — Relentless design/plan interview to align on ideas. Stateful: updates `CONTEXT.md` and ADRs.
-2. **`to-spec`** — Synthesize the conversation context into a spec/PRD and publish to the issue tracker.
+1. **`/grilling`** — Relentless design/plan interview to align on ideas. Stateful: updates `.local/CONTEXT.md` and `.local/adr/`.
+2. **`to-spec`** — Synthesize the conversation context into a spec/PRD saved to `.local/specs/` and publish to the issue tracker.
 3. **`to-tickets`** — Break the spec/plan into vertical tracer-bullet tickets with blocking links.
 4. **`implement`** — Write code for a ticket or spec. Drives `/tdd` internally, runs typechecking and tests, runs `/code-review`, and commits.
 5. **`/tdd`** — Red-green-refactor loop to build specific behaviors test-first.
@@ -33,7 +33,7 @@ Starting situations that feed into the main engineering flow:
 
 ## 2. Complete Directory of All 33 Skills
 
-Below is the exhaustive list of all 33 skills, grouped by category.
+Below is the skill directory, grouped by category.
 
 ### 💻 Core Engineering & TDD
 *   **`implement`**
@@ -54,9 +54,9 @@ Below is the exhaustive list of all 33 skills, grouped by category.
     *   *When to Use:* When a git operation halts due to merge conflicts that require manual resolution.
 
 ### 📐 Architecture & Design Systems
-*   **`grill-with-docs`**
-    *   *Path:* `skills/grill-with-docs`
-    *   *Summary:* Relentless stateful plan/design interview that updates `CONTEXT.md` and records ADRs.
+*   **`grilling`**
+    *   *Path:* `skills/grilling`
+    *   *Summary:* Relentless stateful plan/design interview that updates `.local/CONTEXT.md` and records `.local/adr/`.
     *   *When to Use:* To align on a design and preserve decisions statefully in the repository.
 *   **`improve-codebase-architecture`**
     *   *Path:* `skills/improve-codebase-architecture`
@@ -86,15 +86,15 @@ Below is the exhaustive list of all 33 skills, grouped by category.
 ### 📋 Planning & Tracking
 *   **`to-spec`**
     *   *Path:* `skills/to-spec`
-    *   *Summary:* Synthesize conversation and codebase state into a spec (PRD) on the issue tracker.
+    *   *Summary:* Synthesize conversation and codebase state into `.local/specs/`, then publish the spec to the issue tracker.
     *   *When to Use:* To generate a PRD from previous chat history without further interviewing.
 *   **`to-tickets`**
     *   *Path:* `skills/to-tickets`
     *   *Summary:* Break down a plan/spec into vertical tracer-bullet tickets with blocking relationships.
-    *   *When to Use:* Converting a spec or roadmap into a local `tickets.md` checklist or tracker issues.
+    *   *When to Use:* Converting a spec or roadmap into `.local/tickets/` checklist or tracker issues.
 *   **`triage`**
     *   *Path:* `skills/triage`
-    *   *Summary:* Process raw incoming bugs/feature requests through a state machine of triage roles.
+    *   *Summary:* Process raw incoming bugs/feature requests through a state machine and preserve briefs under `.local/triage/`.
     *   *When to Use:* Refining external reports/PRs into clean, actionable briefs for developers.
 *   **`wayfinder`**
     *   *Path:* `skills/wayfinder`
@@ -160,13 +160,9 @@ Below is the exhaustive list of all 33 skills, grouped by category.
     *   *Path:* `skills/grill-me`
     *   *Summary:* Relentless stateless plan interview to stress-test designs without saving local files.
     *   *When to Use:* Sharpening or stress-testing a plan that does not live inside a git repository.
-*   **`grilling`**
-    *   *Path:* `skills/grilling`
-    *   *Summary:* Relentless questioning primitive used to challenge plan assumptions.
-    *   *When to Use:* Internal primitive called by `/grill-me` and `/grill-with-docs`.
 *   **`prototype`**
     *   *Path:* `skills/prototype`
-    *   *Summary:* Builds a small throwaway script to test out state modeling or UI design ideas.
+    *   *Summary:* Builds a small throwaway script under `.local/prototypes/` to test out state modeling or UI design ideas.
     *   *When to Use:* When design questions are hard to settle on paper and require quick experimentation.
 *   **`research`**
     *   *Path:* `skills/research`
@@ -174,7 +170,7 @@ Below is the exhaustive list of all 33 skills, grouped by category.
     *   *When to Use:* Gathering facts, documentation, or API specs in a cited markdown file asynchronously.
 *   **`handoff`**
     *   *Path:* `skills/handoff`
-    *   *Summary:* Compacts the current session context into a markdown file in the OS temp directory.
+    *   *Summary:* Compacts the current session context into a markdown file in `.local/handoffs/`.
     *   *When to Use:* Forking sessions or crossing context boundaries when the context window is full.
 *   **`claude-handoff`**
     *   *Path:* `skills/claude-handoff`

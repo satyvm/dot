@@ -12,6 +12,8 @@ Then run a shaping session that produces a separate article document. This is **
 
 If the user did not say where to save the article, ask once and remember the path.
 
+The article and its source pile are user-authored deliverables, not agent state. Do not move or default either into `.local/`; use `.local/` only for private skill state, and only if such state becomes necessary.
+
 </what-to-do>
 
 <supporting-info>

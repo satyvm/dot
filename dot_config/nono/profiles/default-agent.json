@@ -16,7 +16,8 @@
   "filesystem": {
     "read": [
       "$HOME/.agents/skills",
-      "$HOME/.config/agents",
+      "$HOME/.config/agents/skills",
+      "$HOME/.config/agents/universal_context.md",
       "$HOME/.codex/skills",
       "$HOME/.local/share/fnm",
       "$HOME/.local/state/fnm_multishells",

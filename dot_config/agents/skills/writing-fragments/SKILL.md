@@ -12,6 +12,8 @@ As fragments emerge from either side of the conversation, append them to a singl
 
 If the user did not pass a path, ask once where to save the document, then remember it for the rest of the session.
 
+The markdown document is a user-authored deliverable, not agent state. Do not default it into `.local/`; use `.local/` only for private skill state, and only if such state becomes necessary.
+
 Capture fragments from the very first thing the user says, including the initial prompt.
 
 On first write, put a single H1 at the top with a working title (it can change later) and nothing else — no metadata, no TOC, no date.
