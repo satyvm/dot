@@ -1,0 +1,85 @@
+aiAgentPlatform:
+  version: 1
+  proxy:
+    url: http://127.0.0.1:8317
+    channel: antigravity
+  roles:
+    frontier:
+      alias: frontier
+      target: claude-opus-4-6-thinking
+      provider: antigravity
+      displayName: Frontier
+      contextWindow: 200000
+      maxTokens: 32768
+      reasoning: true
+      input: [text, image]
+    balanced:
+      alias: balanced
+      target: gemini-3.6-flash-high
+      provider: antigravity
+      displayName: Balanced
+      contextWindow: 1048576
+      maxTokens: 65536
+      reasoning: true
+      input: [text, image]
+    fast:
+      alias: fast
+      target: gemini-3.5-flash-low
+      provider: antigravity
+      displayName: Fast
+      contextWindow: 1048576
+      maxTokens: 65536
+      reasoning: true
+      input: [text, image]
+    light:
+      alias: light
+      target: gemini-3.5-flash-extra-low
+      provider: antigravity
+      displayName: Light
+      contextWindow: 1048576
+      maxTokens: 32768
+      reasoning: false
+      input: [text]
+  alternatives:
+    frontier:
+      - provider: codex
+        target: gpt-5.6-sol
+    balanced:
+      - provider: codex
+        target: gpt-5.6-terra
+    fast:
+      - provider: codex
+        target: gpt-5.6-luna
+    light:
+      - provider: antigravity
+        target: gemini-3.1-flash-lite
+  agents:
+    claude:
+      defaultRole: balanced
+      profile: default-claude
+    pi:
+      defaultRole: balanced
+      profile: default-pi
+    opencode:
+      defaultRole: balanced
+      profile: default-opencode
+    crush:
+      defaultRole: balanced
+      profile: default-crush
+  classes:
+    claude:
+      large: frontier
+      normal: balanced
+      fast: fast
+      small: light
+    crush:
+      large: balanced
+      small: light
+  minimumVersions:
+    nono: 0.69.0
+    herdr: 0.7.5
+    cliproxyapi: 7.2.95
+    claude: 2.1.0
+    pi: 0.81.0
+    opencode: 1.1.0
+    crush: 0.40.0

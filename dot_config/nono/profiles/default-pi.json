@@ -2,35 +2,22 @@
   "meta": {
     "name": "default-pi",
     "version": "1.0.0",
-    "description": "Default Nono profile for Pi coding agent (@earendil-works/pi-coding-agent) extending node-dev profile"
+    "description": "ax-managed Pi coding agent profile"
   },
-  "extends": "node-dev",
-  "groups": {
-    "include": [
-      "user_caches_macos",
-      "git_config",
-      "unlink_protection"
-    ]
-  },
+  "extends": "default-agent",
   "filesystem": {
     "allow": [
-      "$HOME/.config/pi",
+      "$HOME/.config/pi/agent/sessions"
+    ],
+    "read": [
       "$HOME/.config/pi/agent"
     ],
     "allow_file": [
-      "$HOME/.config/herdr/herdr.sock"
+      "$HOME/.config/pi/agent/models-store.json"
     ],
-    "read": [
-      "/home",
-      "$HOME/.config/agents/",
-      "$HOME/.local/state/fnm_multishells/",
-      "$HOME/.local/share/fnm/",
-      "$HOME/.local/share/",
-      "$HOME/.fnm/",
-      "$HOME/.nvm/"
+    "deny": [
+      "$HOME/.config/pi/agent/auth.json",
+      "$HOME/.config/pi/agent/credentials.json"
     ]
-  },
-  "workdir": {
-    "access": "readwrite"
   }
 }

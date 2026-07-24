@@ -2,45 +2,22 @@
   "meta": {
     "name": "default-opencode",
     "version": "1.0.0",
-    "description": "Default Nono profile for OpenCode agent extending node-dev profile"
+    "description": "ax-managed OpenCode profile"
   },
-  "extends": "node-dev",
-  "groups": {
-    "include": [
-      "user_caches_macos",
-      "git_config",
-      "unlink_protection"
-    ]
-  },
-  "network": {
-    "allow_domain": [
-      "opencode.ai",
-      "*.opencode.ai",
-      "127.0.0.1",
-      "localhost"
-    ]
-  },
+  "extends": "default-agent",
   "filesystem": {
     "allow": [
-      "$HOME/.config/opencode",
       "$HOME/.local/share/opencode",
       "$HOME/.local/state/opencode",
+      "$HOME/.cache/opencode",
       "$HOME/.local/share/opentui"
     ],
-    "allow_file": [
-      "$HOME/.config/herdr/herdr.sock"
-    ],
     "read": [
-      "/home",
-      "$HOME/.config/agents/",
-      "$HOME/.local/state/fnm_multishells/",
-      "$HOME/.local/share/fnm/",
-      "$HOME/.local/share/",
-      "$HOME/.fnm/",
-      "$HOME/.nvm/"
+      "$HOME/.config/opencode"
+    ],
+    "deny": [
+      "$HOME/.local/share/opencode/auth.json",
+      "$HOME/.config/opencode/auth.json"
     ]
-  },
-  "workdir": {
-    "access": "readwrite"
   }
 }

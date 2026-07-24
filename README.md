@@ -70,6 +70,50 @@ Docker is installed automatically on **dev** and **server** (Colima on macOS, Do
 | `dot_config/git/ignore` | Global gitignore |
 | `dot_config/agents/` | AI agent skills |
 
+### Sandboxed AI coding agents (macOS `dev`)
+
+`ax` is the public launcher for Claude Code, Pi, OpenCode, and Crush. Managed
+shims make the native command names delegate to it, so direct shell launches
+and Herdr restores share the same Nono policy:
+
+```bash
+ax claude
+ax pi --resume session-id
+ax opencode --direct       # explicit emergency sandbox escape
+ax crush --continue
+ax doctor
+```
+
+The stable model roles are `frontier`, `balanced`, `fast`, and `light`.
+Edit and deploy their mappings with:
+
+```bash
+ax models edit
+ax models validate
+ax models sync
+```
+
+The tracked source of truth is `.chezmoidata/ai-agent-platform.yaml`. Chezmoi
+renders client model catalogs and CLIProxyAPI aliases from it. The portable
+boundary includes model metadata, defaults, sandbox profiles, proxy settings,
+and Herdr setup. Device-local state is deliberately outside Git:
+
+- `~/.config/cli-proxy-api/client-key` and `management-key`
+- CLIProxyAPI OAuth/account JSON files
+- agent session/state directories and Herdr runtime sockets
+- SSH keys, Keychain data, browser profiles, and authenticated Git credentials
+
+On each new Mac, run `ax auth setup` to complete the active provider's
+interactive login, then run `ax doctor`. Secrets are inserted only into the
+private rendered proxy config and diagnostics never print their values.
+
+The deterministic suite is `bash dot_local/bin/tests/test_ax.sh`. The separate
+live smoke test makes real model calls and is opt-in:
+
+```bash
+AX_LIVE_SMOKE=1 ~/.local/bin/tests/test_ax_live.sh
+```
+
 ### Repo-only (not deployed to `~/`)
 
 These live in the git repo but chezmoi does **not** sync them to your home directory:

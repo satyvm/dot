@@ -26,7 +26,7 @@ Personal dotfiles managed with [chezmoi](https://chezmoi.io). Primary target is 
 ├── dot_dotfiles/                # → ~/.dotfiles/ (sourced by .zshrc in order)
 │   ├── dot_exports.tmpl         #   PATH, XDG, env vars, Rust/Bun/Go
 │   ├── dot_aliases.tmpl         #   ls→eza, cat→bat, cd→z, lg→lazygit, etc.
-│   ├── dot_functions.tmpl       #   mcd, extract, search, AI agent wrappers
+│   ├── dot_functions.tmpl       #   mcd, extract, search, charm compatibility
 │   └── dot_extra.tmpl           #   zsh plugins, fnm, mise, zoxide, fzf, thefuck
 ├── dot_config/                  # → ~/.config/
 │   ├── nvim/                    #   Neovim (lazy.nvim, satyvm namespace)
@@ -35,8 +35,10 @@ Personal dotfiles managed with [chezmoi](https://chezmoi.io). Primary target is 
 │   ├── ghostty/config.ghostty   #   Ghostty terminal
 │   ├── git/config.tmpl          #   Git config (delta, SSH signing, rebase)
 │   ├── nono/profiles/           #   Nono sandbox profiles for AI agents
+│   ├── ax/models.json.tmpl      #   Rendered canonical agent/model registry
 │   ├── agents/skills/           #   AI agent skills (downloaded via external archives)
 │   └── ...                      #   alacritty, herdr, pet, cli-proxy-api
+├── dot_local/bin/               # → ~/.local/bin/ (`ax` + managed agent shims)
 ├── run_once_after_*.sh.tmpl     # Setup scripts (run once on first apply)
 ├── run_onchange_*.sh.tmpl       # Package installers (re-run on change)
 └── dot_backup/                  # Backup scripts + encrypted assets
@@ -109,11 +111,18 @@ These AI CLI tools are all installed:
 - **PI Coding Agent** (`pi`): @earendil-works agent
 - **OpenCode** (`opencode`): Open-source CLI agent
 
-**Key gotcha**: `dot_functions.tmpl` wraps all four AI tools. When `HERDR_ENV=1` is set, session resume/subcommands are intercepted to run inside `ax <profile> auto safe` (nono sandbox). Otherwise they call the real binary. This means agent session resume in herdr context is transparently sandboxed.
+On macOS `dev`, managed PATH shims for all four native command names always
+delegate to `ax`. `ax` is the single policy gateway: Nono is the default,
+`--direct` is the explicit escape hatch, and Herdr resume arguments pass through
+unchanged. The real binaries are resolved with `~/.local/bin` removed from the
+search path so the shims cannot recurse.
 
 ### Nono Sandbox Profiles
 Located in `dot_config/nono/profiles/`. Each agent has a profile:
-- `default-crush.json` extends `default-claude.json` — adds Crush config paths + read access to skills, fnm, mise dirs
+- `default-agent.json` holds the shared developer network, worktree, runtime-read,
+  and credential-deny boundary; `ax` grants the resolved Herdr socket dynamically
+- `default-claude.json`, `default-pi.json`, `default-opencode.json`, and
+  `default-crush.json` add only the state paths required by each client
 - Nono controls filesystem access, network, workdir permissions for sandboxed AI agents
 
 ## Shell Initialization Order
@@ -122,7 +131,7 @@ Located in `dot_config/nono/profiles/`. Each agent has a profile:
 
 1. `exports` — PATH, XDG dirs, environment variables
 2. `aliases` — ls→eza, cat→bat, cd→z, etc.
-3. `functions` — mcd, extract, search, AI wrappers
+3. `functions` — mcd, extract, search, charm compatibility
 4. `extra` — zsh plugins, fnm, mise, zoxide, fzf (deferred), thefuck, completions, starship (last)
 
 Starship must be last — it replaces PS1.
@@ -180,10 +189,14 @@ Backups are timestamped (`local_DDMMYY`). Auto-detects first non-system volume i
 
 1. **`.tmpl` files are Go templates** — don't edit them as plain config files. Pay attention to template conditionals.
 2. **`run_once_after_*` scripts won't re-run** unless you clear state: `chezmoi state delete-bucket --bucket=scriptState`
-3. **`HERDR_ENV=1` intercepts AI CLI tools** — calling `claude --resume` in herdr context wraps in `ax` sandbox. To bypass, use `command claude` (the wrapper uses `command` to call the real binary).
+3. **Agent names are managed shims** — `claude`, `pi`, `opencode`, and `crush`
+   always enter `ax`, including through `command`. Use `ax <agent> --direct`
+   only for an explicit diagnostic sandbox bypass.
 4. **External skills are refreshed weekly** — if editing local skills in `~/.config/agents/skills/`, be aware they may get overwritten by chezmoi external sync.
 5. **Sensitive data is not in this repo** — SSH keys, browser profiles, personal docs are backed up separately to external SSD.
 6. **Platform-sensitive files** may not be present (e.g., macOS scripts are ignored entirely on Linux via `.chezmoiignore.tmpl`).
-7. **No tests** — this is a configuration repository. Validate by running `chezmoi diff` or `chezmoi apply --dry-run`.
+7. **AI platform tests are shell-based** — run
+   `bash dot_local/bin/tests/test_ax.sh`; also validate repository rendering with
+   `chezmoi diff` or `chezmoi apply --dry-run`.
 8. **Docker on macOS** uses Colima, not Docker Desktop.
 9. **fzf initialization is deferred** via precmd hook for faster shell startup.

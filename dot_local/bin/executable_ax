@@ -1,147 +1,559 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# ax - Unified Agent Executor CLI for CLI Proxy API & Nono Sandboxing
+
+readonly AX_EXIT_USAGE=64
+readonly AX_EXIT_UNAVAILABLE=69
+readonly AX_EXIT_CONFIG=78
+readonly AX_REQUIRED_ROLES='["frontier","balanced","fast","light"]'
+readonly AX_REQUIRED_AGENTS='["claude","pi","opencode","crush"]'
+
+config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+models_file="${AX_REGISTRY_PATH:-$config_home/ax/models.json}"
+proxy_key_file="${AX_PROXY_KEY_FILE:-$config_home/cli-proxy-api/client-key}"
+
+die() {
+  local status="$1"
+  shift
+  printf 'ax: %s\n' "$*" >&2
+  exit "$status"
+}
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || die "$AX_EXIT_UNAVAILABLE" "required command not found: $1"
+}
 
 show_help() {
-  cat << 'EOF2'
-ax — Unified Agent Executor
+  cat <<'EOF'
+ax — policy gateway for local coding agents
 
-USAGE:
-  ax [agent] [sandbox] [extra_args...]
-  ax --help | -h
-  ax models
-  ax quota | q
+Usage:
+  ax <claude|pi|opencode|crush> [--direct] [agent arguments...]
+  ax models [show|edit|validate|sync|live]
+  ax auth setup
+  ax doctor
 
-POSITIONAL PARAMETERS:
-  agent       Agent binary to run:
-                claude   | c   (default)
-                pi       | p
-                opencode | o
-                crush    | charm | cr
-  sandbox     Sandboxing mode:
-                safe   | s  (default: Nono sandboxed run, uses .nono.json if present else default profile)
-                direct | d  (Direct run without sandboxing)
+All normal agent launches use Nono. --direct is the only sandbox escape and
+must immediately follow the agent name. Agent arguments are otherwise passed
+through unchanged.
 
-SUBCOMMANDS:
-  --help, -h  Show this help message
-  models      Display live available proxy models
-  quota, q    Open CLI Proxy API quota dashboard in browser
-EOF2
+Set AX_MODEL to frontier, balanced, fast, or light to override an agent's
+default role. Set AX_MODEL=raw:<provider-model-id> for an explicit experiment.
+EOF
 }
 
-show_models() {
-  echo "Live Available Models (http://127.0.0.1:8317/v1/models):"
-  echo ""
-  local response
-  response=$(curl -s --max-time 2 -H "Authorization: Bearer sk-dummy" http://127.0.0.1:8317/v1/models 2>/dev/null || true)
-  if [[ -n "$response" ]] && command -v jq >/dev/null 2>&1 && echo "$response" | jq -e '.data' >/dev/null 2>&1; then
-    echo "$response" | jq -r '.data[] | "  - " + .id + " [Provider: " + (.owned_by // "unknown") + "]"'
-  elif [[ -n "$response" ]]; then
-    echo "  $response"
-  else
-    echo "  (CLI Proxy API server not responding on 127.0.0.1:8317)"
+load_models() {
+  need jq
+  [[ -r "$models_file" ]] || die "$AX_EXIT_CONFIG" "model registry not found: $models_file; run: chezmoi apply"
+}
+
+validate_models() {
+  local file="${1:-$models_file}"
+  [[ -r "$file" ]] || {
+    printf 'model registry not found: %s\n' "$file" >&2
+    return 1
+  }
+
+  jq -e \
+    --argjson required_roles "$AX_REQUIRED_ROLES" \
+    --argjson required_agents "$AX_REQUIRED_AGENTS" '
+      def nonempty_string: type == "string" and length > 0;
+      def valid_metadata:
+        (.alias | nonempty_string) and
+        (.provider | nonempty_string) and
+        (.target | nonempty_string) and
+        (.displayName | nonempty_string) and
+        (.contextWindow | type == "number" and . > 0) and
+        (.maxTokens | type == "number" and . > 0) and
+        (.reasoning | type == "boolean") and
+        (.input | type == "array" and length > 0 and all(.[]; . == "text" or . == "image"));
+      (.version | type == "number") and
+      (.proxy.url | nonempty_string) and
+      (.proxy.channel | IN("vertex", "aistudio", "antigravity", "claude", "codex", "kimi", "xai")) and
+      ((.roles | keys | sort) == ($required_roles | sort)) and
+      (all(.roles | to_entries[]; .key == .value.alias)) and
+      (([.roles[].alias] | unique | length) == (.roles | length)) and
+      (.proxy.channel as $channel | all(.roles[]; valid_metadata and (.provider == $channel))) and
+      (([.roles[] | [.provider, .target] | join(":")] | unique | length) == (.roles | length)) and
+      ((.agents | keys | sort) == ($required_agents | sort)) and
+      (all(.agents[]; ((.defaultRole as $role | $required_roles | index($role)) != null) and (.profile | nonempty_string))) and
+      (all(.classes[]?[]?; . as $role | $required_roles | index($role) != null)) and
+      (.classes.claude.normal == .agents.claude.defaultRole) and
+      (.classes.crush.large == .agents.crush.defaultRole) and
+      (all(.alternatives | keys[]; . as $role | $required_roles | index($role) != null)) and
+      (all(.alternatives[]?[]?;
+        (.provider | IN("vertex", "aistudio", "antigravity", "claude", "codex", "kimi", "xai")) and
+        (.target | nonempty_string))) and
+      (.minimumVersions | type == "object") and
+      (all(.minimumVersions[]; nonempty_string))
+    ' "$file" >/dev/null
+}
+
+source_registry_json() {
+  local source_path
+  source_path="$(chezmoi source-path 2>/dev/null)/.chezmoidata/ai-agent-platform.yaml"
+  [[ -r "$source_path" ]] || return 1
+  chezmoi execute-template '{{ .aiAgentPlatform | toJson }}'
+}
+
+models_validate_command() {
+  load_models
+  if [[ -n "${AX_REGISTRY_PATH:-}" ]]; then
+    validate_models "$models_file" || die "$AX_EXIT_CONFIG" "model registry is invalid: $models_file"
+    printf 'models: valid\n'
+    return 0
   fi
-}
-
-show_quota() {
-  echo "CLI Proxy API Quota Dashboard:"
-  echo "  URL: http://127.0.0.1:8317/management.html#/quota"
-  if [[ -z "${DRY_RUN:-}" ]]; then
-    open "http://127.0.0.1:8317/management.html#/quota" 2>/dev/null || true
+  local temp_file=""
+  if command -v chezmoi >/dev/null 2>&1; then
+    temp_file="$(mktemp "${TMPDIR:-/tmp}/ax-models.XXXXXX")"
+    if source_registry_json >"$temp_file" 2>/dev/null; then
+      if validate_models "$temp_file"; then
+        rm -f "$temp_file"
+        printf 'models: valid\n'
+        return 0
+      fi
+      rm -f "$temp_file"
+      die "$AX_EXIT_CONFIG" "canonical model registry is invalid"
+    fi
+    rm -f "$temp_file"
   fi
+  validate_models "$models_file" || die "$AX_EXIT_CONFIG" "rendered model registry is invalid: $models_file"
+  printf 'models: valid\n'
 }
 
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-  show_help
-  exit 0
-fi
+models_show() {
+  load_models
+  validate_models "$models_file" || die "$AX_EXIT_CONFIG" "rendered model registry is invalid: $models_file"
+  printf '%-10s %-14s %s\n' ROLE PROVIDER TARGET
+  jq -r '.roles | to_entries[] | [.key, .value.provider, .value.target] | @tsv' "$models_file" |
+    while IFS=$'\t' read -r role provider target; do
+      printf '%-10s %-14s %s\n' "$role" "$provider" "$target"
+    done
+}
 
-if [[ "${1:-}" == "models" ]]; then
-  show_models
-  exit 0
-fi
+read_proxy_key() {
+  [[ -r "$proxy_key_file" ]] || return 1
+  IFS= read -r proxy_key <"$proxy_key_file"
+  [[ -n "$proxy_key" ]]
+}
 
-if [[ "${1:-}" == "quota" || "${1:-}" == "q" ]]; then
-  show_quota
-  exit 0
-fi
-
-AGENT="claude"
-SANDBOX="safe"
-
-parse_agent() {
-  case "${1:-}" in
-    c|claude)   AGENT="claude" ;;
-    p|pi)       AGENT="pi" ;;
-    o|opencode) AGENT="opencode" ;;
-    r|crush|charm|cr) AGENT="crush" ;;
+provider_auth_present() {
+  local channel="$1" prefix auth_file
+  case "$channel" in
+    antigravity) prefix="antigravity-" ;;
+    claude) prefix="claude-" ;;
+    codex) prefix="codex-" ;;
+    kimi) prefix="kimi-" ;;
+    xai) prefix="xai-" ;;
+    vertex) prefix="vertex-" ;;
+    aistudio) prefix="aistudio-" ;;
     *) return 1 ;;
+  esac
+  for auth_file in "$config_home/cli-proxy-api/$prefix"*.json; do
+    [[ -s "$auth_file" ]] && return 0
+  done
+  return 1
+}
+
+proxy_url() {
+  jq -r '.proxy.url' "$models_file"
+}
+
+proxy_ready() {
+  local base_url="$1"
+  read_proxy_key || return 1
+  curl --silent --fail --max-time 2 \
+    -H "Authorization: Bearer $proxy_key" \
+    "$base_url/v1/models" >/dev/null 2>&1
+}
+
+proxy_has_model() {
+  local base_url="$1" model_id="$2"
+  curl --silent --fail --max-time 2 \
+    -H "Authorization: Bearer $proxy_key" \
+    "$base_url/v1/models" |
+    jq -e --arg model_id "$model_id" 'any(.data[]?; .id == $model_id)' >/dev/null 2>&1
+}
+
+ensure_proxy() {
+  local requested_model="${1:-}" base_url
+  base_url="$(proxy_url)"
+  if proxy_ready "$base_url"; then
+    :
+  elif command -v brew >/dev/null 2>&1; then
+    brew services start cliproxyapi >/dev/null 2>&1 || true
+    local _
+    for _ in 1 2 3 4 5; do
+      if proxy_ready "$base_url"; then
+        break
+      fi
+      sleep 1
+    done
+  fi
+  if ! proxy_ready "$base_url"; then
+    die "$AX_EXIT_UNAVAILABLE" "CLIProxyAPI is unavailable; run: brew services restart cliproxyapi"
+  fi
+  if [[ -n "$requested_model" ]] && ! proxy_has_model "$base_url" "$requested_model"; then
+    die "$AX_EXIT_UNAVAILABLE" "model '$requested_model' is not advertised by CLIProxyAPI; run: ax models live"
+  fi
+}
+
+models_live() {
+  load_models
+  local base_url
+  base_url="$(proxy_url)"
+  ensure_proxy
+  curl --silent --fail --max-time 2 \
+    -H "Authorization: Bearer $proxy_key" \
+    "$base_url/v1/models" |
+    jq -r '.data[] | "\(.id)\t\(.owned_by // "unknown")"'
+}
+
+models_edit() {
+  need chezmoi
+  local source_path
+  source_path="$(chezmoi source-path)/.chezmoidata/ai-agent-platform.yaml"
+  [[ -r "$source_path" ]] || die "$AX_EXIT_CONFIG" "canonical registry not found: $source_path"
+  "${VISUAL:-${EDITOR:-vi}}" "$source_path"
+}
+
+models_sync() {
+  need chezmoi
+  models_validate_command
+  chezmoi apply \
+    "$config_home/ax/models.json" \
+    "$config_home/cli-proxy-api/config.yaml" \
+    "$config_home/opencode/opencode.jsonc" \
+    "$config_home/pi/agent/settings.json" \
+    "$config_home/pi/agent/models.json" \
+    "$config_home/crush/crush.json"
+}
+
+models_command() {
+  case "${1:-show}" in
+    show) models_show ;;
+    edit) models_edit ;;
+    validate) models_validate_command ;;
+    sync) models_sync ;;
+    live) models_live ;;
+    *) die "$AX_EXIT_USAGE" "unknown models command: $1" ;;
   esac
 }
 
-parse_sandbox() {
-  case "${1:-}" in
-    s|safe)   SANDBOX="safe" ;;
-    d|direct) SANDBOX="direct" ;;
-    *) return 1 ;;
-  esac
+generate_secret() {
+  local destination="$1"
+  if [[ -s "$destination" ]]; then
+    return 0
+  fi
+  mkdir -p "$(dirname "$destination")"
+  umask 077
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32 >"$destination"
+  else
+    LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 64 >"$destination"
+    printf '\n' >>"$destination"
+  fi
 }
 
-if parse_agent "${1:-}"; then
-  shift
-  parse_sandbox "${1:-}" && shift || true
-elif parse_sandbox "${1:-}"; then
-  shift
-fi
+auth_setup() {
+  [[ "${AX_PLATFORM:-$(uname -s)}" == "Darwin" ]] || die "$AX_EXIT_UNAVAILABLE" "auth setup is supported on macOS dev machines"
+  need cliproxyapi
+  need chezmoi
+  local management_key_file="$config_home/cli-proxy-api/management-key"
+  generate_secret "$proxy_key_file"
+  generate_secret "$management_key_file"
+  chmod 600 "$proxy_key_file" "$management_key_file"
+  chezmoi apply "$config_home/cli-proxy-api/config.yaml"
 
-# Universal Provider settings mapped to CLI Proxy API
-export ANTHROPIC_BASE_URL="http://127.0.0.1:8317"
-export ANTHROPIC_API_KEY="sk-dummy"
-unset ANTHROPIC_AUTH_TOKEN
-export OPENAI_BASE_URL="http://127.0.0.1:8317/v1"
-export OPENAI_API_KEY="sk-dummy"
+  load_models
+  local channel login_flag
+  channel="$(jq -r '.proxy.channel' "$models_file")"
+  case "$channel" in
+    antigravity) login_flag="-antigravity-login" ;;
+    claude) login_flag="-claude-login" ;;
+    codex) login_flag="-codex-login" ;;
+    kimi) login_flag="-kimi-login" ;;
+    xai) login_flag="-xai-login" ;;
+    *)
+      die "$AX_EXIT_CONFIG" "CLIProxyAPI has no interactive login flow configured for channel: $channel"
+      ;;
+  esac
+  printf 'Starting interactive CLIProxyAPI login for %s...\n' "$channel"
+  cliproxyapi "$login_flag"
+  provider_auth_present "$channel" ||
+    die "$AX_EXIT_CONFIG" "provider login completed without a local OAuth/account file; retry: ax auth setup"
+  need brew
+  brew services restart cliproxyapi
+  ensure_proxy
+  printf 'authentication: ready\n'
+}
 
-export CLAUDE_CONFIG_DIR="${HOME}/.claude"
-export PI_CODING_AGENT_DIR="${HOME}/.config/pi/agent"
+version_ge() {
+  local actual="$1" minimum="$2"
+  [[ "$(printf '%s\n%s\n' "$minimum" "$actual" | sort -V | head -n1)" == "$minimum" ]]
+}
 
-# Simplified model defaults (just Gemini proxy models)
-export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-4-6-thinking"
-export ANTHROPIC_DEFAULT_SONNET_MODEL="gemini-3.6-flash-high"
-export ANTHROPIC_DEFAULT_HAIKU_MODEL="gemini-3.5-flash-low"
-export ANTHROPIC_DEFAULT_FABLE_MODEL="gemini-3.1-pro-low"
-export ANTHROPIC_MODEL="gemini-3.6-flash-high"
-export ANTHROPIC_SMALL_FAST_MODEL="gemini-3.5-flash-low"
-export OPENAI_MODEL="gemini-3.6-flash-high"
+command_version() {
+  local command_path="$1"
+  ("$command_path" --version 2>&1 || true) |
+    sed -nE 's/.*[Vv]ersion:? *v?([0-9]+(\.[0-9]+)+).*/\1/p; s/^[^0-9]*v?([0-9]+(\.[0-9]+)+).*/\1/p' |
+    head -n1
+}
 
-export HERDR_AGENT="$AGENT"
-AGENT_CMD="$AGENT"
-
-if [[ "$SANDBOX" == "safe" ]]; then
-  if [[ -f "$PWD/.nono.json" ]]; then
-    PROFILE=".nono.json"
-  elif [[ "$AGENT" == "pi" ]]; then
-    PROFILE="default-pi"
-  elif [[ "$AGENT" == "opencode" ]]; then
-    PROFILE="default-opencode"
-  elif [[ "$AGENT" == "crush" ]]; then
-    PROFILE="default-crush"
-  else
-    PROFILE="default-claude"
+doctor_check_binary() {
+  local command_name="$1" minimum="$2"
+  local command_path=""
+  case "$command_name" in
+    claude|pi|opencode|crush)
+      command_path="$(PATH="$(real_path)" command -v "$command_name" 2>/dev/null || true)"
+      ;;
+    *)
+      command_path="$(command -v "$command_name" 2>/dev/null || true)"
+      ;;
+  esac
+  if [[ -z "$command_path" ]]; then
+    printf '%s: missing (need >= %s)\n' "$command_name" "$minimum"
+    return 1
   fi
-  RUN_CMD=(nono run --profile "$PROFILE" --allow-cwd -- "$AGENT_CMD" "$@")
-else
-  RUN_CMD=("$AGENT_CMD" "$@")
-fi
+  local actual
+  actual="$(command_version "$command_path")"
+  if [[ -z "$actual" ]]; then
+    printf '%s: installed (version unknown; need >= %s)\n' "$command_name" "$minimum"
+    return 1
+  elif version_ge "$actual" "$minimum"; then
+    printf '%s: ready (%s)\n' "$command_name" "$actual"
+  else
+    printf '%s: outdated (%s; need >= %s)\n' "$command_name" "$actual" "$minimum"
+    return 1
+  fi
+}
 
-if [[ -n "${DRY_RUN:-}" ]]; then
-  echo "AGENT=$AGENT SANDBOX=$SANDBOX"
-  echo "HERDR_AGENT=$HERDR_AGENT"
-  echo "ANTHROPIC_BASE_URL=$ANTHROPIC_BASE_URL"
-  echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY"
-  echo "ANTHROPIC_MODEL=$ANTHROPIC_MODEL"
-  echo "OPENAI_MODEL=$OPENAI_MODEL"
-  echo "EXEC: ${RUN_CMD[*]}"
-  exit 0
-fi
+doctor() {
+  load_models
+  local failures=0 name minimum active_channel
+  active_channel="$(jq -r '.proxy.channel' "$models_file")"
+  if validate_models "$models_file"; then
+    printf 'models: valid\n'
+  else
+    printf 'models: invalid\n'
+    failures=$((failures + 1))
+  fi
 
-exec "${RUN_CMD[@]}"
+  if read_proxy_key; then
+    printf 'proxy authentication: configured\n'
+  else
+    printf 'proxy authentication: missing (run: ax auth setup)\n'
+    failures=$((failures + 1))
+  fi
+  if provider_auth_present "$active_channel"; then
+    printf 'provider authentication (%s): configured\n' "$active_channel"
+  else
+    printf 'provider authentication (%s): missing (run: ax auth setup)\n' "$active_channel"
+    failures=$((failures + 1))
+  fi
+  if proxy_ready "$(proxy_url)"; then
+    printf 'proxy: ready\n'
+  else
+    printf 'proxy: unavailable (run: brew services restart cliproxyapi)\n'
+    failures=$((failures + 1))
+  fi
+
+  while IFS=$'\t' read -r name minimum; do
+    doctor_check_binary "$name" "$minimum" || failures=$((failures + 1))
+  done < <(jq -r '.minimumVersions | to_entries[] | [.key, .value] | @tsv' "$models_file")
+
+  local profile
+  for profile in default-claude default-pi default-opencode default-crush; do
+    if [[ -r "$config_home/nono/profiles/$profile.json" ]] &&
+      command -v nono >/dev/null 2>&1 &&
+      nono profile validate "$config_home/nono/profiles/$profile.json" >/dev/null 2>&1; then
+      printf 'profile %s: valid\n' "$profile"
+    else
+      printf 'profile %s: missing or invalid\n' "$profile"
+      failures=$((failures + 1))
+    fi
+  done
+
+  local shim
+  for name in claude pi opencode crush; do
+    shim="$HOME/.local/bin/$name"
+    if [[ -x "$shim" ]] && grep -q "ax $name" "$shim"; then
+      printf 'shim %s: ready\n' "$name"
+    else
+      printf 'shim %s: missing or stale\n' "$name"
+      failures=$((failures + 1))
+    fi
+  done
+
+  if command -v herdr >/dev/null 2>&1; then
+    local status
+    status="$(herdr integration status 2>/dev/null || true)"
+    for name in claude pi opencode; do
+      if grep -Eq "^${name}: current" <<<"$status"; then
+        printf 'herdr %s integration: current\n' "$name"
+      else
+        printf 'herdr %s integration: missing or stale\n' "$name"
+        failures=$((failures + 1))
+      fi
+    done
+  fi
+
+  ((failures == 0))
+}
+
+real_path() {
+  if [[ -n "${AX_REAL_PATH:-}" ]]; then
+    printf '%s\n' "$AX_REAL_PATH"
+    return
+  fi
+  local shim_dir="$HOME/.local/bin"
+  local entry result=()
+  IFS=':' read -r -a path_entries <<<"$PATH"
+  for entry in "${path_entries[@]}"; do
+    [[ -n "$entry" && "$entry" != "$shim_dir" ]] && result+=("$entry")
+  done
+  local joined
+  printf -v joined '%s:' "${result[@]}"
+  printf '%s\n' "${joined%:}"
+}
+
+resolve_agent_binary() {
+  local agent="$1" search_path
+  search_path="$(real_path)"
+  PATH="$search_path" command -v "$agent" 2>/dev/null ||
+    die "$AX_EXIT_UNAVAILABLE" "real agent binary not found outside managed shims: $agent"
+}
+
+configure_environment() {
+  local agent="$1" role="$2" model_id="$3" base_url="$4"
+  export AX_MODEL_ROLE="$role"
+  export AX_MODEL_ID="$model_id"
+  export HERDR_AGENT="$agent"
+  export ANTHROPIC_BASE_URL="$base_url"
+  export ANTHROPIC_API_KEY="$proxy_key"
+  unset ANTHROPIC_AUTH_TOKEN
+  export OPENAI_BASE_URL="$base_url/v1"
+  export OPENAI_API_KEY="$proxy_key"
+  export OPENAI_MODEL="$model_id"
+  export ANTHROPIC_MODEL="$model_id"
+  export ANTHROPIC_DEFAULT_OPUS_MODEL
+  ANTHROPIC_DEFAULT_OPUS_MODEL="$(jq -r '.classes.claude.large' "$models_file")"
+  export ANTHROPIC_DEFAULT_SONNET_MODEL
+  ANTHROPIC_DEFAULT_SONNET_MODEL="$(jq -r '.classes.claude.normal' "$models_file")"
+  export ANTHROPIC_DEFAULT_HAIKU_MODEL
+  ANTHROPIC_DEFAULT_HAIKU_MODEL="$(jq -r '.classes.claude.fast' "$models_file")"
+  export ANTHROPIC_SMALL_FAST_MODEL
+  ANTHROPIC_SMALL_FAST_MODEL="$(jq -r '.classes.claude.small' "$models_file")"
+}
+
+launch_agent() {
+  local agent="$1"
+  shift
+  local direct=false
+  if [[ "${1:-}" == "--direct" ]]; then
+    direct=true
+    shift
+  fi
+
+  load_models
+  validate_models "$models_file" || die "$AX_EXIT_CONFIG" "rendered model registry is invalid: $models_file"
+  local model_override=false
+  [[ -n "${AX_MODEL+x}" ]] && model_override=true
+  local requested="${AX_MODEL:-$(jq -r --arg agent "$agent" '.agents[$agent].defaultRole' "$models_file")}"
+  local role model_id
+  if [[ "$requested" == raw:* ]]; then
+    role="raw"
+    model_id="${requested#raw:}"
+    [[ -n "$model_id" ]] || die "$AX_EXIT_USAGE" "raw model override is empty"
+  elif jq -e --arg role "$requested" '.roles[$role]' "$models_file" >/dev/null; then
+    role="$requested"
+    model_id="$requested"
+  else
+    die "$AX_EXIT_USAGE" "unknown model role: $requested"
+  fi
+
+  read_proxy_key || die "$AX_EXIT_CONFIG" "proxy client key is missing; run: ax auth setup"
+  ensure_proxy "$model_id"
+  local base_url binary
+  base_url="$(proxy_url)"
+  binary="$(resolve_agent_binary "$agent")"
+  configure_environment "$agent" "$role" "$model_id" "$base_url"
+
+  local crush_override_file=""
+  if [[ "$model_override" == true ]]; then
+    case "$agent" in
+      claude)
+        set -- --model "$model_id" "$@"
+        ;;
+      pi)
+        set -- --model "cliproxy/$model_id" "$@"
+        ;;
+      opencode)
+        set -- --model "openai/$model_id" "$@"
+        ;;
+      crush)
+        local crush_config="$config_home/crush/crush.json"
+        [[ -r "$crush_config" ]] || die "$AX_EXIT_CONFIG" "Crush config is missing: $crush_config"
+        mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/crush"
+        crush_override_file="$(mktemp "${XDG_CACHE_HOME:-$HOME/.cache}/crush/ax-model.XXXXXX.json")"
+        jq --arg model "$model_id" --arg role "$role" '
+          .models.large.model = $model |
+          if $role == "raw" then
+            .providers.cliproxy.models += [{
+              "id": $model,
+              "name": ("Raw: " + $model),
+              "context_window": 200000,
+              "default_max_tokens": 32768
+            }]
+          else . end
+        ' "$crush_config" >"$crush_override_file"
+        export CRUSH_GLOBAL_CONFIG="$crush_override_file"
+        ;;
+    esac
+  fi
+
+  local -a run_command
+  if [[ "$direct" == true ]]; then
+    run_command=("$binary" "$@")
+  else
+    local profile
+    profile="$(jq -r --arg agent "$agent" '.agents[$agent].profile' "$models_file")"
+    if [[ -n "${HERDR_SOCKET_PATH:-}" ]]; then
+      run_command=(nono run --profile "$profile" --allow-cwd --allow-unix-socket "$HERDR_SOCKET_PATH" -- "$binary" "$@")
+    else
+      run_command=(nono run --profile "$profile" --allow-cwd -- "$binary" "$@")
+    fi
+  fi
+
+  if [[ -n "$crush_override_file" ]]; then
+    trap 'rm -f "$crush_override_file"' EXIT HUP INT TERM
+    "${run_command[@]}"
+    exit $?
+  fi
+  exec "${run_command[@]}"
+}
+
+case "${1:-}" in
+  --help|-h|"")
+    show_help
+    ;;
+  models)
+    shift
+    models_command "$@"
+    ;;
+  auth)
+    shift
+    [[ "${1:-}" == "setup" ]] || die "$AX_EXIT_USAGE" "usage: ax auth setup"
+    auth_setup
+    ;;
+  doctor)
+    doctor
+    ;;
+  claude|pi|opencode|crush)
+    agent="$1"
+    shift
+    launch_agent "$agent" "$@"
+    ;;
+  *)
+    die "$AX_EXIT_USAGE" "unknown command or agent: $1; use --help"
+    ;;
+esac

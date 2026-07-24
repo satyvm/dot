@@ -2,36 +2,22 @@
   "meta": {
     "name": "default-crush",
     "version": "1.0.0",
-    "description": "Default Nono profile for Crush/Charm agent extending default-claude profile"
+    "description": "ax-managed Crush profile"
   },
-  "extends": "default-claude",
-  "groups": {
-    "include": [
-      "user_caches_macos",
-      "git_config",
-      "unlink_protection"
-    ]
-  },
+  "extends": "default-agent",
   "filesystem": {
     "allow": [
-      "$HOME/.config/crush",
       "$HOME/.local/share/crush",
-      "$HOME/.local/state/crush"
-    ],
-    "allow_file": [
-      "$HOME/.config/herdr/herdr.sock"
+      "$HOME/.local/state/crush",
+      "$HOME/.cache/crush"
     ],
     "read": [
-      "/home",
-      "$HOME/.config/agents/",
-      "$HOME/.local/state/fnm_multishells/",
-      "$HOME/.local/share/fnm/",
-      "$HOME/.local/share/",
-      "$HOME/.fnm/",
-      "$HOME/.nvm/"
+      "$HOME/.config/crush"
+    ],
+    "deny": [
+      "$HOME/.config/crush/auth.json",
+      "$HOME/.local/share/crush/auth.json",
+      "$HOME/.local/share/crush/hyper.json"
     ]
-  },
-  "workdir": {
-    "access": "readwrite"
   }
 }

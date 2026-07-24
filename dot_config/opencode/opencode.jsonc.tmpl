@@ -1,0 +1,33 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": false,
+  "enabled_providers": ["openai"],
+  "model": "openai/{{ .aiAgentPlatform.agents.opencode.defaultRole }}",
+  "provider": {
+    "openai": {
+      "options": {
+        "baseURL": "{{ .aiAgentPlatform.proxy.url }}/v1",
+        "apiKey": "{env:OPENAI_API_KEY}"
+      },
+      "models": {
+{{- $roles := .aiAgentPlatform.roles -}}
+{{- range $index, $role := list "frontier" "balanced" "fast" "light" }}
+        "{{ $role }}": {
+          "id": "{{ $role }}",
+          "name": "{{ (index $roles $role).displayName }}",
+          "family": "canonical",
+          "limit": {
+            "context": {{ (index $roles $role).contextWindow }},
+            "output": {{ (index $roles $role).maxTokens }}
+          },
+          "modalities": {
+            "input": {{ (index $roles $role).input | toJson }},
+            "output": ["text"]
+          },
+          "reasoning": {{ (index $roles $role).reasoning }}
+        }{{ if lt $index 3 }},{{ end }}
+{{- end }}
+      }
+    }
+  }
+}

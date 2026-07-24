@@ -1,0 +1,10 @@
+# Device-local AI authentication and credentials must never enter the source state.
+dot_config/cli-proxy-api/*.json
+dot_config/cli-proxy-api/*key*
+dot_config/**/auth.json
+dot_config/**/credentials.json
+
+# SSH material and Keychain exports are outside the portable dotfiles boundary.
+dot_ssh/
+private_dot_ssh/
+*Keychain*.keychain-db

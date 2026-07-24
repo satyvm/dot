@@ -23,6 +23,26 @@ run_once_after_setup-linux.sh.tmpl
 run_onchange_apt-packages.sh.tmpl
 {{- end }}
 
+# ── AI agent platform: first milestone is macOS dev only ─────────────────────
+{{- if not (and (eq .chezmoi.os "darwin") (eq .profile "dev")) }}
+.config/ax
+.config/cli-proxy-api
+.config/crush
+.config/opencode
+.config/pi
+.config/nono/profiles/default-agent.json
+.config/nono/profiles/default-claude.json
+.config/nono/profiles/default-crush.json
+.config/nono/profiles/default-opencode.json
+.config/nono/profiles/default-pi.json
+.local/bin/ax
+.local/bin/claude
+.local/bin/crush
+.local/bin/opencode
+.local/bin/pi
+run_onchange_after_setup-ai-agent-platform.sh.tmpl
+{{- end }}
+
 # ── Server profile: skip desktop/GUI scripts ─────────────────────────────────
 {{- if eq .profile "server" }}
 run_once_after_setup-zend.sh.tmpl

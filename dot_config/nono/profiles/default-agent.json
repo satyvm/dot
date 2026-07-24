@@ -1,0 +1,55 @@
+{
+  "meta": {
+    "name": "default-agent",
+    "version": "1.0.0",
+    "description": "Shared macOS developer boundary for ax-managed coding agents"
+  },
+  "extends": "node-dev",
+  "groups": {
+    "include": [
+      "rust_runtime",
+      "python_runtime",
+      "git_config",
+      "unlink_protection"
+    ]
+  },
+  "filesystem": {
+    "read": [
+      "$HOME/.config/agents",
+      "$HOME/.codex/skills",
+      "$HOME/.local/share/fnm",
+      "$HOME/.local/state/fnm_multishells",
+      "$HOME/.local/share/mise",
+      "$HOME/.local/state/mise",
+      "$HOME/.fnm",
+      "$HOME/.bun",
+      "$HOME/.cargo",
+      "$HOME/.rustup",
+      "$HOME/.go"
+    ],
+    "deny": [
+      "$HOME/.ssh",
+      "$HOME/.gnupg",
+      "$HOME/.aws",
+      "$HOME/.cargo/credentials",
+      "$HOME/.cargo/credentials.toml",
+      "$HOME/.config/gh/hosts.yml",
+      "$HOME/.config/cli-proxy-api",
+      "$HOME/.cache/zsh/history",
+      "$HOME/.zsh_history",
+      "$HOME/Library/Keychains",
+      "$HOME/Library/Application Support/Google/Chrome",
+      "$HOME/Library/Application Support/Chromium",
+      "$HOME/Library/Application Support/Firefox"
+    ]
+  },
+  "network": {
+    "block": false,
+    "network_profile": "developer",
+    "open_port": [8317],
+    "no_proxy": ["127.0.0.1", "localhost"]
+  },
+  "workdir": {
+    "access": "readwrite"
+  }
+}

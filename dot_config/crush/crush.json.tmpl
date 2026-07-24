@@ -1,0 +1,33 @@
+{
+  "$schema": "https://charm.land/crush.json",
+  "providers": {
+    "cliproxy": {
+      "type": "openai-compat",
+      "base_url": "{{ .aiAgentPlatform.proxy.url }}/v1",
+      "api_key": "$OPENAI_API_KEY",
+      "models": [
+{{- $roles := .aiAgentPlatform.roles -}}
+{{- range $index, $role := list "frontier" "balanced" "fast" "light" -}}
+{{- $model := index $roles $role }}
+        {
+          "id": "{{ $role }}",
+          "name": "{{ $model.displayName }}",
+          "context_window": {{ $model.contextWindow }},
+          "default_max_tokens": {{ $model.maxTokens }}
+        }{{ if lt $index 3 }},{{ end }}
+{{- end }}
+      ]
+    }
+  },
+  "models": {
+    "large": {
+      "model": "{{ .aiAgentPlatform.classes.crush.large }}",
+      "provider": "cliproxy",
+      "max_tokens": {{ (index .aiAgentPlatform.roles .aiAgentPlatform.classes.crush.large).maxTokens }}
+    },
+    "small": {
+      "model": "{{ .aiAgentPlatform.classes.crush.small }}",
+      "provider": "cliproxy"
+    }
+  }
+}

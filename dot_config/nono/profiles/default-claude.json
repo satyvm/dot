@@ -2,24 +2,39 @@
   "meta": {
     "name": "default-claude",
     "version": "1.0.0",
-    "description": "Default Nono profile for Claude Code agent extending built-in claude-code profile"
+    "description": "ax-managed Claude Code profile"
   },
-  "extends": "claude-code",
+  "extends": "default-agent",
   "filesystem": {
     "allow": [
+      "$HOME/.claude/backups",
+      "$HOME/.claude/cache",
+      "$HOME/.claude/daemon",
+      "$HOME/.claude/file-history",
+      "$HOME/.claude/ide",
+      "$HOME/.claude/jobs",
+      "$HOME/.claude/paste-cache",
+      "$HOME/.claude/plans",
+      "$HOME/.claude/projects",
+      "$HOME/.claude/session-env",
+      "$HOME/.claude/sessions",
+      "$HOME/.claude/shell-snapshots",
+      "$HOME/.claude/tasks",
+      "$HOME/.claude/telemetry"
+    ],
+    "read": [
       "$HOME/.claude"
     ],
     "allow_file": [
-      "$HOME/.config/herdr/herdr.sock"
+      "$HOME/.claude/.claude.json",
+      "$HOME/.claude/.last-cleanup",
+      "$HOME/.claude/daemon.lock",
+      "$HOME/.claude/daemon.log",
+      "$HOME/.claude/daemon.status.json",
+      "$HOME/.claude/history.jsonl"
     ],
-    "read": [
-      "/home",
-      "$HOME/.config/agents/",
-      "$HOME/.local/state/fnm_multishells/",
-      "$HOME/.local/share/fnm/",
-      "$HOME/.local/share/",
-      "$HOME/.fnm/",
-      "$HOME/.nvm/"
+    "deny": [
+      "$HOME/.claude/.credentials.json"
     ]
   }
 }

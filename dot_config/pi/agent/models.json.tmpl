@@ -1,0 +1,26 @@
+{
+  "providers": {
+    "cliproxy": {
+      "baseUrl": "{{ .aiAgentPlatform.proxy.url }}/v1",
+      "api": "openai-completions",
+      "apiKey": "$OPENAI_API_KEY",
+      "compat": {
+        "maxTokensField": "max_tokens"
+      },
+      "models": [
+{{- $roles := .aiAgentPlatform.roles -}}
+{{- range $index, $role := list "frontier" "balanced" "fast" "light" -}}
+{{- $model := index $roles $role }}
+        {
+          "id": "{{ $role }}",
+          "name": "{{ $model.displayName }}",
+          "input": {{ $model.input | toJson }},
+          "reasoning": {{ $model.reasoning }},
+          "contextWindow": {{ $model.contextWindow }},
+          "maxTokens": {{ $model.maxTokens }}
+        }{{ if lt $index 3 }},{{ end }}
+{{- end }}
+      ]
+    }
+  }
+}

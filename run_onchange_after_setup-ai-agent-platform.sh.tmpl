@@ -1,0 +1,53 @@
+{{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+original_path="$PATH"
+shim_dir="$HOME/.local/bin"
+sanitized_entries=()
+IFS=':' read -r -a original_entries <<<"$original_path"
+for entry in "${original_entries[@]}"; do
+  [[ -n "$entry" && "$entry" != "$shim_dir" ]] && sanitized_entries+=("$entry")
+done
+printf -v sanitized_path '%s:' "${sanitized_entries[@]}"
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${sanitized_path%:}"
+
+warn() {
+  printf 'warning: %s\n' "$*" >&2
+}
+
+if ! command -v brew >/dev/null 2>&1; then
+  warn "Homebrew is missing; AI agent service setup was skipped"
+  exit 0
+fi
+
+if ! command -v herdr >/dev/null 2>&1; then
+  warn "Herdr is missing; agent integrations were not installed"
+else
+  for agent in claude pi opencode; do
+    if command -v "$agent" >/dev/null 2>&1; then
+      if ! herdr integration install "$agent"; then
+        warn "Could not install the Herdr $agent integration; retry: herdr integration install $agent"
+      fi
+    else
+      warn "$agent is optional and not installed; skipped its Herdr integration"
+    fi
+  done
+fi
+
+proxy_config="$HOME/.config/cli-proxy-api/config.yaml"
+brew_proxy_config="$(brew --prefix)/etc/cliproxyapi.conf"
+if [[ -f "$proxy_config" ]]; then
+  mkdir -p "$(dirname "$brew_proxy_config")"
+  ln -sfn "$proxy_config" "$brew_proxy_config"
+else
+  warn "CLIProxyAPI config is missing; run: chezmoi apply"
+fi
+
+if [[ -s "$HOME/.config/cli-proxy-api/client-key" ]]; then
+  brew services restart cliproxyapi ||
+    warn "CLIProxyAPI did not start; retry: brew services restart cliproxyapi"
+else
+  warn "CLIProxyAPI device keys are not initialized; run: ax auth setup"
+fi
+{{- end }}

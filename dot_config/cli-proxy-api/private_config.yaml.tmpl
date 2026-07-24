@@ -1,0 +1,44 @@
+{{- $clientKeyPath := joinPath .chezmoi.homeDir ".config/cli-proxy-api/client-key" -}}
+{{- $managementKeyPath := joinPath .chezmoi.homeDir ".config/cli-proxy-api/management-key" -}}
+host: "127.0.0.1"
+port: 8317
+tls:
+  enable: false
+  cert: ""
+  key: ""
+remote-management:
+  allow-remote: false
+  secret-key: {{ if stat $managementKeyPath }}{{ include $managementKeyPath | trim | quote }}{{ else }}""{{ end }}
+  disable-control-panel: false
+auth-dir: "~/.config/cli-proxy-api"
+api-keys:{{ if stat $clientKeyPath }}
+  - {{ include $clientKeyPath | trim | quote }}{{ else }} []{{ end }}
+debug: false
+pprof:
+  enable: false
+  addr: "127.0.0.1:8316"
+logging-to-file: true
+logs-max-total-size-mb: 100
+usage-statistics-enabled: false
+force-model-prefix: false
+request-retry: 3
+max-retry-credentials: 0
+max-retry-interval: 30
+quota-exceeded:
+  switch-project: true
+  switch-preview-model: false
+  antigravity-credits: false
+routing:
+  strategy: "fill-first"
+  session-affinity: true
+  session-affinity-ttl: "24h"
+ws-auth: true
+oauth-model-alias:
+  {{ .aiAgentPlatform.proxy.channel }}:
+{{- range $role, $model := .aiAgentPlatform.roles }}
+    - name: {{ $model.target | quote }}
+      alias: {{ $model.alias | quote }}
+      display-name: {{ $model.displayName | quote }}
+      fork: false
+      force-mapping: true
+{{- end }}
