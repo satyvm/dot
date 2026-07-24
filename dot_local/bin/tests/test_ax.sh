@@ -94,6 +94,17 @@ if [[ "${1:-}" == "--version" ]]; then
 fi
 printf 'agent=%s\n' "$(basename "$0")"
 printf 'model=%s\n' "${AX_MODEL_ROLE:-}:${AX_MODEL_ID:-}"
+printf 'pi_agent_dir=%s\n' "${PI_CODING_AGENT_DIR:-}"
+if [[ -n "${ANTHROPIC_AUTH_TOKEN:-}" ]]; then
+  printf 'anthropic_auth_token=set\n'
+else
+  printf 'anthropic_auth_token=unset\n'
+fi
+if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+  printf 'anthropic_api_key=set\n'
+else
+  printf 'anthropic_api_key=unset\n'
+fi
 printf 'crush_config=%s\n' "${CRUSH_GLOBAL_CONFIG:-}"
 if [[ -n "${CRUSH_GLOBAL_CONFIG:-}" ]]; then
   printf 'crush_model=%s\n' "$(/usr/bin/jq -r '.models.large.model' "$CRUSH_GLOBAL_CONFIG")"
@@ -115,7 +126,13 @@ cat >"$FAKE_BIN/herdr" <<'SH'
 if [[ "${1:-}" == "--version" ]]; then
   echo "herdr 99.0.0"
 elif [[ "${1:-}" == "integration" && "${2:-}" == "status" ]]; then
-  printf '%s\n' "claude: current (v99)" "pi: current (v99)" "opencode: current (v99)"
+  printf '%s\n' "claude: current (v99)"
+  if [[ "${PI_CODING_AGENT_DIR:-}" == "$HOME/.pi/agent" ]]; then
+    printf '%s\n' "pi: current (v99)"
+  else
+    printf '%s\n' "pi: not installed"
+  fi
+  printf '%s\n' "opencode: current (v99)"
 fi
 SH
 
@@ -190,7 +207,13 @@ run_ax() {
 printf 'TAP version 13\n'
 
 OUTPUT="$(run_ax claude --resume 'session id' --flag='two words')"
-assert_contains "$OUTPUT" "nono <run> <--profile> <default-claude> <--allow-cwd> <--> <$FAKE_BIN/claude> <--resume> <session id> <--flag=two words>" "safe launch selects the Claude profile and preserves arguments"
+assert_contains "$OUTPUT" "nono <run> <--profile> <default-claude> <--allow-cwd> <--> <$FAKE_BIN/claude>" "safe launch selects the Claude profile"
+assert_contains "$OUTPUT" "<--settings> <{\"availableModels\":[\"frontier\",\"balanced\",\"fast\",\"light\"]}>" "Claude receives the canonical role allowlist"
+assert_contains "$OUTPUT" "<--resume> <session id> <--flag=two words>" "safe launch preserves Claude arguments"
+
+OUTPUT="$(run_ax claude --direct)"
+assert_contains "$OUTPUT" "anthropic_auth_token=set" "Claude receives the gateway credential as a bearer token"
+assert_contains "$OUTPUT" "anthropic_api_key=unset" "Claude avoids interactive API-key approval state"
 
 OUTPUT="$(HERDR_SOCKET_PATH="$FIXTURE_ROOT/herdr named.sock" run_ax opencode --session 'herdr session')"
 assert_contains "$OUTPUT" "<--allow-unix-socket> <$FIXTURE_ROOT/herdr named.sock>" "Herdr's resolved named-session socket is granted dynamically"
@@ -198,6 +221,12 @@ assert_contains "$OUTPUT" "<--session> <herdr session>" "Herdr restore arguments
 
 OUTPUT="$(run_ax pi --direct --session 'path with spaces')"
 assert_contains "$OUTPUT" "agent=pi" "direct launch resolves the real Pi binary without shim recursion"
+assert_contains "$OUTPUT" "pi_agent_dir=$HOME_DIR/.pi/agent" "Pi uses its documented global agent directory"
+if [[ -d "$HOME_DIR/.pi/agent/sessions" ]]; then
+  pass "Pi session root exists before the sandbox starts"
+else
+  fail "Pi session root exists before the sandbox starts" "missing: $HOME_DIR/.pi/agent/sessions"
+fi
 assert_contains "$OUTPUT" "arg[0]=<--session>" "direct launch preserves the session flag"
 assert_contains "$OUTPUT" "arg[1]=<path with spaces>" "direct launch preserves a spaced session identifier"
 
@@ -210,7 +239,7 @@ assert_contains "$OUTPUT" "<direct>" "sandbox bypass requires the explicit --dir
 
 OUTPUT="$(AX_MODEL=frontier run_ax opencode)"
 assert_contains "$OUTPUT" "nono <run> <--profile> <default-opencode>" "OpenCode selects its agent-specific profile"
-assert_contains "$OUTPUT" "<--model> <openai/frontier>" "OpenCode receives an explicit canonical role override"
+assert_contains "$OUTPUT" "<--model> <cliproxy/frontier>" "OpenCode receives an explicit canonical role override"
 
 OUTPUT="$(AX_MODEL='raw:experimental/model' run_ax pi --resume 'native id')"
 assert_contains "$OUTPUT" "<--model> <cliproxy/experimental/model>" "Pi receives an explicit raw-model override"
@@ -320,10 +349,11 @@ mkdir -p "$RENDER_ROOT"
 if command -v chezmoi >/dev/null 2>&1; then
   chezmoi execute-template <"$REPO_ROOT/dot_config/ax/models.json.tmpl" >"$RENDER_ROOT/models.json"
   chezmoi execute-template <"$REPO_ROOT/dot_config/opencode/opencode.jsonc.tmpl" >"$RENDER_ROOT/opencode.json"
-  chezmoi execute-template <"$REPO_ROOT/dot_config/pi/agent/settings.json.tmpl" >"$RENDER_ROOT/pi-settings.json"
-  chezmoi execute-template <"$REPO_ROOT/dot_config/pi/agent/models.json.tmpl" >"$RENDER_ROOT/pi-models.json"
+  chezmoi execute-template <"$REPO_ROOT/dot_pi/agent/settings.json.tmpl" >"$RENDER_ROOT/pi-settings.json"
+  chezmoi execute-template <"$REPO_ROOT/dot_pi/agent/models.json.tmpl" >"$RENDER_ROOT/pi-models.json"
   chezmoi execute-template <"$REPO_ROOT/dot_config/crush/crush.json.tmpl" >"$RENDER_ROOT/crush.json"
   chezmoi execute-template <"$REPO_ROOT/dot_config/cli-proxy-api/private_config.yaml.tmpl" >"$RENDER_ROOT/proxy.yaml"
+  chezmoi execute-template <"$REPO_ROOT/run_onchange_after_setup-ai-agent-platform.sh.tmpl" >"$RENDER_ROOT/setup-ai-agent-platform.sh"
   if jq -e . "$RENDER_ROOT"/*.json >/dev/null; then
     pass "all rendered client JSON documents parse"
   else
@@ -335,9 +365,17 @@ if command -v chezmoi >/dev/null 2>&1; then
     fail "rendered CLIProxyAPI YAML parses" "invalid YAML"
   fi
   assert_contains "$(cat "$RENDER_ROOT/proxy.yaml")" 'host: "127.0.0.1"' "CLIProxyAPI binds only to IPv4 loopback"
-  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"model": "openai/balanced"' "OpenCode receives the canonical balanced default"
+  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"model": "cliproxy/balanced"' "OpenCode receives the canonical balanced default"
+  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"small_model": "cliproxy/light"' "OpenCode keeps background tasks on the canonical light model"
+  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"npm": "@ai-sdk/openai-compatible"' "OpenCode uses the proxy's Chat Completions protocol"
   assert_contains "$(cat "$RENDER_ROOT/pi-settings.json")" '"defaultModel": "balanced"' "Pi receives the canonical balanced default"
   assert_contains "$(cat "$RENDER_ROOT/crush.json")" '"model": "balanced"' "Crush receives the canonical balanced default"
+  if bash -n "$RENDER_ROOT/setup-ai-agent-platform.sh"; then
+    pass "rendered AI platform setup script parses"
+  else
+    fail "rendered AI platform setup script parses" "invalid shell syntax"
+  fi
+  assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" 'PI_CODING_AGENT_DIR="$HOME/.pi/agent" herdr integration install "$agent"' "Herdr installs Pi integration in Pi's documented agent directory"
 else
   fail "chezmoi render tests" "chezmoi is not installed"
 fi
@@ -362,8 +400,8 @@ if command -v nono >/dev/null 2>&1; then
   fi
   PI_EFFECTIVE="$(nono profile show "$REPO_ROOT/dot_config/nono/profiles/default-pi.json" --json)"
   if jq -e '
-    (.filesystem.read | index("$HOME/.config/pi/agent")) != null and
-    (.filesystem.allow | index("$HOME/.config/pi/agent")) == null
+    (.filesystem.read | index("$HOME/.pi/agent")) != null and
+    (.filesystem.allow | index("$HOME/.pi/agent")) == null
   ' <<<"$PI_EFFECTIVE" >/dev/null; then
     pass "Pi generated config and integration directory are read-only"
   else
@@ -372,7 +410,9 @@ if command -v nono >/dev/null 2>&1; then
   CLAUDE_EFFECTIVE="$(nono profile show "$REPO_ROOT/dot_config/nono/profiles/default-claude.json" --json)"
   if jq -e '
     (.filesystem.read | index("$HOME/.claude")) != null and
-    (.filesystem.allow | index("$HOME/.claude")) == null
+    (.filesystem.allow | index("$HOME/.claude")) == null and
+    (.filesystem.allow_file | index("$HOME/.claude.json")) != null and
+    (.filesystem.allow_file | index("$HOME/.claude.json.lock")) != null
   ' <<<"$CLAUDE_EFFECTIVE" >/dev/null; then
     pass "Claude settings and Herdr hooks are read-only"
   else

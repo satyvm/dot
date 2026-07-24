@@ -15,6 +15,7 @@
   },
   "filesystem": {
     "read": [
+      "$HOME/.agents/skills",
       "$HOME/.config/agents",
       "$HOME/.codex/skills",
       "$HOME/.local/share/fnm",

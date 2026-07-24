@@ -26,7 +26,10 @@ if ! command -v herdr >/dev/null 2>&1; then
 else
   for agent in claude pi opencode; do
     if command -v "$agent" >/dev/null 2>&1; then
-      if ! herdr integration install "$agent"; then
+      if [[ "$agent" == "pi" ]]; then
+        PI_CODING_AGENT_DIR="$HOME/.pi/agent" herdr integration install "$agent" ||
+          warn "Could not install the Herdr $agent integration; retry: PI_CODING_AGENT_DIR=\"\$HOME/.pi/agent\" herdr integration install $agent"
+      elif ! herdr integration install "$agent"; then
         warn "Could not install the Herdr $agent integration; retry: herdr integration install $agent"
       fi
     else

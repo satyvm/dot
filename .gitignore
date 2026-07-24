@@ -3,6 +3,8 @@ dot_config/cli-proxy-api/*.json
 dot_config/cli-proxy-api/*key*
 dot_config/**/auth.json
 dot_config/**/credentials.json
+dot_pi/**/auth.json
+dot_pi/**/credentials.json
 
 # SSH material and Keychain exports are outside the portable dotfiles boundary.
 dot_ssh/

@@ -223,8 +223,8 @@ models_sync() {
     "$config_home/ax/models.json" \
     "$config_home/cli-proxy-api/config.yaml" \
     "$config_home/opencode/opencode.jsonc" \
-    "$config_home/pi/agent/settings.json" \
-    "$config_home/pi/agent/models.json" \
+    "$HOME/.pi/agent/settings.json" \
+    "$HOME/.pi/agent/models.json" \
     "$config_home/crush/crush.json"
 }
 
@@ -386,7 +386,7 @@ doctor() {
 
   if command -v herdr >/dev/null 2>&1; then
     local status
-    status="$(herdr integration status 2>/dev/null || true)"
+    status="$(PI_CODING_AGENT_DIR="$HOME/.pi/agent" herdr integration status 2>/dev/null || true)"
     for name in claude pi opencode; do
       if grep -Eq "^${name}: current" <<<"$status"; then
         printf 'herdr %s integration: current\n' "$name"
@@ -429,8 +429,13 @@ configure_environment() {
   export AX_MODEL_ID="$model_id"
   export HERDR_AGENT="$agent"
   export ANTHROPIC_BASE_URL="$base_url"
-  export ANTHROPIC_API_KEY="$proxy_key"
-  unset ANTHROPIC_AUTH_TOKEN
+  if [[ "$agent" == "claude" ]]; then
+    export ANTHROPIC_AUTH_TOKEN="$proxy_key"
+    unset ANTHROPIC_API_KEY
+  else
+    export ANTHROPIC_API_KEY="$proxy_key"
+    unset ANTHROPIC_AUTH_TOKEN
+  fi
   export OPENAI_BASE_URL="$base_url/v1"
   export OPENAI_API_KEY="$proxy_key"
   export OPENAI_MODEL="$model_id"
@@ -443,6 +448,10 @@ configure_environment() {
   ANTHROPIC_DEFAULT_HAIKU_MODEL="$(jq -r '.classes.claude.fast' "$models_file")"
   export ANTHROPIC_SMALL_FAST_MODEL
   ANTHROPIC_SMALL_FAST_MODEL="$(jq -r '.classes.claude.small' "$models_file")"
+  if [[ "$agent" == "pi" ]]; then
+    export PI_CODING_AGENT_DIR="$HOME/.pi/agent"
+    mkdir -p "$PI_CODING_AGENT_DIR/sessions"
+  fi
 }
 
 launch_agent() {
@@ -479,6 +488,9 @@ launch_agent() {
   configure_environment "$agent" "$role" "$model_id" "$base_url"
 
   local crush_override_file=""
+  if [[ "$agent" == "claude" ]]; then
+    set -- --settings "{\"availableModels\":$AX_REQUIRED_ROLES}" "$@"
+  fi
   if [[ "$model_override" == true ]]; then
     case "$agent" in
       claude)
@@ -488,7 +500,7 @@ launch_agent() {
         set -- --model "cliproxy/$model_id" "$@"
         ;;
       opencode)
-        set -- --model "openai/$model_id" "$@"
+        set -- --model "cliproxy/$model_id" "$@"
         ;;
       crush)
         local crush_config="$config_home/crush/crush.json"

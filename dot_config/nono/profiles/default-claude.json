@@ -26,6 +26,8 @@
       "$HOME/.claude"
     ],
     "allow_file": [
+      "$HOME/.claude.json",
+      "$HOME/.claude.json.lock",
       "$HOME/.claude/.claude.json",
       "$HOME/.claude/.last-cleanup",
       "$HOME/.claude/daemon.lock",

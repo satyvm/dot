@@ -7,17 +7,20 @@
   "extends": "default-agent",
   "filesystem": {
     "allow": [
-      "$HOME/.config/pi/agent/sessions"
+      "$HOME/.pi/agent/sessions"
     ],
     "read": [
-      "$HOME/.config/pi/agent"
+      "$HOME/.pi/agent"
     ],
     "allow_file": [
-      "$HOME/.config/pi/agent/models-store.json"
+      "$HOME/.pi/agent/auth.json.lock",
+      "$HOME/.pi/agent/models-store.json",
+      "$HOME/.pi/agent/models-store.json.lock",
+      "$HOME/.pi/agent/settings.json.lock"
     ],
     "deny": [
-      "$HOME/.config/pi/agent/auth.json",
-      "$HOME/.config/pi/agent/credentials.json"
+      "$HOME/.pi/agent/auth.json",
+      "$HOME/.pi/agent/credentials.json"
     ]
   }
 }
