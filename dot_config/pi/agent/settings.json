@@ -1,0 +1,24 @@
+{
+  "lastChangelogVersion": "0.81.1",
+  "theme": "dark",
+  "defaultProvider": "cliproxy",
+  "defaultModel": "gemini-3.6-flash-high",
+  "defaultThinkingLevel": "medium",
+  "enabledModels": [
+    "cliproxy/gemini-3.1-pro-low",
+    "cliproxy/gemini-3.6-flash-high",
+    "cliproxy/gemini-3.5-flash-low",
+    "cliproxy/gpt-5.6-sol",
+    "cliproxy/gpt-5.6-terra",
+    "cliproxy/gpt-5.6-luna",
+    "nvidia/moonshotai/kimi-k2.6",
+    "nvidia/z-ai/glm-5.1",
+    "nvidia/minimaxai/minimax-m3",
+    "nvidia/deepseek-ai/deepseek-v4-pro",
+    "nvidia/deepseek-ai/deepseek-v4-flash"
+  ],
+  "terminal": {
+    "showTerminalProgress": true
+  },
+  "enableInstallTelemetry": false
+}

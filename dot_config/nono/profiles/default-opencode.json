@@ -1,8 +1,8 @@
 {
   "meta": {
-    "name": "default-pi",
+    "name": "default-opencode",
     "version": "1.0.0",
-    "description": "Default Nono profile for Pi coding agent (@earendil-works/pi-coding-agent) extending node-dev profile"
+    "description": "Default Nono profile for OpenCode agent extending node-dev profile"
   },
   "extends": "node-dev",
   "groups": {
@@ -12,10 +12,20 @@
       "unlink_protection"
     ]
   },
+  "network": {
+    "allow_domain": [
+      "opencode.ai",
+      "*.opencode.ai",
+      "127.0.0.1",
+      "localhost"
+    ]
+  },
   "filesystem": {
     "allow": [
-      "$HOME/.config/pi",
-      "$HOME/.config/pi/agent"
+      "$HOME/.config/opencode",
+      "$HOME/.local/share/opencode",
+      "$HOME/.local/state/opencode",
+      "$HOME/.local/share/opentui"
     ],
     "allow_file": [
       "$HOME/.config/herdr/herdr.sock"

@@ -9,9 +9,12 @@
     "allow": [
       "$HOME/.claude"
     ],
+    "allow_file": [
+      "$HOME/.config/herdr/herdr.sock"
+    ],
     "read": [
       "/home",
-      "$HOME/.config/agents/skills/",
+      "$HOME/.config/agents/",
       "$HOME/.local/state/fnm_multishells/",
       "$HOME/.local/share/fnm/",
       "$HOME/.local/share/",

@@ -1,10 +1,10 @@
 {
   "meta": {
-    "name": "default-pi",
+    "name": "default-crush",
     "version": "1.0.0",
-    "description": "Default Nono profile for Pi coding agent (@earendil-works/pi-coding-agent) extending node-dev profile"
+    "description": "Default Nono profile for Crush/Charm agent extending default-claude profile"
   },
-  "extends": "node-dev",
+  "extends": "default-claude",
   "groups": {
     "include": [
       "user_caches_macos",
@@ -14,8 +14,9 @@
   },
   "filesystem": {
     "allow": [
-      "$HOME/.config/pi",
-      "$HOME/.config/pi/agent"
+      "$HOME/.config/crush",
+      "$HOME/.local/share/crush",
+      "$HOME/.local/state/crush"
     ],
     "allow_file": [
       "$HOME/.config/herdr/herdr.sock"
