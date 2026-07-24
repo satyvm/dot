@@ -1,0 +1,79 @@
+services:
+  cliproxyapi:
+    image: eceasy/cli-proxy-api:v7.2.95
+    restart: unless-stopped
+    volumes:
+      - cliproxy-config:/etc/cli-proxy-api
+      - cliproxy-auth:/root/.cli-proxy-api
+    networks:
+      - hermes-net
+    environment:
+      - DEPLOY=cloud
+      - PORT=8317
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-f"
+        - "http://127.0.0.1:8317/v1/models"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
+  hermes-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      cliproxyapi:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${DEV_SSH_PORT:-2222}:22"
+    environment:
+      - DEV_SSH_PUBLIC_KEY=${DEV_SSH_PUBLIC_KEY:?}
+      - OPENAI_API_BASE=http://cliproxyapi:8317/v1
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-cli-proxy-local-token}
+      - HERMES_WEBUI_PASSWORD=${HERMES_WEBUI_PASSWORD:?}
+    volumes:
+      - type: bind
+        source: ${SERVER_DEV_PATH:?/home/ubuntu/dev}
+        target: /home/ubuntu/dev
+      - remote-home:/home/ubuntu
+      - ssh-host-keys:/etc/ssh/host-keys
+      - hermes-state:/opt/data
+    networks:
+      - hermes-net
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-f"
+        - "http://127.0.0.1:8787/health"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      - "coolify.managed=true"
+      - "coolify.port=8787"
+
+networks:
+  hermes-net:
+    driver: bridge
+
+volumes:
+  remote-home:
+  ssh-host-keys:
+  hermes-state:
+  cliproxy-config:
+  cliproxy-auth:

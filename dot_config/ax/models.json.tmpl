@@ -1,1 +1,6 @@
-{{- .aiAgentPlatform | toPrettyJson }}
+{{- $platform := deepCopy .aiAgentPlatform -}}
+{{- if eq .aiMode "remote" -}}
+  {{- $proxy := set (deepCopy $platform.proxy) "url" "http://cliproxyapi:8317" -}}
+  {{- $platform = set $platform "proxy" $proxy -}}
+{{- end -}}
+{{- $platform | toPrettyJson }}

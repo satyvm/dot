@@ -15,15 +15,10 @@ if [ "$OS" = "Darwin" ]; then
         echo "✅ Xcode CLI tools installed."
     fi
 
-    if which -s brew; then
-        echo "✅ Homebrew already installed."
-    else
-        echo "🍺 Installing Homebrew..."
-        /bin/bash -c \
-          "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        eval "$(/opt/homebrew/bin/brew shellenv)"
+    if ! command -v brew &> /dev/null; then
+        echo "Homebrew is required. Install it first, then rerun this script."
+        exit 1
     fi
-
     brew install age chezmoi
 
 elif [ "$OS" = "Linux" ]; then
@@ -31,15 +26,9 @@ elif [ "$OS" = "Linux" ]; then
     sudo apt update
     sudo apt install -y curl age build-essential procps file
 
-    # 🍺 Install Homebrew if not already installed
-    if [ ! -d "/home/linuxbrew/.linuxbrew" ] && ! command -v brew &> /dev/null; then
-        echo "🍺 Installing Homebrew..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    fi
-
-    # Activate Linuxbrew environment for this script run
-    if [ -d "/home/linuxbrew/.linuxbrew" ]; then
-        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    if ! command -v brew &> /dev/null; then
+        echo "Homebrew is required. Install it first, then rerun this script."
+        exit 1
     fi
 
     # Ensure ~/.local/bin exists and is on the PATH

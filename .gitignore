@@ -6,6 +6,16 @@ dot_config/**/credentials.json
 dot_pi/**/auth.json
 dot_pi/**/credentials.json
 
+# Machine-local source-state, editor, and operating-system clutter.
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*.tmp
+*.bak
+.chezmoi.local.*
+
 # SSH material and Keychain exports are outside the portable dotfiles boundary.
 dot_ssh/
 private_dot_ssh/

@@ -12,7 +12,7 @@
       "npm": "@ai-sdk/openai-compatible",
       "name": "CLIProxyAPI",
       "options": {
-        "baseURL": "{{ .aiAgentPlatform.proxy.url }}/v1",
+        "baseURL": "{{ if eq .aiMode "remote" }}http://cliproxyapi:8317{{ else }}{{ .aiAgentPlatform.proxy.url }}{{ end }}/v1",
         "apiKey": "{env:OPENAI_API_KEY}",
         "timeout": 600000,
         "chunkTimeout": 60000

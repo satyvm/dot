@@ -1,91 +1,29 @@
-{{- if eq .chezmoi.os "linux" -}}
-#!/bin/bash
-set -eufo pipefail
+#!/usr/bin/env bash
+set -euo pipefail
 
-{{- if or (eq .profile "dev") (eq .profile "personal") }}
-if command -v snap >/dev/null 2>&1; then
-  sudo snap install telegram-desktop
-  sudo snap install discord
-else
-  echo "⚠️  Snap not found. Skipping telegram and discord."
-fi
-{{- end }}
-
-# --- Helper functions to detect restricted environments ---
 is_container() {
-  [ -f /.dockerenv ] || [ -f /run/.containerenv ] && return 0
-  if [ -f /proc/1/cgroup ] && grep -qE 'docker|lxc|containerd|kubepods|sandbox' /proc/1/cgroup; then
-    return 0
-  fi
-  if command -v systemd-detect-virt >/dev/null 2>&1; then
-    if systemd-detect-virt --container >/dev/null 2>&1; then
-      return 0
-    fi
-  fi
-  return 1
+  [[ -f /.dockerenv || -f /run/.containerenv ]] && return 0
+  command -v systemd-detect-virt >/dev/null 2>&1 && systemd-detect-virt --container >/dev/null 2>&1
 }
 
-is_wsl() {
-  if [ -f /proc/sys/kernel/osrelease ] && grep -qE 'Microsoft|microsoft' /proc/sys/kernel/osrelease; then
-    return 0
-  fi
-  return 1
-}
+if is_container; then
+  echo "Container detected; skipping firewall and fail2ban configuration."
+  exit 0
+fi
 
-# --- UFW Firewall and fail2ban ---
-if is_container || is_wsl; then
-  echo "⚠️  Running inside a container or WSL. Skipping firewall (UFW) and fail2ban configuration."
+if command -v ufw >/dev/null 2>&1; then
+  sudo ufw default deny incoming
+  sudo ufw default allow outgoing
+  sudo ufw allow ssh
+  sudo ufw allow 80/tcp
+  sudo ufw allow 443/tcp
+  sudo ufw --force enable
 else
-  if command -v ufw >/dev/null 2>&1; then
-    echo "🔥 Configuring UFW..."
-    sudo ufw default deny incoming
-    sudo ufw default allow outgoing
-    sudo ufw allow ssh
-    sudo ufw allow 80/tcp
-    sudo ufw allow 443/tcp
-    sudo ufw --force enable
-    echo "✅ UFW enabled."
-  else
-    echo "⚠️  UFW not installed. Skipping firewall configuration."
-  fi
-
-  {{- if eq .profile "server" }}
-  if [ -d /run/systemd/system ]; then
-    sudo systemctl enable fail2ban
-    sudo systemctl start fail2ban
-
-    sudo tee /etc/fail2ban/jail.local > /dev/null <<JAILEOF
-[DEFAULT]
-bantime  = 1h
-findtime = 10m
-maxretry = 5
-
-[sshd]
-enabled = true
-port    = ssh
-filter  = sshd
-logpath = /var/log/auth.log
-JAILEOF
-
-    sudo systemctl restart fail2ban
-    echo "✅ fail2ban configured."
-  else
-    echo "⚠️  systemd is not running. Skipping fail2ban configuration."
-  fi
-  {{ end }}
+  echo "UFW is not installed; skipping firewall setup."
 fi
 
-# --- Set zsh as default shell ---
-CURRENT_SHELL="${SHELL:-}"
-CURRENT_USER="${USER:-$(id -un)}"
-if [ "${CURRENT_SHELL##*/}" != "zsh" ]; then
-  echo "🐚 Changing default shell to zsh..."
-  if command -v chsh >/dev/null 2>&1; then
-    sudo chsh -s "$(which zsh)" "$CURRENT_USER" || chsh -s "$(which zsh)" || echo "⚠️  Could not change default shell automatically. Please run: chsh -s $(which zsh)"
-  else
-    echo "⚠️  chsh command not found. Please change default shell to zsh manually."
-  fi
+if command -v systemctl >/dev/null 2>&1 && command -v fail2ban-client >/dev/null 2>&1; then
+  sudo systemctl enable --now fail2ban
+else
+  echo "fail2ban or systemd is unavailable; skipping fail2ban setup."
 fi
-
-echo "✅ Linux server setup complete."
-{{ end -}}

@@ -2,15 +2,6 @@
 #!/bin/bash
 set -eufo pipefail
 
-{{- if eq .profile "dev" }}
-if command -v docker-compose &> /dev/null; then
-  echo "🐳 Setting up Docker Compose CLI plugin..."
-  mkdir -p "$HOME/.config/docker/cli-plugins"
-  ln -sfn "$(command -v docker-compose)" "$HOME/.config/docker/cli-plugins/docker-compose"
-fi
-{{- end }}
-
-{{- if or (eq .profile "personal") (eq .profile "dev") }}
 echo "Removing non-essential stock macOS apps..."
 APPS_TO_REMOVE=(
   "GarageBand"
@@ -50,7 +41,6 @@ install_mas_app "WireGuard" "1451685025"
 install_mas_app "Velja" "1607635845"
 install_mas_app "Kofe Flow" "6762003285"
 install_mas_app "CleanMyKeyboard" "6468120888"
-{{- end }}
 
 echo "🍏 Setting macOS defaults..."
 osascript -e 'tell application "System Settings" to quit' 2>/dev/null \

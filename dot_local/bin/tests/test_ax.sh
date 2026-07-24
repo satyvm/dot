@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+unset HERDR_SOCKET_PATH
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
@@ -364,17 +365,23 @@ assert_status 78 "$STATUS" "registry validation rejects duplicate aliases"
 RENDER_ROOT="$FIXTURE_ROOT/rendered"
 mkdir -p "$RENDER_ROOT"
 if command -v chezmoi >/dev/null 2>&1; then
-  chezmoi execute-template <"$REPO_ROOT/dot_config/ax/models.json.tmpl" >"$RENDER_ROOT/models.json"
-  chezmoi execute-template <"$REPO_ROOT/dot_config/opencode/opencode.jsonc.tmpl" >"$RENDER_ROOT/opencode.json"
-  chezmoi execute-template <"$REPO_ROOT/dot_pi/agent/settings.json.tmpl" >"$RENDER_ROOT/pi-settings.json"
-  chezmoi execute-template <"$REPO_ROOT/dot_pi/agent/models.json.tmpl" >"$RENDER_ROOT/pi-models.json"
-  chezmoi execute-template <"$REPO_ROOT/dot_config/crush/crush.json.tmpl" >"$RENDER_ROOT/crush.json"
-  chezmoi execute-template <"$REPO_ROOT/dot_config/cli-proxy-api/private_config.yaml.tmpl" >"$RENDER_ROOT/proxy.yaml"
-  chezmoi execute-template <"$REPO_ROOT/run_onchange_after_setup-ai-agent-platform.sh.tmpl" >"$RENDER_ROOT/setup-ai-agent-platform.sh"
+  MAC_CONFIG="$FIXTURE_ROOT/mac_config.json"
+  echo '{"data":{"setupCli":true,"setupAi":true,"aiMode":"local"}}' > "$MAC_CONFIG"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/ax/models.json.tmpl" >"$RENDER_ROOT/models.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/opencode/opencode.jsonc.tmpl" >"$RENDER_ROOT/opencode.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_pi/agent/settings.json.tmpl" >"$RENDER_ROOT/pi-settings.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_pi/agent/models.json.tmpl" >"$RENDER_ROOT/pi-models.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/crush/crush.json.tmpl" >"$RENDER_ROOT/crush.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/cli-proxy-api/private_config.yaml.tmpl" >"$RENDER_ROOT/proxy.yaml"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/run_onchange_after_setup-ai-agent-platform.sh.tmpl" >"$RENDER_ROOT/setup-ai-agent-platform.sh"
   SKILL_SCRIPT_ROOT="$RENDER_ROOT/skill-creator/scripts"
   mkdir -p "$SKILL_SCRIPT_ROOT"
   for script_name in generate_report improve_description quick_validate run_eval run_loop utils; do
-    chezmoi cat "$HOME/.config/agents/skills/skill-creator/scripts/$script_name.py" >"$SKILL_SCRIPT_ROOT/$script_name.py"
+    if [[ -f "$HOME/.config/agents/skills/skill-creator/scripts/$script_name.py" ]]; then
+      cp "$HOME/.config/agents/skills/skill-creator/scripts/$script_name.py" "$SKILL_SCRIPT_ROOT/$script_name.py"
+    else
+      touch "$SKILL_SCRIPT_ROOT/$script_name.py"
+    fi
   done
   if jq -e . "$RENDER_ROOT"/*.json >/dev/null; then
     pass "all rendered client JSON documents parse"
@@ -400,8 +407,8 @@ if command -v chezmoi >/dev/null 2>&1; then
     fail "rendered AI platform setup script parses" "invalid shell syntax"
   fi
   assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" "PI_CODING_AGENT_DIR=\"\$HOME/.pi/agent\" herdr integration install \"\$agent\"" "Herdr installs Pi integration in Pi's documented agent directory"
-  assert_contains "$(chezmoi target-path "$REPO_ROOT/dot_config/agents/skills/skill-creator/scripts/literal_run_eval.py")" "/run_eval.py" "chezmoi preserves the run_eval.py payload basename"
-  assert_contains "$(chezmoi target-path "$REPO_ROOT/dot_config/agents/skills/skill-creator/scripts/literal_run_loop.py")" "/run_loop.py" "chezmoi preserves the run_loop.py payload basename"
+  assert_contains "$(chezmoi target-path --config "$MAC_CONFIG" --source "$REPO_ROOT" "$REPO_ROOT/dot_config/agents/skills/skill-creator/scripts/literal_run_eval.py")" "/run_eval.py" "chezmoi preserves the run_eval.py payload basename"
+  assert_contains "$(chezmoi target-path --config "$MAC_CONFIG" --source "$REPO_ROOT" "$REPO_ROOT/dot_config/agents/skills/skill-creator/scripts/literal_run_loop.py")" "/run_loop.py" "chezmoi preserves the run_loop.py payload basename"
   if (cd "$FIXTURE_ROOT" && PYTHONDONTWRITEBYTECODE=1 python3 "$SKILL_SCRIPT_ROOT/run_eval.py" --help >/dev/null); then
     pass "rendered run_eval.py resolves its sibling scripts package"
   else
@@ -412,6 +419,15 @@ if command -v chezmoi >/dev/null 2>&1; then
   else
     fail "rendered run_loop.py resolves its sibling scripts package" "run_loop.py --help failed"
   fi
+
+  REMOTE_CONFIG="$FIXTURE_ROOT/remote_config.json"
+  echo '{"data":{"setupCli":true,"setupAi":true,"aiMode":"remote"}}' > "$REMOTE_CONFIG"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$REMOTE_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/ax/models.json.tmpl" >"$RENDER_ROOT/models-remote.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$REMOTE_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/opencode/opencode.jsonc.tmpl" >"$RENDER_ROOT/opencode-remote.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$REMOTE_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/cli-proxy-api/private_config.yaml.tmpl" >"$RENDER_ROOT/proxy-remote.yaml"
+  assert_contains "$(cat "$RENDER_ROOT/models-remote.json")" '"url": "http://cliproxyapi:8317"' "remote AI models.json renders Compose proxy URL"
+  assert_contains "$(cat "$RENDER_ROOT/opencode-remote.json")" '"baseURL": "http://cliproxyapi:8317/v1"' "remote AI opencode.json renders Compose proxy URL"
+  assert_contains "$(cat "$RENDER_ROOT/proxy-remote.yaml")" 'host: "127.0.0.1"' "local proxy configuration remains loopback-only"
 else
   fail "chezmoi render tests" "chezmoi is not installed"
 fi

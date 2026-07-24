@@ -179,7 +179,7 @@ ensure_proxy() {
   base_url="$(proxy_url)"
   if proxy_ready "$base_url"; then
     :
-  elif command -v brew >/dev/null 2>&1; then
+  elif [[ "${AX_PLATFORM:-$(uname -s)}" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
     brew services start cliproxyapi >/dev/null 2>&1 || true
     local _
     for _ in 1 2 3 4 5; do
@@ -190,7 +190,11 @@ ensure_proxy() {
     done
   fi
   if ! proxy_ready "$base_url"; then
-    die "$AX_EXIT_UNAVAILABLE" "CLIProxyAPI is unavailable; run: brew services restart cliproxyapi"
+    if [[ "${AX_PLATFORM:-$(uname -s)}" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
+      die "$AX_EXIT_UNAVAILABLE" "CLIProxyAPI is unavailable; run: brew services restart cliproxyapi"
+    else
+      die "$AX_EXIT_UNAVAILABLE" "CLIProxyAPI is unavailable at $base_url; ensure cliproxyapi container is running"
+    fi
   fi
   if [[ -n "$requested_model" ]] && ! proxy_has_model "$base_url" "$requested_model"; then
     die "$AX_EXIT_UNAVAILABLE" "model '$requested_model' is not advertised by CLIProxyAPI; run: ax models live"
@@ -255,13 +259,18 @@ generate_secret() {
 }
 
 auth_setup() {
-  [[ "${AX_PLATFORM:-$(uname -s)}" == "Darwin" ]] || die "$AX_EXIT_UNAVAILABLE" "auth setup is supported on macOS dev machines"
-  need cliproxyapi
-  need chezmoi
   local management_key_file="$config_home/cli-proxy-api/management-key"
   generate_secret "$proxy_key_file"
   generate_secret "$management_key_file"
   chmod 600 "$proxy_key_file" "$management_key_file"
+
+  if [[ "${AX_PLATFORM:-$(uname -s)}" != "Darwin" ]]; then
+    printf 'Device keys generated at %s\n' "$proxy_key_file"
+    printf 'On Linux/remote-dev, CLIProxyAPI is managed by Docker Compose sidecar.\n'
+    return 0
+  fi
+  need cliproxyapi
+  need chezmoi
   chezmoi apply "$config_home/cli-proxy-api/config.yaml"
 
   load_models
@@ -359,7 +368,11 @@ doctor() {
   if proxy_ready "$(proxy_url)"; then
     printf 'proxy: ready\n'
   else
-    printf 'proxy: unavailable (run: brew services restart cliproxyapi)\n'
+    if [[ "${AX_PLATFORM:-$(uname -s)}" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
+      printf 'proxy: unavailable (run: brew services restart cliproxyapi)\n'
+    else
+      printf 'proxy: unavailable (ensure cliproxyapi container is running in Docker Compose)\n'
+    fi
     failures=$((failures + 1))
   fi
 

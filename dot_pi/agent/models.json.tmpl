@@ -1,7 +1,7 @@
 {
   "providers": {
     "cliproxy": {
-      "baseUrl": "{{ .aiAgentPlatform.proxy.url }}/v1",
+      "baseUrl": "{{ if eq .aiMode "remote" }}http://cliproxyapi:8317{{ else }}{{ .aiAgentPlatform.proxy.url }}{{ end }}/v1",
       "api": "openai-completions",
       "apiKey": "$OPENAI_API_KEY",
       "compat": {

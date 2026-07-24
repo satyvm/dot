@@ -1,6 +1,6 @@
 # AGENTS.md — satyvm / dot
 
-Personal dotfiles managed with [chezmoi](https://chezmoi.io). Primary target is **macOS** (dev/personal profiles), with **Linux** (Debian/Ubuntu server profile) support.
+Personal dotfiles managed with [chezmoi](https://chezmoi.io). Primary target is **macOS**, with Linux support through Homebrew.
 
 ## Quick Reference
 
@@ -17,8 +17,8 @@ Personal dotfiles managed with [chezmoi](https://chezmoi.io). Primary target is 
 
 ```
 ~/.local/share/chezmoi/
-├── .chezmoi.json.tmpl           # Config: encryption, age keys, profile/git prompts
-├── .chezmoiignore.tmpl          # Platform/profile ignore rules (uses Go templates)
+├── .chezmoi.json.tmpl           # Config: encryption, age keys, category/git prompts
+├── .chezmoiignore.tmpl          # Platform/category deployment rules (uses Go templates)
 ├── .chezmoiexternal.toml        # External archives (agent skills from GitHub)
 ├── .setup.sh                    # Bootstrap: installs deps, runs chezmoi init
 ├── dot_zshrc                    # → ~/.zshrc
@@ -47,15 +47,12 @@ Personal dotfiles managed with [chezmoi](https://chezmoi.io). Primary target is 
         └── executable_restore-local.sh  # → restore-local.sh
 ```
 
-## Machine Profiles
+## Setup Categories
 
-Set during `chezmoi init`. Controls which packages/scripts are applied via Go template conditionals (`{{ .profile }}`).
-
-| Profile | macOS | Linux |
-|---------|-------|-------|
-| `personal` | Essential GUIs + CLI tools | CLI tools only |
-| `dev` | Full desktop — all apps, Cursor profile, macOS defaults | CLI + Docker + server hardening |
-| `server` | CLI + Docker (Colima) — no GUIs | CLI + Docker + UFW/fail2ban |
+Set during `chezmoi init` and persisted under `data` in the local Chezmoi
+config. Every category defaults to off: `setupCli`, `setupDeveloper`,
+`setupAi`, `guiTier`, `setupMacos`, `setupSshKey`, and `setupLinuxHardening`.
+Developer tooling requires CLI; AI has `local` and `remote` modes.
 
 ## Template System
 
@@ -64,12 +61,13 @@ All `.tmpl` files are [chezmoi Go templates](https://chezmoi.io/reference/templa
 | Variable | Source | Example |
 |----------|--------|---------|
 | `.chezmoi.os` | chezmoi built-in | `"darwin"` / `"linux"` |
-| `.profile` | `.chezmoi.json.tmpl` prompt | `"personal"` / `"dev"` / `"server"` |
+| `.setupCli` | `.chezmoi.json.tmpl` prompt | boolean |
+| `.setupAi` / `.aiMode` | `.chezmoi.json.tmpl` prompt | boolean / `"local"` or `"remote"` |
 | `.name` | `.chezmoi.json.tmpl` prompt | Git user name |
 | `.email` | `.chezmoi.json.tmpl` prompt | Git email |
 | `.setupSshKey` | `.chezmoi.json.tmpl` prompt | boolean |
 
-Common patterns: `{{- if eq .chezmoi.os "darwin" }}`, `{{- if eq .profile "dev" }}`, `{{- end }}`.
+Common patterns: `{{- if eq .chezmoi.os "darwin" }}`, `{{- if .setupCli }}`, `{{- end }}`.
 
 ## Chezmoi Naming Conventions
 
@@ -153,7 +151,7 @@ Starship must be last — it replaces PS1.
 ## Package Management
 
 - **macOS**: Homebrew (Brewfile in `run_onchange_brew-packages.sh.tmpl`)
-- **Linux**: apt packages (in `run_onchange_apt-packages.sh.tmpl`)
+- **Linux**: Homebrew packages (Linuxbrew)
 
 Package sets vary by profile — dev profile gets the most, server skips GUIs. Docker included on dev + server profiles.
 

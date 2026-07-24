@@ -1,0 +1,54 @@
+aiTools:
+  version: 1
+  paths:
+    devRoot:
+      mac-dev: /Users/s/dev
+      remote-dev: /home/ubuntu/dev
+  mcp:
+    servers:
+      filesystem:
+        command: npx
+        args: ["-y", "@modelcontextprotocol/server-filesystem@0.6.2", "{{ .devRoot }}"]
+        pinnedVersion: "0.6.2"
+        environments: ["mac-dev", "remote-dev"]
+        roots: ["{{ .devRoot }}"]
+        clients: ["hermes", "claude", "pi", "opencode", "crush", "zed"]
+      github:
+        command: npx
+        args: ["-y", "@modelcontextprotocol/server-github@0.6.2"]
+        pinnedVersion: "0.6.2"
+        environments: ["mac-dev", "remote-dev"]
+        credentials: ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+        clients: ["hermes", "claude", "pi", "opencode", "crush", "zed"]
+      fetch:
+        command: uvx
+        args: ["mcp-server-fetch@0.6.2"]
+        pinnedVersion: "0.6.2"
+        environments: ["mac-dev", "remote-dev"]
+        clients: ["hermes", "claude", "pi", "opencode", "crush", "zed"]
+  lsp:
+    servers:
+      vtsls:
+        command: vtsls
+        args: ["--stdio"]
+        pinnedVersion: "0.2.6"
+        environments: ["mac-dev", "remote-dev"]
+        filetypes: ["typescript", "typescriptreact", "javascript", "javascriptreact"]
+      pyright:
+        command: pyright-langserver
+        args: ["--stdio"]
+        pinnedVersion: "1.1.391"
+        environments: ["mac-dev", "remote-dev"]
+        filetypes: ["python"]
+      gopls:
+        command: gopls
+        args: []
+        pinnedVersion: "0.17.1"
+        environments: ["mac-dev", "remote-dev"]
+        filetypes: ["go"]
+      rust-analyzer:
+        command: rust-analyzer
+        args: []
+        pinnedVersion: "2025-01-20"
+        environments: ["mac-dev", "remote-dev"]
+        filetypes: ["rust"]

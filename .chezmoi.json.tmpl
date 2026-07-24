@@ -1,4 +1,19 @@
-{{- $setupSshKey := promptBool "Setup SSH key" -}}
+{{- $setupCli := promptBool "Install core CLI setup" -}}
+{{- $setupDeveloper := false -}}
+{{- if $setupCli }}{{ $setupDeveloper = promptBool "Install developer toolchain" }}{{ end -}}
+{{- $setupAi := promptBool "Install AI setup" -}}
+{{- $aiMode := "local" -}}
+{{- if $setupAi }}{{ $aiMode = promptChoice "AI deployment mode" (list "local" "remote") }}{{ end -}}
+{{- $guiTier := "none" -}}
+{{- $setupMacos := false -}}
+{{- $setupLinuxHardening := false -}}
+{{- if eq .chezmoi.os "darwin" }}
+{{- $guiTier = promptChoice "GUI tools" (list "none" "minimum" "all") -}}
+{{- $setupMacos = promptBool "Apply macOS customization" -}}
+{{- else if eq .chezmoi.os "linux" }}
+{{- $setupLinuxHardening = promptBool "Configure Linux firewall and fail2ban" -}}
+{{- end -}}
+{{- $setupSshKey := promptBool "Set up SSH key and GitHub signing" -}}
 {
   "encryption": "age",
   "age": {
@@ -6,7 +21,13 @@
     "recipient": "age1naksqkvrfy66sr6ezvw3ykf5ga4tuzp67q78dm94weeduydwssrqx7j67x"
   },
   "data": {
-    "profile": {{ promptChoice "Machine profile" (list "personal" "dev" "server") | quote }},
+    "setupCli": {{ $setupCli }},
+    "setupDeveloper": {{ $setupDeveloper }},
+    "setupAi": {{ $setupAi }},
+    "aiMode": {{ $aiMode | quote }},
+    "guiTier": {{ $guiTier | quote }},
+    "setupMacos": {{ $setupMacos }},
+    "setupLinuxHardening": {{ $setupLinuxHardening }},
     "setupSshKey": {{ $setupSshKey }},
     "name": {{ promptString "Git user name" "Satyam" | quote }},
     "email": {{ promptString "Git email address" "75127014+satyvm@users.noreply.github.com" | quote }}

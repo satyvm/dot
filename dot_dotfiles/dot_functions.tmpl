@@ -51,27 +51,9 @@ function help() {
   "$@" --help 2>&1 | bat --plain --language=help
 }
 
-{{- if not (and (eq .chezmoi.os "darwin") (eq .profile "dev")) }}
-# Outside macOS dev, keep native commands as direct pass-throughs. The ax
-# platform and its generated profiles are intentionally not deployed there.
-function claude() {
-  command claude "$@"
-}
-
-function pi() {
-  command pi "$@"
-}
-
-function opencode() {
-  command opencode "$@"
-}
-
-function crush() {
-  command crush "$@"
-}
-{{- end }}
-
+{{- if .setupAi }}
 # charm : compatibility name for Crush
 function charm() {
   crush "$@"
 }
+{{- end }}

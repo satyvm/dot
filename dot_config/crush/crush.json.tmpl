@@ -8,7 +8,7 @@
   "providers": {
     "cliproxy": {
       "type": "openai-compat",
-      "base_url": "{{ .aiAgentPlatform.proxy.url }}/v1",
+      "base_url": "{{ if eq .aiMode "remote" }}http://cliproxyapi:8317{{ else }}{{ .aiAgentPlatform.proxy.url }}{{ end }}/v1",
       "api_key": "$OPENAI_API_KEY",
       "models": [
 {{- $roles := .aiAgentPlatform.roles -}}

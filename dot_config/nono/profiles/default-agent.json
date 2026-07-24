@@ -49,7 +49,7 @@
     "block": false,
     "network_profile": "developer",
     "open_port": [8317],
-    "no_proxy": ["127.0.0.1", "localhost"]
+    "no_proxy": ["127.0.0.1", "localhost", "cliproxyapi"]
   },
   "workdir": {
     "access": "readwrite"

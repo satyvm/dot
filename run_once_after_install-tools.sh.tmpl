@@ -1,56 +1,30 @@
-#!/bin/bash
-set -eufo pipefail
+#!/usr/bin/env bash
+set -euo pipefail
 
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/home/linuxbrew/.linuxbrew/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
-{{- if and (ne (env "CODESPACES") "true") (ne .profile "personal") }}
-# 🦀 Rustup
-if ! command -v rustup &> /dev/null; then
-  echo "🦀 Installing rustup..."
+
+if ! command -v rustup >/dev/null 2>&1; then
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-  # Source cargo env so rustup/cargo are immediately available
-  source "$HOME/.cargo/env"
 fi
-# 🐍 uv
-if ! command -v uv &> /dev/null; then
-  echo "🐍 Installing uv..."
+[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+
+if ! command -v uv >/dev/null 2>&1; then
   curl -LsSf https://astral.sh/uv/install.sh | sh
-  # PATH was already prepended above, uv should now be found
 fi
-# Always ensure python tools are present (separated from uv install check)
-if command -v uv &> /dev/null; then
+if command -v uv >/dev/null 2>&1; then
   uv python install
-  for tool in pylint black isort; do
-    uv tool install "$tool" 2>/dev/null || true
-  done
-fi
-# 🟢 Node.js via fnm (fnm must be installed first by brew/apt)
-if command -v fnm &> /dev/null; then
-  eval "$(fnm env)"           # ← initializes fnm's PATH shims
-  if ! command -v node &> /dev/null; then
-    echo "🟢 Installing Node.js LTS..."
-    fnm install --lts
-    fnm default lts-latest
-    fnm use default
-    corepack enable
-    corepack prepare pnpm@latest --activate
-  fi
-else
-  echo "⚠️ fnm not found, skipping Node.js setup."
-fi
-# 🍞 Bun
-if ! command -v bun &> /dev/null; then
-  echo "🍞 Installing bun..."
-  curl -fsSL https://bun.sh/install | bash
-fi
-# 🛠️ Mise tools (Kubernetes toolchain) — only if mise is installed
-if command -v mise &> /dev/null; then
-  echo "🛠️ Installing global tools via mise..."
-  for tool in gcloud aws-cli kubectl kubectx kubens k9s; do
-    echo "  Installing ${tool}@latest via mise..."
-    mise use -g "${tool}@latest" || echo "⚠️  Failed to install ${tool} via mise. Skipping..."
-  done
-else
-  echo "⚠️ mise not found, skipping Kubernetes tools."
+  for tool in pylint black isort; do uv tool install "$tool" 2>/dev/null || true; done
 fi
 
-{{ end -}}
+if command -v fnm >/dev/null 2>&1; then
+  eval "$(fnm env)"
+  if ! command -v node >/dev/null 2>&1; then
+    fnm install --lts
+    fnm default lts-latest
+    corepack enable
+  fi
+fi
+if ! command -v bun >/dev/null 2>&1; then curl -fsSL https://bun.sh/install | bash; fi
+if command -v mise >/dev/null 2>&1; then
+  for tool in gcloud aws-cli kubectl kubectx kubens k9s; do mise use -g "${tool}@latest" || true; done
+fi

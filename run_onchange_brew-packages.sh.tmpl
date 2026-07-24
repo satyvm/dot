@@ -1,19 +1,19 @@
-{{- if or (eq .chezmoi.os "darwin") (eq .chezmoi.os "linux") -}}
-#!/bin/bash
-set -eufo pipefail
+#!/usr/bin/env bash
+set -euo pipefail
 
 export PATH="/home/linuxbrew/.linuxbrew/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-if command -v brew &> /dev/null; then
-brew bundle --file=/dev/stdin <<EOF
-brew "chezmoi"
+if ! command -v brew >/dev/null 2>&1; then
+  echo "Homebrew is required for selected dotfiles packages; install it first, then rerun chezmoi apply."
+  exit 0
+fi
 
-{{- if or (eq .profile "dev") (eq .profile "server") }}
-{{- if eq .chezmoi.os "darwin" }}
+brew bundle --file=/dev/stdin <<'EOF'
+brew "chezmoi"
+{{- if .setupCli }}
 brew "git"
 brew "curl"
 brew "wget"
-{{- end }}
 brew "git-delta"
 brew "gh"
 brew "jj"
@@ -36,14 +36,13 @@ brew "neovim"
 brew "tmux"
 brew "tree-sitter-cli"
 brew "pet"
-
 brew "btop"
 brew "watch"
+{{- end }}
+{{- if .setupDeveloper }}
 brew "fnm"
 brew "go"
 brew "postgresql@18"
-
-# tools for mise
 brew "mise"
 brew "clang-format"
 brew "freetype"
@@ -60,70 +59,63 @@ brew "libxml2"
 brew "lua"
 brew "pkg-config"
 brew "tpm"
-
-brew "herdr"
 brew "kondo"
 brew "shellcheck"
 brew "commitizen"
-
+brew "docker"
 {{- if eq .chezmoi.os "darwin" }}
 brew "colima"
-brew "docker"
 brew "docker-compose"
 {{- end }}
 {{- end }}
-
-{{- if and (eq .chezmoi.os "darwin") (or (eq .profile "personal") (eq .profile "dev")) }}
+{{- if .setupAi }}
+brew "herdr"
+brew "nono"
+brew "opencode"
+brew "pi-coding-agent"
+brew "charmbracelet/tap/crush"
+{{- if eq .aiMode "local" }}
+brew "cliproxyapi"
+{{- end }}
+{{- if eq .chezmoi.os "darwin" }}
+cask "claude-code"
+{{- else }}
+brew "claude-code"
+{{- end }}
+{{- end }}
+{{- if and (eq .chezmoi.os "darwin") (or (eq .guiTier "minimum") (eq .guiTier "all")) }}
+cask "raycast"
+cask "jordanbaird-ice"
+cask "shottr"
+cask "hyperkey"
+cask "ghostty"
+cask "font-jetbrains-mono-nerd-font"
+{{- end }}
+{{- if and (eq .chezmoi.os "darwin") (eq .guiTier "all") }}
 brew "mas"
 cask "helium-browser"
 cask "discord"
 cask "telegram"
 cask "whatsapp"
-cask "raycast"
 cask "notion-calendar"
-
 cask "notion"
 cask "zotero"
-
 cask "dockdoor"
 cask "TheBoredTeam/boring-notch/boring-notch"
-cask "jordanbaird-ice"
-cask "shottr"
-cask "hyperkey"
-
 cask "iina"
 cask "appcleaner"
 cask "veracrypt-fuse-t"
 cask "google-drive"
 cask "protonvpn"
 cask "handy"
-
-cask "font-jetbrains-mono-nerd-font"
-{{- end }}
-
-{{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") }}
 cask "zen"
 cask "google-gemini"
-
 cask "zed"
-brew "nono"
-brew "cliproxyapi"
-
 cask "antigravity-ide"
-cask "claude-code"
-brew "opencode"
-brew "pi-coding-agent"
-brew "charmbracelet/tap/crush"
-
 cask "alacritty"
-cask "ghostty"
 cask "yaak"
 cask "utm"
 cask "onyx"
 cask "basictex"
 {{- end }}
 EOF
-else
-  echo "⚠️ Homebrew not found. Skipping brew bundle."
-fi
-{{ end -}}

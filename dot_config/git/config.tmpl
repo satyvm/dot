@@ -1,7 +1,7 @@
 [user]
   name = {{ .name | quote }}
   email = {{ .email | quote }}
-{{- if or .setupSshKey (stat (joinPath .chezmoi.homeDir ".ssh/gh_personal.pub")) }}
+{{- if and .setupCli (or .setupSshKey (stat (joinPath .chezmoi.homeDir ".ssh/gh_personal.pub")) ) }}
   signingkey = {{ joinPath .chezmoi.homeDir ".ssh/gh_personal.pub" | quote }}
 
 [gpg]
@@ -14,6 +14,7 @@
   gpgsign = true
 {{- end }}
 
+{{- if .setupCli }}
 [init]
   defaultBranch = main
 
@@ -34,3 +35,4 @@
 
 [merge]
   conflictstyle = diff3
+{{- end }}

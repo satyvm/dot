@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "{{ .chezmoi.os }}" == "linux" ]] && command -v zsh >/dev/null 2>&1 && [[ "${SHELL##*/}" != "zsh" ]]; then
+  chsh -s "$(command -v zsh)" || echo "Set zsh manually with: chsh -s $(command -v zsh)"
+fi

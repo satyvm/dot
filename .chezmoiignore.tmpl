@@ -1,40 +1,44 @@
-# ── Repo-only files (never deployed to home) ─────────────────────────────────
+# Repo-only files
 README.md
 LICENSE
 AGENTS.md
 .setup.sh
-scripts
-cursor-default.code-profile
+.local
+dot_backup
 
-# ── Ignore encrypted backup files if the decryption key is missing ──────────
+# Secrets never enter the managed destination when the local age key is absent.
 {{- if not (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
 .backup/cursor-default.code-profile
 {{- end }}
 
-
-# ── macOS-only scripts: ignore on Linux ──────────────────────────────────────
-{{- if ne .chezmoi.os "darwin" }}
-run_once_after_setup-macos.sh.tmpl
-{{- end }}
-
-# ── Linux-only scripts: ignore on macOS ──────────────────────────────────────
-{{- if ne .chezmoi.os "linux" }}
-run_once_after_setup-linux.sh.tmpl
+# The repository uses Homebrew on both supported platforms; the former APT and
+# GUI-launch scripts are intentionally retired.
 run_onchange_apt-packages.sh.tmpl
+run_once_after_setup-zend.sh.tmpl
+
+{{- if not (or .setupCli .setupAi) }}
+dot_zshrc
+dot_zshenv
+dot_dotfiles
+.config/nvim
+.config/tmux
+.config/starship
+.config/private_pet
+run_once_after_setup-shell.sh.tmpl
 {{- end }}
 
-# ── AI agent platform: first milestone is macOS dev only ─────────────────────
-{{- if not (and (eq .chezmoi.os "darwin") (eq .profile "dev")) }}
+{{- if not .setupDeveloper }}
+run_once_after_install-tools.sh.tmpl
+{{- end }}
+
+{{- if not .setupAi }}
+.config/agents
 .config/ax
-.config/cli-proxy-api
 .config/crush
+.config/herdr
+.config/nono
 .config/opencode
 .pi
-.config/nono/profiles/default-agent.json
-.config/nono/profiles/default-claude.json
-.config/nono/profiles/default-crush.json
-.config/nono/profiles/default-opencode.json
-.config/nono/profiles/default-pi.json
 .local/bin/ax
 .local/bin/claude
 .local/bin/crush
@@ -42,10 +46,29 @@ run_onchange_apt-packages.sh.tmpl
 .local/bin/pi
 run_onchange_after_setup-ai-agent-platform.sh.tmpl
 {{- end }}
+{{- if or (not .setupAi) (eq .aiMode "remote") }}
+.config/cli-proxy-api
+{{- end }}
 
-# ── Server profile: skip desktop/GUI scripts ─────────────────────────────────
-{{- if eq .profile "server" }}
-run_once_after_setup-zend.sh.tmpl
-.config/alacritty
+{{- if ne .guiTier "minimum" }}
+{{- if ne .guiTier "all" }}
 .config/ghostty
+{{- end }}
+{{- end }}
+{{- if ne .guiTier "all" }}
+.config/alacritty
+{{- end }}
+
+{{- if and (not .setupCli) (not .setupAi) (eq .guiTier "none") }}
+run_onchange_brew-packages.sh.tmpl
+{{- end }}
+
+{{- if or (ne .chezmoi.os "darwin") (not .setupMacos) }}
+run_once_after_setup-macos.sh.tmpl
+{{- end }}
+{{- if or (ne .chezmoi.os "linux") (not .setupLinuxHardening) }}
+run_once_after_setup-linux.sh.tmpl
+{{- end }}
+{{- if not .setupSshKey }}
+run_once_after_setup-ssh-key.sh.tmpl
 {{- end }}
