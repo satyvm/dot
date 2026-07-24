@@ -5,6 +5,32 @@
       "{{ .chezmoi.homeDir }}/.config/agents/universal_context.md"
     ]
   },
+  "mcp": {
+{{- $environment := "mac-dev" -}}
+{{- if eq .aiMode "remote" }}{{ $environment = "remote-dev" }}{{ end -}}
+{{- $devRoot := index .aiTools.paths.devRoot $environment -}}
+{{- $mcpServers := .aiTools.mcp.servers -}}
+{{- range $index, $name := keys $mcpServers | sortAlpha }}
+{{- $server := index $mcpServers $name }}
+    "{{ $name }}": {
+      "type": "stdio",
+      "command": "{{ $server.command }}",
+      "args": [{{ range $argIndex, $arg := $server.args }}{{ if $argIndex }}, {{ end }}{{ if eq $arg "$DEV_ROOT" }}{{ $devRoot | quote }}{{ else }}{{ $arg | quote }}{{ end }}{{ end }}],
+      "timeout": 120,
+      "disabled": false
+    }{{ if lt $index (sub (len $mcpServers) 1) }},{{ end }}
+{{- end }}
+  },
+  "lsp": {
+{{- $lspServers := .aiTools.lsp.servers -}}
+{{- range $index, $name := keys $lspServers | sortAlpha }}
+{{- $server := index $lspServers $name }}
+    "{{ $name }}": {
+      "command": "{{ $server.command }}",
+      "args": {{ $server.args | toJson }}
+    }{{ if lt $index (sub (len $lspServers) 1) }},{{ end }}
+{{- end }}
+  },
   "providers": {
     "cliproxy": {
       "type": "openai-compat",

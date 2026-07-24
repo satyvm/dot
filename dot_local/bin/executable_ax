@@ -158,6 +158,17 @@ proxy_url() {
   jq -r '.proxy.url' "$models_file"
 }
 
+proxy_is_local() {
+  case "$(proxy_url)" in
+    http://127.0.0.1:*|https://127.0.0.1:*|http://localhost:*|https://localhost:*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 proxy_ready() {
   local base_url="$1"
   read_proxy_key || return 1
@@ -259,16 +270,18 @@ generate_secret() {
 }
 
 auth_setup() {
+  if [[ "${AX_PLATFORM:-$(uname -s)}" != "Darwin" ]]; then
+    read_proxy_key ||
+      die "$AX_EXIT_CONFIG" "remote proxy client key is missing; redeploy hermes-dev with CLIPROXY_CLIENT_KEY configured"
+    printf 'Remote CLIProxyAPI authentication is managed by the Compose sidecar.\n'
+    printf 'Client key: configured\n'
+    return 0
+  fi
+
   local management_key_file="$config_home/cli-proxy-api/management-key"
   generate_secret "$proxy_key_file"
   generate_secret "$management_key_file"
   chmod 600 "$proxy_key_file" "$management_key_file"
-
-  if [[ "${AX_PLATFORM:-$(uname -s)}" != "Darwin" ]]; then
-    printf 'Device keys generated at %s\n' "$proxy_key_file"
-    printf 'On Linux/remote-dev, CLIProxyAPI is managed by Docker Compose sidecar.\n'
-    return 0
-  fi
   need cliproxyapi
   need chezmoi
   chezmoi apply "$config_home/cli-proxy-api/config.yaml"
@@ -359,7 +372,9 @@ doctor() {
     printf 'proxy authentication: missing (run: ax auth setup)\n'
     failures=$((failures + 1))
   fi
-  if provider_auth_present "$active_channel"; then
+  if ! proxy_is_local; then
+    printf 'provider authentication (%s): managed by remote CLIProxyAPI\n' "$active_channel"
+  elif provider_auth_present "$active_channel"; then
     printf 'provider authentication (%s): configured\n' "$active_channel"
   else
     printf 'provider authentication (%s): missing (run: ax auth setup)\n' "$active_channel"

@@ -4,7 +4,7 @@ LICENSE
 AGENTS.md
 .setup.sh
 .local
-dot_backup
+.backup
 
 # Secrets never enter the managed destination when the local age key is absent.
 {{- if not (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
@@ -27,14 +27,20 @@ dot_dotfiles
 run_once_after_setup-shell.sh.tmpl
 {{- end }}
 
-{{- if not .setupDeveloper }}
+{{- if or (not .setupDeveloper) (eq .aiMode "remote") }}
 run_once_after_install-tools.sh.tmpl
+{{- end }}
+{{- if eq .aiMode "remote" }}
+run_onchange_brew-packages.sh.tmpl
 {{- end }}
 
 {{- if not .setupAi }}
 .config/agents
+.config/ai-tools
 .config/ax
 .config/crush
+.config/zed
+.zed
 .config/herdr
 .config/nono
 .config/opencode
@@ -45,6 +51,12 @@ run_once_after_install-tools.sh.tmpl
 .local/bin/opencode
 .local/bin/pi
 run_onchange_after_setup-ai-agent-platform.sh.tmpl
+{{- end }}
+{{- if ne .chezmoi.os "darwin" }}
+.zed
+{{- end }}
+{{- if ne .chezmoi.os "linux" }}
+.config/zed
 {{- end }}
 {{- if or (not .setupAi) (eq .aiMode "remote") }}
 .config/cli-proxy-api

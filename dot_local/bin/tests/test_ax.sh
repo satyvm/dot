@@ -306,6 +306,9 @@ else
   fail "auth setup initializes both per-device keys" "one or more key files are missing"
 fi
 
+OUTPUT="$(AX_PLATFORM=Linux run_ax auth setup)"
+assert_contains "$OUTPUT" "managed by the Compose sidecar" "remote auth setup preserves the Compose-managed client key"
+
 mv "$CONFIG_HOME/cli-proxy-api/antigravity-test.json" "$FIXTURE_ROOT/antigravity-test.json"
 printf '{}\n' >"$CONFIG_HOME/cli-proxy-api/codex-stale.json"
 set +e
@@ -316,6 +319,13 @@ assert_status 1 "$STATUS" "doctor fails when provider authentication is missing"
 assert_contains "$OUTPUT" "provider authentication (antigravity): missing" "doctor reports missing active-channel authentication without exposing secrets"
 rm "$CONFIG_HOME/cli-proxy-api/codex-stale.json"
 mv "$FIXTURE_ROOT/antigravity-test.json" "$CONFIG_HOME/cli-proxy-api/antigravity-test.json"
+
+REMOTE_REGISTRY="$FIXTURE_ROOT/remote-models.json"
+jq '.proxy.url = "http://cliproxyapi:8317"' "$CONFIG_HOME/ax/models.json" >"$REMOTE_REGISTRY"
+mv "$CONFIG_HOME/cli-proxy-api/antigravity-test.json" "$FIXTURE_ROOT/antigravity-remote-test.json"
+OUTPUT="$(AX_REGISTRY_PATH="$REMOTE_REGISTRY" AX_PLATFORM=Linux run_ax doctor)"
+assert_contains "$OUTPUT" "managed by remote CLIProxyAPI" "remote doctor does not require sidecar-owned provider files"
+mv "$FIXTURE_ROOT/antigravity-remote-test.json" "$CONFIG_HOME/cli-proxy-api/antigravity-test.json"
 
 for agent in claude pi opencode crush; do
   shim="$SHIM_DIR/executable_$agent"
@@ -372,6 +382,8 @@ if command -v chezmoi >/dev/null 2>&1; then
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_pi/agent/settings.json.tmpl" >"$RENDER_ROOT/pi-settings.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_pi/agent/models.json.tmpl" >"$RENDER_ROOT/pi-models.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/crush/crush.json.tmpl" >"$RENDER_ROOT/crush.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/ai-tools/claude-mcp.json.tmpl" >"$RENDER_ROOT/claude-mcp.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_zed/settings.json.tmpl" >"$RENDER_ROOT/zed.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/cli-proxy-api/private_config.yaml.tmpl" >"$RENDER_ROOT/proxy.yaml"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/run_onchange_after_setup-ai-agent-platform.sh.tmpl" >"$RENDER_ROOT/setup-ai-agent-platform.sh"
   SKILL_SCRIPT_ROOT="$RENDER_ROOT/skill-creator/scripts"
@@ -401,12 +413,15 @@ if command -v chezmoi >/dev/null 2>&1; then
   assert_contains "$(cat "$RENDER_ROOT/pi-settings.json")" '"defaultModel": "balanced"' "Pi receives the canonical balanced default"
   assert_contains "$(cat "$RENDER_ROOT/crush.json")" '"model": "balanced"' "Crush receives the canonical balanced default"
   assert_contains "$(cat "$RENDER_ROOT/crush.json")" '/.config/agents/universal_context.md"' "Crush loads the universal context through context_paths"
+  assert_contains "$(cat "$RENDER_ROOT/claude-mcp.json")" '"/Users/s/dev"' "local Claude MCP is restricted to the Mac dev root"
+  assert_contains "$(cat "$RENDER_ROOT/zed.json")" '"host": "hermes-dev"' "Zed renders the remote development SSH alias"
   if bash -n "$RENDER_ROOT/setup-ai-agent-platform.sh"; then
     pass "rendered AI platform setup script parses"
   else
     fail "rendered AI platform setup script parses" "invalid shell syntax"
   fi
   assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" "PI_CODING_AGENT_DIR=\"\$HOME/.pi/agent\" herdr integration install \"\$agent\"" "Herdr installs Pi integration in Pi's documented agent directory"
+  assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" 'config["mcp_servers"] = servers' "Hermes MCP sync preserves the rest of config.yaml"
   assert_contains "$(chezmoi target-path --config "$MAC_CONFIG" --source "$REPO_ROOT" "$REPO_ROOT/dot_config/agents/skills/skill-creator/scripts/literal_run_eval.py")" "/run_eval.py" "chezmoi preserves the run_eval.py payload basename"
   assert_contains "$(chezmoi target-path --config "$MAC_CONFIG" --source "$REPO_ROOT" "$REPO_ROOT/dot_config/agents/skills/skill-creator/scripts/literal_run_loop.py")" "/run_loop.py" "chezmoi preserves the run_loop.py payload basename"
   if (cd "$FIXTURE_ROOT" && PYTHONDONTWRITEBYTECODE=1 python3 "$SKILL_SCRIPT_ROOT/run_eval.py" --help >/dev/null); then
@@ -424,9 +439,13 @@ if command -v chezmoi >/dev/null 2>&1; then
   echo '{"data":{"setupCli":true,"setupAi":true,"aiMode":"remote"}}' > "$REMOTE_CONFIG"
   HOME="$HOME_DIR" chezmoi execute-template --config "$REMOTE_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/ax/models.json.tmpl" >"$RENDER_ROOT/models-remote.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$REMOTE_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/opencode/opencode.jsonc.tmpl" >"$RENDER_ROOT/opencode-remote.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$REMOTE_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/ai-tools/claude-mcp.json.tmpl" >"$RENDER_ROOT/claude-mcp-remote.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$REMOTE_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/zed/settings.json.tmpl" >"$RENDER_ROOT/zed-remote.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$REMOTE_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/cli-proxy-api/private_config.yaml.tmpl" >"$RENDER_ROOT/proxy-remote.yaml"
   assert_contains "$(cat "$RENDER_ROOT/models-remote.json")" '"url": "http://cliproxyapi:8317"' "remote AI models.json renders Compose proxy URL"
   assert_contains "$(cat "$RENDER_ROOT/opencode-remote.json")" '"baseURL": "http://cliproxyapi:8317/v1"' "remote AI opencode.json renders Compose proxy URL"
+  assert_contains "$(cat "$RENDER_ROOT/claude-mcp-remote.json")" '"/home/ubuntu/dev"' "remote Claude MCP is restricted to the server dev root"
+  assert_contains "$(cat "$RENDER_ROOT/zed-remote.json")" '"/home/ubuntu/dev"' "remote Zed MCP uses the server dev root"
   assert_contains "$(cat "$RENDER_ROOT/proxy-remote.yaml")" 'host: "127.0.0.1"' "local proxy configuration remains loopback-only"
 else
   fail "chezmoi render tests" "chezmoi is not installed"

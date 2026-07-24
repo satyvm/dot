@@ -1,0 +1,15 @@
+{{- $environment := "mac-dev" -}}
+{{- if eq .aiMode "remote" }}{{ $environment = "remote-dev" }}{{ end -}}
+{{- $devRoot := index .aiTools.paths.devRoot $environment -}}
+{
+  "context_servers": {
+{{- $servers := .aiTools.mcp.servers -}}
+{{- range $index, $name := keys $servers | sortAlpha }}
+{{- $server := index $servers $name }}
+    "{{ $name }}": {
+      "command": "{{ $server.command }}",
+      "args": [{{ range $argIndex, $arg := $server.args }}{{ if $argIndex }}, {{ end }}{{ if eq $arg "$DEV_ROOT" }}{{ $devRoot | quote }}{{ else }}{{ $arg | quote }}{{ end }}{{ end }}]
+    }{{ if lt $index (sub (len $servers) 1) }},{{ end }}
+{{- end }}
+  }
+}

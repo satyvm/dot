@@ -1,24 +1,93 @@
 services:
+  cliproxy-init:
+    image: alpine:3.22.1
+    restart: "no"
+    environment:
+      CLIPROXY_CLIENT_KEY: ${CLIPROXY_CLIENT_KEY:?}
+      CLIPROXY_MANAGEMENT_KEY: ${CLIPROXY_MANAGEMENT_KEY:?}
+    volumes:
+      - cliproxy-config:/config
+      - platform-secrets:/secrets
+    command:
+      - /bin/sh
+      - -euc
+      - |
+        umask 077
+        printf '%s\n' "$${CLIPROXY_CLIENT_KEY}" > /secrets/client-key
+        cat > /config/config.yaml <<EOF
+        host: "0.0.0.0"
+        port: 8317
+        tls:
+          enable: false
+        remote-management:
+          allow-remote: false
+          secret-key: "$${CLIPROXY_MANAGEMENT_KEY}"
+          disable-control-panel: true
+        auth-dir: "/root/.cli-proxy-api"
+        api-keys:
+          - "$${CLIPROXY_CLIENT_KEY}"
+        debug: false
+        logging-to-file: true
+        logs-max-total-size-mb: 100
+        usage-statistics-enabled: false
+        request-retry: 3
+        max-retry-credentials: 0
+        max-retry-interval: 30
+        routing:
+          strategy: "fill-first"
+          session-affinity: true
+          session-affinity-ttl: "24h"
+        ws-auth: true
+        oauth-model-alias:
+          antigravity:
+            - name: "claude-opus-4-6-thinking"
+              alias: "frontier"
+              display-name: "Frontier"
+              force-mapping: true
+            - name: "gemini-3.6-flash-high"
+              alias: "balanced"
+              display-name: "Balanced"
+              force-mapping: true
+            - name: "gemini-3.5-flash-low"
+              alias: "fast"
+              display-name: "Fast"
+              force-mapping: true
+            - name: "gemini-3.5-flash-extra-low"
+              alias: "light"
+              display-name: "Light"
+              force-mapping: true
+        EOF
+        chmod 0600 /config/config.yaml /secrets/client-key
+
   cliproxyapi:
     image: eceasy/cli-proxy-api:v7.2.95
     restart: unless-stopped
+    depends_on:
+      cliproxy-init:
+        condition: service_completed_successfully
+    command:
+      - -config
+      - /config/config.yaml
+    environment:
+      CLIPROXY_CLIENT_KEY: ${CLIPROXY_CLIENT_KEY:?}
+      DEPLOY: cloud
+      PORT: "8317"
     volumes:
-      - cliproxy-config:/etc/cli-proxy-api
+      - cliproxy-config:/config:ro
       - cliproxy-auth:/root/.cli-proxy-api
     networks:
       - hermes-net
-    environment:
-      - DEPLOY=cloud
-      - PORT=8317
     healthcheck:
       test:
-        - CMD
-        - curl
-        - "-f"
-        - "http://127.0.0.1:8317/v1/models"
+        - CMD-SHELL
+        - >-
+          curl --fail --silent
+          -H "Authorization: Bearer $${CLIPROXY_CLIENT_KEY}"
+          http://127.0.0.1:8317/v1/models >/dev/null
       interval: 10s
       timeout: 5s
-      retries: 5
+      start_period: 20s
+      retries: 10
     deploy:
       resources:
         limits:
@@ -29,6 +98,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        REMOTE_UID: ${REMOTE_UID:-1000}
+        REMOTE_GID: ${REMOTE_GID:-1000}
+        HERMES_WEBUI_VERSION: ${HERMES_WEBUI_VERSION:-0.51.92}
+        HERMES_AGENT_VERSION: ${HERMES_AGENT_VERSION:-0.18.2}
     restart: unless-stopped
     depends_on:
       cliproxyapi:
@@ -36,36 +110,48 @@ services:
     ports:
       - "127.0.0.1:${DEV_SSH_PORT:-2222}:22"
     environment:
-      - DEV_SSH_PUBLIC_KEY=${DEV_SSH_PUBLIC_KEY:?}
-      - OPENAI_API_BASE=http://cliproxyapi:8317/v1
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-cli-proxy-local-token}
-      - HERMES_WEBUI_PASSWORD=${HERMES_WEBUI_PASSWORD:?}
+      SERVICE_URL_HERMESDEV_8787:
+      DEV_SSH_PUBLIC_KEY: ${DEV_SSH_PUBLIC_KEY:?}
+      REMOTE_DOTFILES_REPO: ${REMOTE_DOTFILES_REPO:-https://github.com/satyvm/dot.git}
+      REMOTE_GIT_NAME: ${REMOTE_GIT_NAME:-Satyam}
+      REMOTE_GIT_EMAIL: ${REMOTE_GIT_EMAIL:-75127014+satyvm@users.noreply.github.com}
+      HERMES_HOME: /home/ubuntu/.hermes
+      HERMES_WEBUI_STATE_DIR: /home/ubuntu/.hermes/webui
+      HERMES_WEBUI_DEFAULT_WORKSPACE: /home/ubuntu/dev
+      HERMES_WEBUI_HOST: 0.0.0.0
+      HERMES_WEBUI_PORT: "8787"
+      HERMES_WEBUI_PASSWORD: ${HERMES_WEBUI_PASSWORD:?}
+      HERMES_SKIP_CHMOD: "1"
+      OPENAI_API_BASE: http://cliproxyapi:8317/v1
+      OPENAI_BASE_URL: http://cliproxyapi:8317/v1
+      OPENAI_API_KEY: ${CLIPROXY_CLIENT_KEY:?}
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PERSONAL_ACCESS_TOKEN:-}
     volumes:
       - type: bind
-        source: ${SERVER_DEV_PATH:?/home/ubuntu/dev}
+        source: ${SERVER_DEV_PATH:?set /home/ubuntu/dev}
         target: /home/ubuntu/dev
       - remote-home:/home/ubuntu
+      - hermes-state:/home/ubuntu/.hermes
       - ssh-host-keys:/etc/ssh/host-keys
-      - hermes-state:/opt/data
+      - platform-secrets:/run/platform-secrets:ro
     networks:
       - hermes-net
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - --silent
+        - http://127.0.0.1:8787/health
+      interval: 30s
+      timeout: 8s
+      start_period: 90s
+      retries: 5
     deploy:
       resources:
         limits:
           memory: 4G
           cpus: "2.0"
-    healthcheck:
-      test:
-        - CMD
-        - curl
-        - "-f"
-        - "http://127.0.0.1:8787/health"
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    labels:
-      - "coolify.managed=true"
-      - "coolify.port=8787"
 
 networks:
   hermes-net:
@@ -73,7 +159,8 @@ networks:
 
 volumes:
   remote-home:
-  ssh-host-keys:
   hermes-state:
+  ssh-host-keys:
+  platform-secrets:
   cliproxy-config:
   cliproxy-auth:

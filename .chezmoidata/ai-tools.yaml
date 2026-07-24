@@ -8,7 +8,7 @@ aiTools:
     servers:
       filesystem:
         command: npx
-        args: ["-y", "@modelcontextprotocol/server-filesystem@0.6.2", "{{ .devRoot }}"]
+        args: ["-y", "@modelcontextprotocol/server-filesystem@0.6.2", "$DEV_ROOT"]
         pinnedVersion: "0.6.2"
         environments: ["mac-dev", "remote-dev"]
         roots: ["{{ .devRoot }}"]
@@ -31,24 +31,24 @@ aiTools:
       vtsls:
         command: vtsls
         args: ["--stdio"]
-        pinnedVersion: "0.2.6"
+        pinnedVersion: "0.3.0"
         environments: ["mac-dev", "remote-dev"]
         filetypes: ["typescript", "typescriptreact", "javascript", "javascriptreact"]
       pyright:
         command: pyright-langserver
         args: ["--stdio"]
-        pinnedVersion: "1.1.391"
+        pinnedVersion: "1.1.411"
         environments: ["mac-dev", "remote-dev"]
         filetypes: ["python"]
       gopls:
         command: gopls
         args: []
-        pinnedVersion: "0.17.1"
+        pinnedVersion: "0.23.0"
         environments: ["mac-dev", "remote-dev"]
         filetypes: ["go"]
       rust-analyzer:
         command: rust-analyzer
         args: []
-        pinnedVersion: "2025-01-20"
+        pinnedVersion: "2026-07-20"
         environments: ["mac-dev", "remote-dev"]
         filetypes: ["rust"]

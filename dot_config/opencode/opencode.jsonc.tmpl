@@ -7,6 +7,20 @@
   "enabled_providers": ["cliproxy"],
   "model": "cliproxy/{{ .aiAgentPlatform.agents.opencode.defaultRole }}",
   "small_model": "cliproxy/light",
+  "mcp": {
+{{- $environment := "mac-dev" -}}
+{{- if eq .aiMode "remote" }}{{ $environment = "remote-dev" }}{{ end -}}
+{{- $devRoot := index .aiTools.paths.devRoot $environment -}}
+{{- $servers := .aiTools.mcp.servers -}}
+{{- range $index, $name := keys $servers | sortAlpha }}
+{{- $server := index $servers $name }}
+    "{{ $name }}": {
+      "type": "local",
+      "command": [{{ $server.command | quote }}{{ range $arg := $server.args }}, {{ if eq $arg "$DEV_ROOT" }}{{ $devRoot | quote }}{{ else }}{{ $arg | quote }}{{ end }}{{ end }}],
+      "enabled": true
+    }{{ if lt $index (sub (len $servers) 1) }},{{ end }}
+{{- end }}
+  },
   "provider": {
     "cliproxy": {
       "npm": "@ai-sdk/openai-compatible",

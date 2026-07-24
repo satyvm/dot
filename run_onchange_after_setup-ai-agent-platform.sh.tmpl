@@ -3,6 +3,79 @@ set -euo pipefail
 
 warn() { printf 'warning: %s\n' "$*" >&2; }
 
+# Claude Code keeps user-scoped MCPs in ~/.claude.json alongside mutable
+# session state. Merge only the catalog-owned server names and preserve every
+# other key rather than managing that whole file with chezmoi.
+managed_mcp="$HOME/.config/ai-tools/claude-mcp.json"
+claude_config="$HOME/.claude.json"
+if command -v jq >/dev/null 2>&1 && [[ -s "$managed_mcp" ]]; then
+  claude_tmp="$(mktemp "${TMPDIR:-/tmp}/claude-mcp.XXXXXX")"
+  if [[ -s "$claude_config" ]]; then
+    jq --slurpfile managed "$managed_mcp" \
+      '.mcpServers = ((.mcpServers // {}) + $managed[0].mcpServers)' \
+      "$claude_config" >"$claude_tmp"
+  else
+    jq '.' "$managed_mcp" >"$claude_tmp"
+  fi
+  install -m 0600 "$claude_tmp" "$claude_config"
+  rm -f "$claude_tmp"
+else
+  warn "jq or the managed MCP catalog is missing; Claude MCP sync was skipped"
+fi
+
+# Hermes keeps MCP definitions in the same mutable YAML document as WebUI and
+# provider settings. Merge only mcp_servers with Hermes' own Python/YAML runtime
+# and atomically replace the file.
+hermes_python="${HERMES_WEBUI_PYTHON:-python3}"
+hermes_config="$HOME/.hermes/config.yaml"
+if command -v hermes >/dev/null 2>&1 &&
+  "$hermes_python" -c 'import yaml' >/dev/null 2>&1 &&
+  [[ -s "$managed_mcp" ]]; then
+  HERMES_MANAGED_MCP="$managed_mcp" HERMES_CONFIG="$hermes_config" \
+    "$hermes_python" - <<'PY'
+import json
+import os
+from pathlib import Path
+import tempfile
+
+import yaml
+
+managed_path = Path(os.environ["HERMES_MANAGED_MCP"])
+config_path = Path(os.environ["HERMES_CONFIG"])
+managed = json.loads(managed_path.read_text())["mcpServers"]
+servers = {
+    name: {
+        key: value
+        for key, value in definition.items()
+        if key in {"command", "args", "env", "url", "headers"}
+    }
+    for name, definition in managed.items()
+}
+
+config = {}
+if config_path.exists():
+    config = yaml.safe_load(config_path.read_text()) or {}
+if not isinstance(config, dict):
+    raise SystemExit(f"{config_path} must contain a YAML mapping")
+config["mcp_servers"] = servers
+
+config_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+handle, temporary = tempfile.mkstemp(
+    prefix=".config.", suffix=".yaml", dir=config_path.parent
+)
+try:
+    with os.fdopen(handle, "w") as stream:
+        yaml.safe_dump(config, stream, sort_keys=False)
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, config_path)
+finally:
+    if os.path.exists(temporary):
+        os.unlink(temporary)
+PY
+elif command -v hermes >/dev/null 2>&1; then
+  warn "Hermes Python/YAML runtime is unavailable; Hermes MCP sync was skipped"
+fi
+
 if command -v herdr >/dev/null 2>&1; then
   for agent in claude pi opencode; do
     if command -v "$agent" >/dev/null 2>&1; then
