@@ -19,5 +19,10 @@
       "$HOME/.local/share/crush/auth.json",
       "$HOME/.local/share/crush/hyper.json"
     ]
+  },
+  "network": {
+    "allow_domain": [
+      "hyper.charm.land"
+    ]
   }
 }

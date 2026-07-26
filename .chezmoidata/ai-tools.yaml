@@ -6,25 +6,12 @@ aiTools:
       remote-dev: /home/ubuntu/dev
   mcp:
     servers:
-      filesystem:
+      context7:
         command: npx
-        args: ["-y", "@modelcontextprotocol/server-filesystem@0.6.2", "$DEV_ROOT"]
-        pinnedVersion: "0.6.2"
+        args: ["-y", "@upstash/context7-mcp@2.1.1"]
+        pinnedVersion: "2.1.1"
         environments: ["mac-dev", "remote-dev"]
         roots: ["{{ .devRoot }}"]
-        clients: ["hermes", "claude", "pi", "opencode", "crush", "zed"]
-      github:
-        command: npx
-        args: ["-y", "@modelcontextprotocol/server-github@0.6.2"]
-        pinnedVersion: "0.6.2"
-        environments: ["mac-dev", "remote-dev"]
-        credentials: ["GITHUB_PERSONAL_ACCESS_TOKEN"]
-        clients: ["hermes", "claude", "pi", "opencode", "crush", "zed"]
-      fetch:
-        command: uvx
-        args: ["mcp-server-fetch@0.6.2"]
-        pinnedVersion: "0.6.2"
-        environments: ["mac-dev", "remote-dev"]
         clients: ["hermes", "claude", "pi", "opencode", "crush", "zed"]
   lsp:
     servers:
@@ -33,22 +20,27 @@ aiTools:
         args: ["--stdio"]
         pinnedVersion: "0.3.0"
         environments: ["mac-dev", "remote-dev"]
-        filetypes: ["typescript", "typescriptreact", "javascript", "javascriptreact"]
+        filetypes:
+          ["typescript", "typescriptreact", "javascript", "javascriptreact"]
+        extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"]
       pyright:
         command: pyright-langserver
         args: ["--stdio"]
         pinnedVersion: "1.1.411"
         environments: ["mac-dev", "remote-dev"]
         filetypes: ["python"]
+        extensions: [".py", ".pyi"]
       gopls:
         command: gopls
         args: []
         pinnedVersion: "0.23.0"
         environments: ["mac-dev", "remote-dev"]
         filetypes: ["go"]
+        extensions: [".go"]
       rust-analyzer:
         command: rust-analyzer
         args: []
         pinnedVersion: "2026-07-20"
         environments: ["mac-dev", "remote-dev"]
         filetypes: ["rust"]
+        extensions: [".rs"]

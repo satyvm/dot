@@ -1,5 +1,5 @@
 {{- $clientKeyPath := joinPath .chezmoi.homeDir ".config/cli-proxy-api/client-key" -}}
-{{- $managementKeyPath := joinPath .chezmoi.homeDir ".config/cli-proxy-api/management-key" -}}
+{{- $managementKeyHashPath := joinPath .chezmoi.homeDir ".config/cli-proxy-api/management-key.bcrypt" -}}
 host: "127.0.0.1"
 port: 8317
 tls:
@@ -8,7 +8,7 @@ tls:
   key: ""
 remote-management:
   allow-remote: false
-  secret-key: {{ if stat $managementKeyPath }}{{ include $managementKeyPath | trim | quote }}{{ else }}""{{ end }}
+  secret-key: {{ if stat $managementKeyHashPath }}{{ include $managementKeyHashPath | trim | quote }}{{ else }}""{{ end }}
   disable-control-panel: false
 auth-dir: "~/.config/cli-proxy-api"
 api-keys:{{ if stat $clientKeyPath }}
@@ -34,11 +34,18 @@ routing:
   session-affinity-ttl: "24h"
 ws-auth: true
 oauth-model-alias:
-  {{ .aiAgentPlatform.proxy.channel }}:
+{{- $aliases := dict -}}
 {{- range $role, $model := .aiAgentPlatform.roles }}
+  {{- $existing := default (list) (get $aliases $model.provider) -}}
+  {{- $_ := set $aliases $model.provider (append $existing $model) -}}
+{{- end }}
+{{- range $provider := keys $aliases | sortAlpha }}
+  {{ $provider }}:
+{{- range $model := get $aliases $provider }}
     - name: {{ $model.target | quote }}
       alias: {{ $model.alias | quote }}
       display-name: {{ $model.displayName | quote }}
       fork: false
       force-mapping: true
+{{- end }}
 {{- end }}

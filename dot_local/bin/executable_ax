@@ -29,7 +29,7 @@ ax — policy gateway for local coding agents
 Usage:
   ax <claude|pi|opencode|crush> [--direct] [agent arguments...]
   ax models [show|edit|validate|sync|live]
-  ax auth setup
+  ax auth setup [antigravity|claude|codex|kimi|xai]
   ax doctor
 
 All normal agent launches use Nono. --direct is the only sandbox escape and
@@ -72,7 +72,7 @@ validate_models() {
       ((.roles | keys | sort) == ($required_roles | sort)) and
       (all(.roles | to_entries[]; .key == .value.alias)) and
       (([.roles[].alias] | unique | length) == (.roles | length)) and
-      (.proxy.channel as $channel | all(.roles[]; valid_metadata and (.provider == $channel))) and
+      (all(.roles[]; valid_metadata and (.provider | IN("vertex", "aistudio", "antigravity", "claude", "codex", "kimi", "xai")))) and
       (([.roles[] | [.provider, .target] | join(":")] | unique | length) == (.roles | length)) and
       ((.agents | keys | sort) == ($required_agents | sort)) and
       (all(.agents[]; ((.defaultRole as $role | $required_roles | index($role)) != null) and (.profile | nonempty_string))) and
@@ -269,6 +269,17 @@ generate_secret() {
   fi
 }
 
+ensure_management_key_hash() {
+  local key_file="$1" hash_file="$2" key
+  [[ -s "$hash_file" ]] && return 0
+  need htpasswd
+  IFS= read -r key <"$key_file"
+  [[ -n "$key" ]] || die "$AX_EXIT_CONFIG" "management key is empty: $key_file"
+  umask 077
+  htpasswd -B -C 10 -bn ax "$key" | sed 's/^[^:]*://' >"$hash_file"
+  chmod 600 "$hash_file"
+}
+
 auth_setup() {
   if [[ "${AX_PLATFORM:-$(uname -s)}" != "Darwin" ]]; then
     read_proxy_key ||
@@ -279,16 +290,18 @@ auth_setup() {
   fi
 
   local management_key_file="$config_home/cli-proxy-api/management-key"
+  local management_key_hash_file="$config_home/cli-proxy-api/management-key.bcrypt"
   generate_secret "$proxy_key_file"
   generate_secret "$management_key_file"
-  chmod 600 "$proxy_key_file" "$management_key_file"
+  ensure_management_key_hash "$management_key_file" "$management_key_hash_file"
+  chmod 600 "$proxy_key_file" "$management_key_file" "$management_key_hash_file"
   need cliproxyapi
   need chezmoi
   chezmoi apply "$config_home/cli-proxy-api/config.yaml"
 
   load_models
   local channel login_flag
-  channel="$(jq -r '.proxy.channel' "$models_file")"
+  channel="${1:-$(jq -r '.proxy.channel' "$models_file")}" 
   case "$channel" in
     antigravity) login_flag="-antigravity-login" ;;
     claude) login_flag="-claude-login" ;;
@@ -351,8 +364,7 @@ doctor_check_binary() {
 
 doctor() {
   load_models
-  local failures=0 name minimum active_channel
-  active_channel="$(jq -r '.proxy.channel' "$models_file")"
+  local failures=0 name minimum
   if validate_models "$models_file"; then
     printf 'models: valid\n'
   else
@@ -372,14 +384,16 @@ doctor() {
     printf 'proxy authentication: missing (run: ax auth setup)\n'
     failures=$((failures + 1))
   fi
-  if ! proxy_is_local; then
-    printf 'provider authentication (%s): managed by remote CLIProxyAPI\n' "$active_channel"
-  elif provider_auth_present "$active_channel"; then
-    printf 'provider authentication (%s): configured\n' "$active_channel"
-  else
-    printf 'provider authentication (%s): missing (run: ax auth setup)\n' "$active_channel"
-    failures=$((failures + 1))
-  fi
+  while IFS= read -r provider; do
+    if ! proxy_is_local; then
+      printf 'provider authentication (%s): managed by remote CLIProxyAPI\n' "$provider"
+    elif provider_auth_present "$provider"; then
+      printf 'provider authentication (%s): configured\n' "$provider"
+    else
+      printf 'provider authentication (%s): missing (run: ax auth setup %s)\n' "$provider" "$provider"
+      failures=$((failures + 1))
+    fi
+  done < <(jq -r '[.roles[].provider] | unique[]' "$models_file")
   if proxy_ready "$(proxy_url)"; then
     printf 'proxy: ready\n'
   else
@@ -473,6 +487,9 @@ configure_environment() {
   export OPENAI_BASE_URL="$base_url/v1"
   export OPENAI_API_KEY="$proxy_key"
   export OPENAI_MODEL="$model_id"
+  if [[ "$agent" == "opencode" ]]; then
+    export OPENCODE_EXPERIMENTAL_LSP_TOOL=true
+  fi
   export ANTHROPIC_MODEL="$model_id"
   export ANTHROPIC_DEFAULT_OPUS_MODEL
   ANTHROPIC_DEFAULT_OPUS_MODEL="$(jq -r '.classes.claude.large' "$models_file")"
@@ -603,7 +620,9 @@ case "${1:-}" in
   auth)
     shift
     [[ "${1:-}" == "setup" ]] || die "$AX_EXIT_USAGE" "usage: ax auth setup"
-    auth_setup
+    shift
+    [[ $# -le 1 ]] || die "$AX_EXIT_USAGE" "usage: ax auth setup [antigravity|claude|codex|kimi|xai]"
+    auth_setup "$@"
     ;;
   doctor)
     doctor

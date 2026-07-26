@@ -6,8 +6,8 @@ aiAgentPlatform:
   roles:
     frontier:
       alias: frontier
-      target: claude-opus-4-6-thinking
-      provider: antigravity
+      target: gpt-5.6-sol
+      provider: codex
       displayName: Frontier
       contextWindow: 200000
       maxTokens: 32768
@@ -24,8 +24,8 @@ aiAgentPlatform:
       input: [text, image]
     fast:
       alias: fast
-      target: gemini-3.5-flash-low
-      provider: antigravity
+      target: gpt-5.6-terra
+      provider: codex
       displayName: Fast
       contextWindow: 1048576
       maxTokens: 65536
@@ -33,8 +33,8 @@ aiAgentPlatform:
       input: [text, image]
     light:
       alias: light
-      target: gemini-3.5-flash-extra-low
-      provider: antigravity
+      target: gpt-5.4-mini
+      provider: codex
       displayName: Light
       contextWindow: 1048576
       maxTokens: 32768

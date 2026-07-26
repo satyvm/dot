@@ -143,9 +143,17 @@ cat >"$FAKE_BIN/cliproxyapi" <<'SH'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "-antigravity-login" ]]; then
   echo "interactive-login=antigravity"
+elif [[ "${1:-}" == "-codex-login" ]]; then
+  echo "interactive-login=codex"
+  printf '{}\n' >"$XDG_CONFIG_HOME/cli-proxy-api/codex-test.json"
 else
   echo "CLIProxyAPI Version: 99.0.0"
 fi
+SH
+
+cat >"$FAKE_BIN/htpasswd" <<'SH'
+#!/usr/bin/env bash
+printf 'ax:$2a$10$test-management-key-hash\n'
 SH
 
 cat >"$FAKE_BIN/chezmoi" <<'SH'
@@ -161,7 +169,7 @@ if [[ "${1:-}" == "services" ]]; then
   echo "brew-service=$2:$3"
 fi
 SH
-chmod +x "$FAKE_BIN/herdr" "$FAKE_BIN/cliproxyapi" "$FAKE_BIN/chezmoi" "$FAKE_BIN/brew"
+chmod +x "$FAKE_BIN/herdr" "$FAKE_BIN/cliproxyapi" "$FAKE_BIN/htpasswd" "$FAKE_BIN/chezmoi" "$FAKE_BIN/brew"
 for profile in default-claude default-pi default-opencode default-crush; do
   printf '{}\n' >"$CONFIG_HOME/nono/profiles/$profile.json"
 done
@@ -300,10 +308,18 @@ mv "$FIXTURE_ROOT/universal_context.md" "$CONFIG_HOME/agents/universal_context.m
 OUTPUT="$(AX_PLATFORM=Darwin run_ax auth setup)"
 assert_contains "$OUTPUT" "interactive-login=antigravity" "auth setup runs the active provider's interactive login"
 assert_contains "$OUTPUT" "brew-service=restart:cliproxyapi" "auth setup restarts CLIProxyAPI after login"
-if [[ -s "$CONFIG_HOME/cli-proxy-api/client-key" && -s "$CONFIG_HOME/cli-proxy-api/management-key" ]]; then
-  pass "auth setup initializes both per-device keys"
+if [[ -s "$CONFIG_HOME/cli-proxy-api/client-key" && -s "$CONFIG_HOME/cli-proxy-api/management-key" && -s "$CONFIG_HOME/cli-proxy-api/management-key.bcrypt" ]]; then
+  pass "auth setup initializes client, management, and bcrypt-hash keys"
 else
-  fail "auth setup initializes both per-device keys" "one or more key files are missing"
+  fail "auth setup initializes client, management, and bcrypt-hash keys" "one or more key files are missing"
+fi
+
+OUTPUT="$(AX_PLATFORM=Darwin run_ax auth setup codex)"
+assert_contains "$OUTPUT" "interactive-login=codex" "auth setup uses Codex OAuth for ChatGPT authentication"
+if [[ -s "$CONFIG_HOME/cli-proxy-api/codex-test.json" ]]; then
+  pass "Codex OAuth writes a provider credential"
+else
+  fail "Codex OAuth writes a provider credential" "missing Codex credential fixture"
 fi
 
 OUTPUT="$(AX_PLATFORM=Linux run_ax auth setup)"
@@ -372,6 +388,15 @@ STATUS=$?
 set -e
 assert_status 78 "$STATUS" "registry validation rejects duplicate aliases"
 
+MIXED_REGISTRY="$FIXTURE_ROOT/mixed-provider-models.json"
+jq '
+  .roles.frontier.provider = "codex" |
+  .roles.fast.provider = "codex" |
+  .roles.light.provider = "codex"
+' "$CONFIG_HOME/ax/models.json" >"$MIXED_REGISTRY"
+OUTPUT="$(AX_REGISTRY_PATH="$MIXED_REGISTRY" run_ax models validate)"
+assert_contains "$OUTPUT" "models: valid" "registry validation permits simultaneous provider roles"
+
 RENDER_ROOT="$FIXTURE_ROOT/rendered"
 mkdir -p "$RENDER_ROOT"
 if command -v chezmoi >/dev/null 2>&1; then
@@ -406,14 +431,17 @@ if command -v chezmoi >/dev/null 2>&1; then
     fail "rendered CLIProxyAPI YAML parses" "invalid YAML"
   fi
   assert_contains "$(cat "$RENDER_ROOT/proxy.yaml")" 'host: "127.0.0.1"' "CLIProxyAPI binds only to IPv4 loopback"
+  assert_contains "$(cat "$RENDER_ROOT/proxy.yaml")" 'codex:' "CLIProxyAPI renders Codex aliases alongside Antigravity aliases"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"model": "cliproxy/balanced"' "OpenCode receives the canonical balanced default"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"small_model": "cliproxy/light"' "OpenCode keeps background tasks on the canonical light model"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"npm": "@ai-sdk/openai-compatible"' "OpenCode uses the proxy's Chat Completions protocol"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '/.config/agents/universal_context.md"' "OpenCode loads the universal context as an instruction file"
+  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"extensions": [".go"]' "OpenCode maps Go files to gopls"
+  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"extensions": [".ts",".tsx",".js",".jsx",".mjs",".cjs",".mts",".cts"]' "OpenCode maps JavaScript and TypeScript files to vtsls"
   assert_contains "$(cat "$RENDER_ROOT/pi-settings.json")" '"defaultModel": "balanced"' "Pi receives the canonical balanced default"
   assert_contains "$(cat "$RENDER_ROOT/crush.json")" '"model": "balanced"' "Crush receives the canonical balanced default"
   assert_contains "$(cat "$RENDER_ROOT/crush.json")" '/.config/agents/universal_context.md"' "Crush loads the universal context through context_paths"
-  assert_contains "$(cat "$RENDER_ROOT/claude-mcp.json")" '"/Users/s/dev"' "local Claude MCP is restricted to the Mac dev root"
+  assert_contains "$(cat "$RENDER_ROOT/claude-mcp.json")" '"@upstash/context7-mcp@2.1.1"' "local Claude MCP uses the supported Context7 server"
   assert_contains "$(cat "$RENDER_ROOT/zed.json")" '"host": "hermes-dev"' "Zed renders the remote development SSH alias"
   if bash -n "$RENDER_ROOT/setup-ai-agent-platform.sh"; then
     pass "rendered AI platform setup script parses"
@@ -444,8 +472,8 @@ if command -v chezmoi >/dev/null 2>&1; then
   HOME="$HOME_DIR" chezmoi execute-template --config "$REMOTE_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/cli-proxy-api/private_config.yaml.tmpl" >"$RENDER_ROOT/proxy-remote.yaml"
   assert_contains "$(cat "$RENDER_ROOT/models-remote.json")" '"url": "http://cliproxyapi:8317"' "remote AI models.json renders Compose proxy URL"
   assert_contains "$(cat "$RENDER_ROOT/opencode-remote.json")" '"baseURL": "http://cliproxyapi:8317/v1"' "remote AI opencode.json renders Compose proxy URL"
-  assert_contains "$(cat "$RENDER_ROOT/claude-mcp-remote.json")" '"/home/ubuntu/dev"' "remote Claude MCP is restricted to the server dev root"
-  assert_contains "$(cat "$RENDER_ROOT/zed-remote.json")" '"/home/ubuntu/dev"' "remote Zed MCP uses the server dev root"
+  assert_contains "$(cat "$RENDER_ROOT/claude-mcp-remote.json")" '"@upstash/context7-mcp@2.1.1"' "remote Claude MCP uses the supported Context7 server"
+  assert_contains "$(cat "$RENDER_ROOT/zed-remote.json")" '"@upstash/context7-mcp@2.1.1"' "remote Zed MCP uses the supported Context7 server"
   assert_contains "$(cat "$RENDER_ROOT/proxy-remote.yaml")" 'host: "127.0.0.1"' "local proxy configuration remains loopback-only"
 else
   fail "chezmoi render tests" "chezmoi is not installed"
@@ -465,6 +493,8 @@ if command -v nono >/dev/null 2>&1; then
   assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/Library/Keychains\"" "effective policy denies macOS Keychain data"
   assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.cargo/credentials.toml\"" "effective policy denies Cargo registry credentials"
   assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.config/agents/universal_context.md\"" "effective policy grants read-only universal context access"
+  assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.npm/_cacache\"" "effective policy permits npm package cache writes"
+  assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.npm/_npx\"" "effective policy permits npx ephemeral package writes"
   if [[ "$EFFECTIVE_PROFILE" != *"\"\$HOME/.local/share\""* ]]; then
     pass "effective policy avoids a broad ~/.local/share grant"
   else

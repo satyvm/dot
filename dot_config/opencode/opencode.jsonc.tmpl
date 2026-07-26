@@ -21,6 +21,16 @@
     }{{ if lt $index (sub (len $servers) 1) }},{{ end }}
 {{- end }}
   },
+  "lsp": {
+{{- $lspServers := .aiTools.lsp.servers -}}
+{{- range $index, $name := keys $lspServers | sortAlpha }}
+{{- $server := index $lspServers $name }}
+    "{{ $name }}": {
+      "command": [{{ $server.command | quote }}{{ range $arg := $server.args }}, {{ $arg | quote }}{{ end }}],
+      "extensions": {{ $server.extensions | toJson }}
+    }{{ if lt $index (sub (len $lspServers) 1) }},{{ end }}
+{{- end }}
+  },
   "provider": {
     "cliproxy": {
       "npm": "@ai-sdk/openai-compatible",

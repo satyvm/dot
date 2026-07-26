@@ -14,6 +14,11 @@
     ]
   },
   "filesystem": {
+    "allow": [
+      "$HOME/.npm/_cacache",
+      "$HOME/.npm/_npx",
+      "$HOME/.npm/_logs"
+    ],
     "read": [
       "$HOME/.agents/skills",
       "$HOME/.config/agents/skills",
