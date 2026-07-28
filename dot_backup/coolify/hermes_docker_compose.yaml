@@ -150,9 +150,7 @@ services:
       OPENAI_API_KEY: ${CLIPROXY_CLIENT_KEY:?}
       TEA_SOCKET_PATH: /run/tea/tea.sock
     volumes:
-      - type: bind
-        source: ${SERVER_DEV_PATH:?set /home/ubuntu/dev}
-        target: /home/ubuntu/dev
+      - /home/ubuntu/dev:/home/ubuntu/dev
       - remote-home:/home/ubuntu
       - hermes-state:/home/ubuntu/.hermes
       - ssh-host-keys:/etc/ssh/host-keys
