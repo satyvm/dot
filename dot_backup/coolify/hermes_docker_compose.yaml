@@ -83,13 +83,16 @@ services:
     restart: unless-stopped
     command:
       - python3
-      - /app/tea_sidecar.py
+      - /tea_sidecar.py
     environment:
       GITEA_TOKEN: ${GITEA_TOKEN:-}
       GITEA_URL: ${GITEA_URL:-https://gitea.satyvm.com}
       TEA_SOCKET_PATH: /run/tea/tea.sock
+    configs:
+      - source: tea-sidecar-script
+        target: /tea_sidecar.py
+        mode: 0444
     volumes:
-      - ./dot_backup/coolify/tea_sidecar.py:/app/tea_sidecar.py:ro
       - tea-socket:/run/tea
     networks:
       - hermes-net
@@ -162,6 +165,10 @@ services:
 networks:
   hermes-net:
     driver: bridge
+
+configs:
+  tea-sidecar-script:
+    file: ./dot_backup/coolify/tea_sidecar.py
 
 volumes:
   remote-home:

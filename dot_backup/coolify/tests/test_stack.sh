@@ -42,6 +42,8 @@ if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; 
   grep -q 'target: /home/ubuntu/.hermes' "$rendered"
   grep -q 'http://cliproxyapi:8317/v1' "$rendered"
   grep -q 'tea-sidecar' "$rendered"
+  grep -q 'source: tea-sidecar-script' "$rendered"
+  grep -q 'target: /tea_sidecar.py' "$rendered"
   grep -q '/run/tea/tea.sock' "$rendered"
 else
   grep -q '22223' "$compose_file"
@@ -52,9 +54,15 @@ fi
 grep -q 'python /apptoo/server.py' "$stack_dir/supervisord.conf"
 grep -q 'PasswordAuthentication no' "$stack_dir/Dockerfile"
 grep -q 'context: ./dot_backup/coolify' "$compose_file"
-grep -q './dot_backup/coolify/tea_sidecar.py:/app/tea_sidecar.py:ro' "$compose_file"
+grep -q 'tea-sidecar-script:' "$compose_file"
+grep -q 'file: ./dot_backup/coolify/tea_sidecar.py' "$compose_file"
+if grep -q 'tea_sidecar.py:.*tea_sidecar.py' "$compose_file"; then
+  echo "tea sidecar script must use a Compose config, not a bind mount" >&2
+  exit 1
+fi
 grep -q 'exec ./CLIProxyAPI -config /config/config.yaml' "$compose_file"
 grep -q '/dev/tcp/127.0.0.1/8317' "$compose_file"
+grep -q 'cache/chezmoi' "$stack_dir/entrypoint.sh"
 grep -q '/home/linuxbrew/.linuxbrew/bin/herdr' "$stack_dir/Dockerfile"
 grep -q '/home/linuxbrew/.linuxbrew/bin/nono' "$stack_dir/Dockerfile"
 grep -q '/home/linuxbrew/.linuxbrew/bin/crush' "$stack_dir/Dockerfile"

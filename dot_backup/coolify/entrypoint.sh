@@ -152,6 +152,12 @@ prepare_runtime_directories() {
   # root and directories owned by this service; never recurse into the dev bind.
   chown ubuntu:ubuntu "$remote_home"
   chmod 0755 "$remote_home"
+  install -d -o ubuntu -g ubuntu -m 0755 \
+    "$remote_home/.cache" \
+    "$remote_home/.config" \
+    "$remote_home/.local"
+  install -d -o ubuntu -g ubuntu -m 0700 \
+    "$remote_home/.cache/chezmoi"
   install -d -o ubuntu -g ubuntu -m 0700 "$remote_home/.hermes"
   install -d -o ubuntu -g ubuntu -m 0755 \
     "$remote_home/.hermes/webui" \
