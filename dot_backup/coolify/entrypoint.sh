@@ -102,11 +102,31 @@ write_chezmoi_config() {
   chmod 0600 "$chezmoi_config"
 }
 
-bootstrap_dotfiles() {
-  if [[ -e "$bootstrap_marker" ]]; then
-    return
+setup_gitea_ssh() {
+  install -d -o ubuntu -g ubuntu -m 0700 "$remote_home/.ssh"
+
+  if [[ ! -s "$remote_home/.ssh/gitea_ai_ed25519" ]]; then
+    log "generating dedicated Gitea SSH key"
+    run_as_ubuntu ssh-keygen -q -t ed25519 \
+      -f "$remote_home/.ssh/gitea_ai_ed25519" -N "" -C "ai@gitea.satyvm.com"
   fi
 
+  local config_file="$remote_home/.ssh/config"
+  if ! grep -q "Host gitea.satyvm.com" "$config_file" 2>/dev/null; then
+    {
+      printf '\nHost gitea.satyvm.com\n'
+      printf '    HostName gitea.satyvm.com\n'
+      printf '    User git\n'
+      printf '    Port 22222\n'
+      printf '    IdentityFile ~/.ssh/gitea_ai_ed25519\n'
+      printf '    IdentitiesOnly yes\n'
+    } >>"$config_file"
+    chown ubuntu:ubuntu "$config_file"
+    chmod 0600 "$config_file"
+  fi
+}
+
+bootstrap_dotfiles() {
   local repository="${REMOTE_DOTFILES_REPO:-https://github.com/satyvm/dot.git}"
   if [[ ! -d "$chezmoi_source/.git" ]]; then
     if [[ -e "$chezmoi_source" ]]; then
@@ -136,6 +156,7 @@ prepare_runtime_directories() {
   install -d -o ubuntu -g ubuntu -m 0755 \
     "$remote_home/.hermes/webui" \
     "$remote_home/.local/state/hermes-dev"
+  install -d -o ubuntu -g ubuntu -m 0777 /run/tea
 }
 
 main() {
@@ -144,6 +165,7 @@ main() {
   install_ssh_host_keys
   install_authorized_key
   install_proxy_client_key
+  setup_gitea_ssh
   bootstrap_dotfiles
 
   /usr/sbin/sshd -t

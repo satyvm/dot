@@ -17,12 +17,14 @@ The Compose application contains:
    and shared client key with restrictive permissions.
 2. `cliproxyapi`, which is reachable only as `http://cliproxyapi:8317` on the
    private Compose network.
-3. `hermes-dev`, a custom image containing Hermes Agent, Hermes WebUI, OpenSSH,
+3. `tea-sidecar`, a Python microservice exposing `/run/tea/tea.sock` to handle
+   Gitea `ai` account API calls securely without leaking tokens to agents.
+4. `hermes-dev`, a custom image containing Hermes Agent, Hermes WebUI, OpenSSH,
    chezmoi, `ax`, Nono, Herdr, Claude Code, Pi, OpenCode, Crush, MCP runtimes,
    and the shared LSP toolchain.
 
 Only WebUI port `8787` receives a Coolify domain. Container SSH is published on
-the host loopback address only. CLIProxyAPI has neither a host port nor a
+the host loopback address only on port 22223. CLIProxyAPI has neither a host port nor a
 Coolify domain.
 
 ## Persistence contract
@@ -88,7 +90,7 @@ Assign a domain only to `hermes-dev:8787`. Do not assign domains or ports to
 
 ```yaml
 ports:
-  - "127.0.0.1:${DEV_SSH_PORT:-2222}:22"
+  - "127.0.0.1:${DEV_SSH_PORT:-22223}:22"
 ```
 
 The first deployment clones and applies the dotfiles, so it takes longer than a
@@ -134,7 +136,7 @@ Host coolify
 
 Host hermes-dev
     HostName 127.0.0.1
-    Port 2222
+    Port 22223
     User ubuntu
     ProxyJump coolify
     IdentityFile ~/.ssh/hermes_dev_ed25519

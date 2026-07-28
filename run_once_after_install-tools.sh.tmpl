@@ -8,6 +8,14 @@ if ! command -v rustup >/dev/null 2>&1; then
 fi
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 
+if command -v cargo >/dev/null 2>&1; then
+  for tool in cargo-clean-all cargo-cache; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      cargo install "$tool" 2>/dev/null || true
+    fi
+  done
+fi
+
 if ! command -v uv >/dev/null 2>&1; then
   curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
@@ -23,8 +31,13 @@ if command -v fnm >/dev/null 2>&1; then
     fnm default lts-latest
     corepack enable
   fi
+  if command -v npm >/dev/null 2>&1 && ! command -v npkill >/dev/null 2>&1; then
+    npm install -g npkill 2>/dev/null || true
+  fi
 fi
 if ! command -v bun >/dev/null 2>&1; then curl -fsSL https://bun.sh/install | bash; fi
 if command -v mise >/dev/null 2>&1; then
-  for tool in gcloud aws-cli kubectl kubectx kubens k9s; do mise use -g "${tool}@latest" || true; done
+  for tool in gcloud aws-cli kubectl kubectx kubens k9s; do mise use -g "${tool}@latest" 
+  gcloud components install gke-gcloud-auth-plugin
+  true; done
 fi

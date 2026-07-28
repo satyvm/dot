@@ -82,6 +82,14 @@ if [[ "${1:-}" == "--version" ]]; then
   echo "nono 99.0.0"
   exit
 fi
+if [[ "${1:-}" == "prune" ]]; then
+  echo "nono prune $*"
+  exit
+fi
+if [[ "${1:-}" == "rollback" ]]; then
+  echo "nono rollback $*"
+  exit
+fi
 printf 'nono'
 for arg in "$@"; do printf ' <%s>' "$arg"; done
 printf '\n'
@@ -211,6 +219,7 @@ run_ax() {
     XDG_CONFIG_HOME="$CONFIG_HOME" \
     XDG_STATE_HOME="$STATE_HOME" \
     HERDR_SOCKET_PATH="${HERDR_SOCKET_PATH:-}" \
+    NONO_CAP_FILE="" \
     AX_REAL_PATH="$FAKE_BIN:/usr/bin:/bin" \
     PATH="$FAKE_BIN:/usr/bin:/bin" \
     "$AX" "$@"
@@ -232,6 +241,9 @@ assert_contains "$OUTPUT" "universal_context=$CONFIG_HOME/agents/universal_conte
 OUTPUT="$(HERDR_SOCKET_PATH="$FIXTURE_ROOT/herdr named.sock" run_ax opencode --session 'herdr session')"
 assert_contains "$OUTPUT" "<--allow-unix-socket> <$FIXTURE_ROOT/herdr named.sock>" "Herdr's resolved named-session socket is granted dynamically"
 assert_contains "$OUTPUT" "<--session> <herdr session>" "Herdr restore arguments remain unchanged"
+
+OUTPUT="$(TEA_SOCKET_PATH="$FIXTURE_ROOT/tea.sock" run_ax opencode)"
+assert_contains "$OUTPUT" "<--allow-unix-socket> <$FIXTURE_ROOT/tea.sock>" "Tea socket is granted dynamically when configured"
 
 OUTPUT="$(run_ax pi --direct --session 'path with spaces')"
 assert_contains "$OUTPUT" "agent=pi" "direct launch resolves the real Pi binary without shim recursion"
@@ -295,6 +307,19 @@ OUTPUT="$(run_ax doctor)"
 assert_contains "$OUTPUT" "proxy: ready" "doctor reports proxy readiness"
 assert_contains "$OUTPUT" "models: valid" "doctor validates the registry"
 assert_contains "$OUTPUT" "universal context: ready" "doctor validates the essential universal context"
+
+mkdir -p "$HOME_DIR/.pi/agent/sessions/old_session" "$HOME_DIR/.cache/crush/old_cache"
+OUTPUT="$(run_ax clear --dry-run)"
+assert_contains "$OUTPUT" "nono prune --dry-run" "ax clear --dry-run previews nono prune"
+assert_contains "$OUTPUT" "Would purge session contents in:" "ax clear --dry-run previews clearing session targets"
+
+OUTPUT="$(run_ax clear)"
+assert_contains "$OUTPUT" "Purged session contents in:" "ax clear purges AI agent sessions"
+if [[ ! -d "$HOME_DIR/.pi/agent/sessions/old_session" && -d "$HOME_DIR/.pi/agent/sessions" ]]; then
+  pass "ax clear cleans session contents while keeping directory structures"
+else
+  fail "ax clear cleans session contents while keeping directory structures" "session directory was not cleaned properly"
+fi
 
 mv "$CONFIG_HOME/agents/universal_context.md" "$FIXTURE_ROOT/universal_context.md"
 set +e

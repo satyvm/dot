@@ -30,6 +30,7 @@ Usage:
   ax <claude|pi|opencode|crush> [--direct] [agent arguments...]
   ax models [show|edit|validate|sync|live]
   ax auth setup [antigravity|claude|codex|kimi|xai]
+  ax clear [--dry-run]
   ax doctor
 
 All normal agent launches use Nono. --direct is the only sandbox escape and
@@ -362,6 +363,58 @@ doctor_check_binary() {
   fi
 }
 
+ax_clear() {
+  local dry_run=false
+  if [[ "${1:-}" == "--dry-run" ]]; then
+    dry_run=true
+  fi
+
+  printf 'Clearing nono sandbox sessions and agent session history...\n'
+
+  if command -v nono >/dev/null 2>&1; then
+    if [[ -n "${NONO_CAP_FILE:-}" ]]; then
+      printf 'Note: running inside nono sandbox; skipping nono system session pruning.\n'
+    else
+      if [[ "$dry_run" == true ]]; then
+        printf 'nono prune --dry-run:\n'
+        nono prune --dry-run 2>&1 || true
+        if nono rollback --help >/dev/null 2>&1; then
+          printf 'nono rollback cleanup --dry-run:\n'
+          nono rollback cleanup --dry-run 2>&1 || true
+        fi
+      else
+        nono prune --older-than 0 >/dev/null 2>&1 || nono prune >/dev/null 2>&1 || true
+        if nono rollback --help >/dev/null 2>&1; then
+          nono rollback cleanup >/dev/null 2>&1 || true
+        fi
+      fi
+    fi
+  fi
+
+  local -a targets=(
+    "$HOME/.pi/agent/sessions"
+    "$HOME/.cache/opencode"
+    "$HOME/.local/share/opencode/sessions"
+    "$HOME/.cache/crush"
+    "$HOME/.claude/sessions"
+    "$HOME/.cache/claude-code"
+  )
+
+  local target
+  for target in "${targets[@]}"; do
+    if [[ -d "$target" ]]; then
+      if [[ "$dry_run" == true ]]; then
+        printf 'Would purge session contents in: %s\n' "$target"
+      else
+        find "$target" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+        printf 'Purged session contents in: %s\n' "$target"
+      fi
+    fi
+  done
+
+  printf 'Clear complete.\n'
+}
+
 doctor() {
   load_models
   local failures=0 name minimum
@@ -594,11 +647,14 @@ launch_agent() {
   else
     local profile
     profile="$(jq -r --arg agent "$agent" '.agents[$agent].profile' "$models_file")"
+    local -a socket_args=()
     if [[ -n "${HERDR_SOCKET_PATH:-}" ]]; then
-      run_command=(nono run --profile "$profile" --allow-cwd --allow-unix-socket "$HERDR_SOCKET_PATH" -- "$binary" "$@")
-    else
-      run_command=(nono run --profile "$profile" --allow-cwd -- "$binary" "$@")
+      socket_args+=(--allow-unix-socket "$HERDR_SOCKET_PATH")
     fi
+    if [[ -n "${TEA_SOCKET_PATH:-}" ]]; then
+      socket_args+=(--allow-unix-socket "$TEA_SOCKET_PATH")
+    fi
+    run_command=(nono run --profile "$profile" --allow-cwd ${socket_args[@]+"${socket_args[@]}"} -- "$binary" "$@")
   fi
 
   if [[ -n "$crush_override_file" ]]; then
@@ -626,6 +682,10 @@ case "${1:-}" in
     ;;
   doctor)
     doctor
+    ;;
+  clear)
+    shift
+    ax_clear "$@"
     ;;
   claude|pi|opencode|crush)
     agent="$1"

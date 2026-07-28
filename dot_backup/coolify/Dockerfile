@@ -137,7 +137,9 @@ RUN install -d /var/run/sshd /etc/ssh/host-keys \
 
 COPY supervisord.conf /etc/supervisor/conf.d/hermes-dev.conf
 COPY entrypoint.sh /usr/local/bin/hermes-dev-entrypoint
-RUN chmod 0555 /usr/local/bin/hermes-dev-entrypoint
+COPY gitea_ai_cli.py /usr/local/bin/gitea-ai
+RUN chmod 0555 /usr/local/bin/hermes-dev-entrypoint /usr/local/bin/gitea-ai \
+    && ln -s /usr/local/bin/gitea-ai /usr/local/bin/tea-ai
 
 EXPOSE 22 8787
 

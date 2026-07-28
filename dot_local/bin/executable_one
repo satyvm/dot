@@ -1,0 +1,862 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly ONE_EXIT_OK=0
+readonly ONE_EXIT_FAILURE=1
+readonly ONE_EXIT_USAGE=64
+# shellcheck disable=SC2034
+readonly ONE_EXIT_UNAVAILABLE=69
+
+# TTY-aware formatting
+if [[ -t 1 ]] && [[ "${TERM:-}" != "dumb" ]]; then
+  readonly BOLD='\033[1m'
+  readonly RED='\033[31m'
+  readonly GREEN='\033[32m'
+  readonly YELLOW='\033[33m'
+  readonly BLUE='\033[34m'
+  readonly DIM='\033[2m'
+  readonly RESET='\033[0m'
+else
+  readonly BOLD=''
+  readonly RED=''
+  readonly GREEN=''
+  readonly YELLOW=''
+  readonly BLUE=''
+  readonly DIM=''
+  readonly RESET=''
+fi
+
+die() {
+  local status="$1"
+  shift
+  printf "${RED}one error:${RESET} %s\n" "$*" >&2
+  exit "$status"
+}
+
+show_help() {
+  cat <<'EOF'
+one — unified developer cleanup CLI
+
+Usage:
+  one system [--dry-run] [--yes] [--only NAME...]
+  one project [PATH] [--dry-run] [--yes] [--node|--rust|--all]
+  one all [PATH] [--dry-run] [--yes]
+  one list
+  one doctor
+  one help
+
+Subcommands:
+  system    Clean system caches (mise, python, node, rust, go, dotnet, docker, brew, nono)
+  project   Clean project build artifacts in PATH (default: .)
+  all       Clean both system caches and project build artifacts
+  list      Show available cleaners and their status
+  doctor    Run diagnostic checks on cleanup tools and cache sizes
+  help      Show this help message
+
+Options:
+  --dry-run          Preview operations and cache sizes without deleting files
+  -y, --yes          Auto-confirm execution prompt
+  --only NAME...     Run only specified system cleaners (comma or space separated)
+  --node             Clean only Node project artifacts (npkill)
+  --rust             Clean only Rust project artifacts (cargo clean-all)
+  --all              Clean all project artifact types (default for project command)
+EOF
+}
+
+format_bytes() {
+  local bytes="${1:-0}"
+  if ! [[ "$bytes" =~ ^[0-9]+$ ]]; then
+    echo "unknown"
+    return
+  fi
+  if (( bytes == 0 )); then
+    echo "0 B"
+  elif (( bytes < 1024 )); then
+    echo "${bytes} B"
+  elif (( bytes < 1048576 )); then
+    awk -v b="$bytes" 'BEGIN { printf "%.1f KB\n", b/1024 }'
+  elif (( bytes < 1073741824 )); then
+    awk -v b="$bytes" 'BEGIN { printf "%.1f MB\n", b/1048576 }'
+  else
+    awk -v b="$bytes" 'BEGIN { printf "%.2f GB\n", b/1073741824 }'
+  fi
+}
+
+get_dir_size_bytes() {
+  local dir="$1"
+  if [[ -d "$dir" ]]; then
+    local kb
+    kb="$(du -sk "$dir" 2>/dev/null | cut -f1)" || kb=0
+    if [[ "$kb" =~ ^[0-9]+$ ]]; then
+      echo "$((kb * 1024))"
+    else
+      echo 0
+    fi
+  else
+    echo 0
+  fi
+}
+
+# --- System Cleaners ---
+
+cleaner_size_mise() {
+  local size=0
+  local cache_dir="${MISE_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/mise}"
+  if [[ ! -d "$cache_dir" && -d "$HOME/Library/Caches/mise" ]]; then
+    cache_dir="$HOME/Library/Caches/mise"
+  fi
+  size="$(get_dir_size_bytes "$cache_dir")"
+  echo "$size"
+}
+
+cleaner_run_mise() {
+  mise prune && mise cache clean
+}
+
+cleaner_size_python() {
+  local size=0
+  local uv_cache="${UV_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/uv}"
+  [[ ! -d "$uv_cache" && -d "$HOME/Library/Caches/uv" ]] && uv_cache="$HOME/Library/Caches/uv"
+  local pip_cache="${PIP_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/pip}"
+  [[ ! -d "$pip_cache" && -d "$HOME/Library/Caches/pip" ]] && pip_cache="$HOME/Library/Caches/pip"
+
+  size=$(( $(get_dir_size_bytes "$uv_cache") + $(get_dir_size_bytes "$pip_cache") ))
+  echo "$size"
+}
+
+cleaner_run_python() {
+  local status=0
+  local ran=0
+  if command -v uv >/dev/null 2>&1; then
+    uv cache clean || status=$?
+    ran=1
+  fi
+  if command -v pip3 >/dev/null 2>&1; then
+    pip3 cache purge || status=$?
+    ran=1
+  elif command -v pip >/dev/null 2>&1; then
+    pip cache purge || status=$?
+    ran=1
+  fi
+  if (( ran == 0 )); then
+    return 0
+  fi
+  return "$status"
+}
+
+cleaner_size_node_sys() {
+  local size=0
+  local npm_cache="$HOME/.npm"
+  local pnpm_cache="${XDG_DATA_HOME:-$HOME/.local/share}/pnpm/store"
+  [[ ! -d "$pnpm_cache" && -d "$HOME/.pnpm-store" ]] && pnpm_cache="$HOME/.pnpm-store"
+  [[ ! -d "$pnpm_cache" && -d "$HOME/Library/Caches/pnpm" ]] && pnpm_cache="$HOME/Library/Caches/pnpm"
+  local bun_cache="$HOME/.bun/install/cache"
+  [[ ! -d "$bun_cache" && -d "$HOME/Library/Caches/bun" ]] && bun_cache="$HOME/Library/Caches/bun"
+
+  size=$(( $(get_dir_size_bytes "$npm_cache") + $(get_dir_size_bytes "$pnpm_cache") + $(get_dir_size_bytes "$bun_cache") ))
+  echo "$size"
+}
+
+cleaner_run_node_sys() {
+  local status=0
+  local ran=0
+  if command -v npm >/dev/null 2>&1; then
+    npm cache clean --force || status=$?
+    ran=1
+  fi
+  if command -v pnpm >/dev/null 2>&1; then
+    pnpm store prune || status=$?
+    ran=1
+  fi
+  if command -v bun >/dev/null 2>&1; then
+    bun pm cache rm || status=$?
+    ran=1
+  fi
+  if (( ran == 0 )); then
+    return 0
+  fi
+  return "$status"
+}
+
+cleaner_size_rust_sys() {
+  local cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+  local size=0
+  size=$(( $(get_dir_size_bytes "$cargo_home/registry/cache") + $(get_dir_size_bytes "$cargo_home/registry/src") + $(get_dir_size_bytes "$cargo_home/git/db") ))
+  echo "$size"
+}
+
+cleaner_run_rust_sys() {
+  if command -v cargo-cache >/dev/null 2>&1; then
+    cargo-cache --remove-dir git-db,registry-sources,registry-crate-cache
+  elif command -v cargo >/dev/null 2>&1; then
+    local cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+    rm -rf "$cargo_home/registry/cache"/* "$cargo_home/registry/src"/* "$cargo_home/git/db"/* 2>/dev/null || true
+  fi
+}
+
+cleaner_size_go() {
+  local size=0
+  local gocache
+  gocache="$(go env GOCACHE 2>/dev/null || true)"
+  [[ -z "$gocache" && -d "$HOME/Library/Caches/go-build" ]] && gocache="$HOME/Library/Caches/go-build"
+  [[ -z "$gocache" && -d "$HOME/.cache/go-build" ]] && gocache="$HOME/.cache/go-build"
+
+  local gomodcache
+  gomodcache="$(go env GOMODCACHE 2>/dev/null || true)"
+  [[ -z "$gomodcache" && -d "$HOME/go/pkg/mod" ]] && gomodcache="$HOME/go/pkg/mod"
+
+  size=$(( $(get_dir_size_bytes "$gocache") + $(get_dir_size_bytes "$gomodcache") ))
+  echo "$size"
+}
+
+cleaner_run_go() {
+  go clean -cache -testcache -modcache
+}
+
+cleaner_size_dotnet() {
+  local size
+  size="$(get_dir_size_bytes "$HOME/.nuget/packages")"
+  echo "$size"
+}
+
+cleaner_run_dotnet() {
+  dotnet nuget locals all --clear
+}
+
+cleaner_size_docker() {
+  # Docker system df estimation
+  if docker info >/dev/null 2>&1; then
+    # Return 0 or estimate if possible; du doesn't apply to docker daemon
+    echo 0
+  else
+    echo 0
+  fi
+}
+
+cleaner_run_docker() {
+  docker system prune -f
+}
+
+cleaner_size_brew() {
+  local cache_dir
+  cache_dir="$(brew --cache 2>/dev/null || true)"
+  [[ -z "$cache_dir" && -d "$HOME/Library/Caches/Homebrew" ]] && cache_dir="$HOME/Library/Caches/Homebrew"
+  [[ -z "$cache_dir" && -d "$HOME/.cache/Homebrew" ]] && cache_dir="$HOME/.cache/Homebrew"
+  get_dir_size_bytes "$cache_dir"
+}
+
+cleaner_run_brew() {
+  brew cleanup --prune=all
+}
+
+cleaner_size_nono() {
+  local session_dir="${XDG_STATE_HOME:-$HOME/.local/state}/nono/sessions"
+  [[ ! -d "$session_dir" && -d "$HOME/.cache/nono" ]] && session_dir="$HOME/.cache/nono"
+  get_dir_size_bytes "$session_dir"
+}
+
+cleaner_run_nono() {
+  nono prune
+}
+
+# --- Project Cleaners ---
+
+detect_node_project() {
+  local path="$1"
+  if [[ -f "$path/package.json" || -d "$path/node_modules" ]]; then
+    return 0
+  fi
+  if find "$path" -maxdepth 3 \( -name "package.json" -o -name "node_modules" \) 2>/dev/null | grep -q .; then
+    return 0
+  fi
+  return 1
+}
+
+detect_rust_project() {
+  local path="$1"
+  if [[ -f "$path/Cargo.toml" || -d "$path/target" ]]; then
+    return 0
+  fi
+  if find "$path" -maxdepth 3 \( -name "Cargo.toml" -o -name "target" \) 2>/dev/null | grep -q .; then
+    return 0
+  fi
+  return 1
+}
+
+cleaner_size_node_proj() {
+  local path="$1"
+  local total=0
+  while IFS= read -r dir; do
+    [[ -d "$dir" ]] || continue
+    local sz
+    sz="$(get_dir_size_bytes "$dir")"
+    total=$((total + sz))
+  done < <(find "$path" -name "node_modules" -type d -prune 2>/dev/null || true)
+  echo "$total"
+}
+
+cleaner_run_node_proj() {
+  local path="$1"
+  local auto_yes="$2"
+  local dry_run="$3"
+
+  if [[ "$dry_run" == true ]]; then
+    if command -v npkill >/dev/null 2>&1; then
+      npkill -d "$path" --dry-run
+    else
+      printf 'npkill --dry-run -d %s\n' "$path"
+    fi
+  elif [[ "$auto_yes" == true ]]; then
+    npkill -d "$path" --delete-all -y
+  else
+    npkill -d "$path"
+  fi
+}
+
+cleaner_size_rust_proj() {
+  local path="$1"
+  local total=0
+  while IFS= read -r dir; do
+    [[ -d "$dir" ]] || continue
+    local sz
+    sz="$(get_dir_size_bytes "$dir")"
+    total=$((total + sz))
+  done < <(find "$path" -name "target" -type d -prune 2>/dev/null || true)
+  echo "$total"
+}
+
+cleaner_run_rust_proj() {
+  local path="$1"
+  local auto_yes="$2"
+  local dry_run="$3"
+
+  local bin="cargo-clean-all"
+  if ! command -v cargo-clean-all >/dev/null 2>&1 && command -v cargo >/dev/null 2>&1; then
+    bin="cargo clean-all"
+  fi
+
+  if [[ "$dry_run" == true ]]; then
+    $bin --dry-run "$path"
+  elif [[ "$auto_yes" == true ]]; then
+    $bin -y "$path"
+  else
+    $bin -i "$path"
+  fi
+}
+
+# --- Command Implementation ---
+
+cmd_list() {
+  printf '%bAvailable Cleaners:%b\n\n' "$BOLD" "$RESET"
+  printf '%bSystem Cleaners:%b\n' "$BOLD" "$RESET"
+
+  local sys_tools=(
+    "mise|mise prune, mise cache clean|false|mise"
+    "python|uv cache clean, pip3 cache purge|false|uv|pip3|pip"
+    "node|npm, pnpm, and Bun global caches|false|npm|pnpm|bun"
+    "rust|Cargo registry download cache|false|cargo|cargo-cache"
+    "go|Go build, test, and module caches|true|go"
+    "dotnet|NuGet package cache|false|dotnet"
+    "docker|docker system prune|true|docker"
+    "brew|brew cleanup --prune=all|true|brew"
+    "nono|nono prune|false|nono"
+  )
+
+  for entry in "${sys_tools[@]}"; do
+    IFS='|' read -r name desc deep tools <<< "$entry"
+    local deep_str=""
+    [[ "$deep" == "true" ]] && deep_str="${YELLOW}[DEEP]${RESET} "
+
+    local avail=false
+    IFS='|' read -ra tlist <<< "$tools"
+    for t in "${tlist[@]}"; do
+      if command -v "$t" >/dev/null 2>&1; then
+        avail=true
+        break
+      fi
+    done
+
+    local status_str="${GREEN}[Available]${RESET}"
+    [[ "$avail" == false ]] && status_str="${DIM}[Unavailable]${RESET}"
+
+    printf '  %-8s %b%-45s %b\n' "$name" "$deep_str" "$desc" "$status_str"
+  done
+
+  printf '\n%bProject Cleaners:%b\n' "$BOLD" "$RESET"
+
+  local npkill_status="${GREEN}[Available]${RESET}"
+  command -v npkill >/dev/null 2>&1 || npkill_status="${DIM}[Unavailable]${RESET}"
+  printf '  %-8s %-45s %b\n' "node" "Node project artifacts cleaner (npkill)" "$npkill_status"
+
+  local rust_status="${GREEN}[Available]${RESET}"
+  (command -v cargo-clean-all >/dev/null 2>&1 || command -v cargo >/dev/null 2>&1) || rust_status="${DIM}[Unavailable]${RESET}"
+  printf '  %-8s %-45s %b\n' "rust" "Rust project artifacts cleaner (cargo clean-all)" "$rust_status"
+}
+
+cmd_doctor() {
+  printf '%bone doctor — System Cleanup Diagnostics%b\n\n' "$BOLD" "$RESET"
+  printf '%bTools Status:%b\n' "$BOLD" "$RESET"
+
+  local tools=(mise uv pip3 npm pnpm bun cargo go dotnet docker brew nono npkill cargo-clean-all kondo)
+  for t in "${tools[@]}"; do
+    if command -v "$t" >/dev/null 2>&1; then
+      printf '  %b[OK]%b   %-16s %s\n' "$GREEN" "$RESET" "$t:" "$(command -v "$t")"
+    else
+      printf '  %b[INFO]%b %-16s not installed\n' "$YELLOW" "$RESET" "$t:"
+    fi
+  done
+
+  printf '\n%bCache Size Summary:%b\n' "$BOLD" "$RESET"
+
+  if command -v mise >/dev/null 2>&1; then
+    printf '  mise cache:   %s\n' "$(format_bytes "$(cleaner_size_mise)")"
+  fi
+  if command -v uv >/dev/null 2>&1 || command -v pip3 >/dev/null 2>&1; then
+    printf '  python cache: %s\n' "$(format_bytes "$(cleaner_size_python)")"
+  fi
+  if command -v npm >/dev/null 2>&1 || command -v pnpm >/dev/null 2>&1 || command -v bun >/dev/null 2>&1; then
+    printf '  node cache:   %s\n' "$(format_bytes "$(cleaner_size_node_sys)")"
+  fi
+  if command -v cargo >/dev/null 2>&1; then
+    printf '  rust cache:   %s\n' "$(format_bytes "$(cleaner_size_rust_sys)")"
+  fi
+  if command -v go >/dev/null 2>&1; then
+    printf '  go cache:     %s\n' "$(format_bytes "$(cleaner_size_go)")"
+  fi
+  if command -v dotnet >/dev/null 2>&1; then
+    printf '  dotnet cache: %s\n' "$(format_bytes "$(cleaner_size_dotnet)")"
+  fi
+  if command -v brew >/dev/null 2>&1; then
+    printf '  brew cache:   %s\n' "$(format_bytes "$(cleaner_size_brew)")"
+  fi
+  if command -v nono >/dev/null 2>&1; then
+    printf '  nono cache:   %s\n' "$(format_bytes "$(cleaner_size_nono)")"
+  fi
+
+  printf '\nDiagnostic status: Ready for cleanup operations.\n'
+}
+
+# --- Core Runner for system, project, and all ---
+
+run_cleanup() {
+  local run_mode="$1" # system, project, or all
+  local target_path="$2"
+  local dry_run="$3"
+  local auto_yes="$4"
+  local node_sel="$5"
+  local rust_sel="$6"
+  shift 6
+  local only_cleaners=("$@")
+
+  # Define available system cleaners in standard order
+  local all_sys=("mise" "python" "node" "rust" "go" "dotnet" "docker" "brew" "nono")
+
+  # Validate --only if provided
+  if (( ${#only_cleaners[@]} > 0 )); then
+    for name in "${only_cleaners[@]}"; do
+      local valid=false
+      for sys in "${all_sys[@]}"; do
+        if [[ "$name" == "$sys" ]]; then
+          valid=true
+          break
+        fi
+      done
+      if [[ "$valid" == false ]]; then
+        die "$ONE_EXIT_USAGE" "unknown system cleaner: $name. Available: mise, python, node, rust, go, dotnet, docker, brew, nono"
+      fi
+    done
+  fi
+
+  # Build list of cleaners to inspect
+  # Item format: category|name|deep|status_msg|avail_flag|size_bytes
+  local preview_items=()
+  local total_bytes=0
+
+  if [[ "$run_mode" == "system" || "$run_mode" == "all" ]]; then
+    for sys in "${all_sys[@]}"; do
+      # If --only set, check if sys is included
+      if (( ${#only_cleaners[@]} > 0 )); then
+        local matched=false
+        for o in "${only_cleaners[@]}"; do
+          [[ "$o" == "$sys" ]] && matched=true && break
+        done
+        [[ "$matched" == false ]] && continue
+      fi
+
+      local is_deep=false
+      [[ "$sys" == "docker" || "$sys" == "go" || "$sys" == "brew" ]] && is_deep=true
+
+      local avail=false
+      case "$sys" in
+        mise)   command -v mise >/dev/null 2>&1 && avail=true ;;
+        python) (command -v uv >/dev/null 2>&1 || command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1) && avail=true ;;
+        node)   (command -v npm >/dev/null 2>&1 || command -v pnpm >/dev/null 2>&1 || command -v bun >/dev/null 2>&1) && avail=true ;;
+        rust)   command -v cargo >/dev/null 2>&1 && avail=true ;;
+        go)     command -v go >/dev/null 2>&1 && avail=true ;;
+        dotnet) command -v dotnet >/dev/null 2>&1 && avail=true ;;
+        docker) command -v docker >/dev/null 2>&1 && avail=true ;;
+        brew)   command -v brew >/dev/null 2>&1 && avail=true ;;
+        nono)   command -v nono >/dev/null 2>&1 && avail=true ;;
+      esac
+
+      local sz=0
+      local status_msg=""
+      if [[ "$avail" == true ]]; then
+        case "$sys" in
+          mise)   sz="$(cleaner_size_mise)" ;;
+          python) sz="$(cleaner_size_python)" ;;
+          node)   sz="$(cleaner_size_node_sys)" ;;
+          rust)   sz="$(cleaner_size_rust_sys)" ;;
+          go)     sz="$(cleaner_size_go)" ;;
+          dotnet) sz="$(cleaner_size_dotnet)" ;;
+          docker) sz="$(cleaner_size_docker)" ;;
+          brew)   sz="$(cleaner_size_brew)" ;;
+          nono)   sz="$(cleaner_size_nono)" ;;
+        esac
+        total_bytes=$((total_bytes + sz))
+        status_msg="Available (Est. size: $(format_bytes "$sz"))"
+      else
+        status_msg="Unavailable (${sys} tool not found)"
+      fi
+
+      preview_items+=("System|$sys|$is_deep|$status_msg|$avail|$sz")
+    done
+  fi
+
+  if [[ "$run_mode" == "project" || "$run_mode" == "all" ]]; then
+    # Node project cleaner
+    if [[ "$node_sel" == true ]]; then
+      local proj_detected=false
+      detect_node_project "$target_path" && proj_detected=true
+
+      local tool_avail=false
+      command -v npkill >/dev/null 2>&1 && tool_avail=true
+
+      local avail=false
+      local status_msg=""
+      local sz=0
+
+      if [[ "$proj_detected" == false ]]; then
+        status_msg="Skipped (no Node project detected in $target_path)"
+      elif [[ "$tool_avail" == false ]]; then
+        status_msg="Unavailable (npkill tool not found)"
+      else
+        avail=true
+        sz="$(cleaner_size_node_proj "$target_path")"
+        total_bytes=$((total_bytes + sz))
+        status_msg="Available (target: $target_path, Est. size: $(format_bytes "$sz"))"
+      fi
+
+      preview_items+=("Project|node|false|$status_msg|$avail|$sz")
+    fi
+
+    # Rust project cleaner
+    if [[ "$rust_sel" == true ]]; then
+      local proj_detected=false
+      detect_rust_project "$target_path" && proj_detected=true
+
+      local tool_avail=false
+      (command -v cargo-clean-all >/dev/null 2>&1 || command -v cargo >/dev/null 2>&1) && tool_avail=true
+
+      local avail=false
+      local status_msg=""
+      local sz=0
+
+      if [[ "$proj_detected" == false ]]; then
+        status_msg="Skipped (no Rust project detected in $target_path)"
+      elif [[ "$tool_avail" == false ]]; then
+        status_msg="Unavailable (cargo-clean-all tool not found)"
+      else
+        avail=true
+        sz="$(cleaner_size_rust_proj "$target_path")"
+        total_bytes=$((total_bytes + sz))
+        status_msg="Available (target: $target_path, Est. size: $(format_bytes "$sz"))"
+      fi
+
+      preview_items+=("Project|rust|false|$status_msg|$avail|$sz")
+    fi
+  fi
+
+  # Display Preview Header
+  printf '%bSelected Cleaners Preview:%b\n' "$BOLD" "$RESET"
+  local runnable_count=0
+  local unavail_count=0
+  local skipped_count=0
+
+  for item in "${preview_items[@]}"; do
+    IFS='|' read -r category name is_deep status_msg avail sz <<< "$item"
+    local deep_str=""
+    [[ "$is_deep" == "true" ]] && deep_str="${YELLOW}[DEEP]${RESET} "
+
+    if [[ "$avail" == "true" ]]; then
+      ((runnable_count++)) || true
+      printf '  [%s] %-8s - %b%s\n' "$category" "$name" "$deep_str" "$status_msg"
+    elif [[ "$status_msg" == Skipped* ]]; then
+      ((skipped_count++)) || true
+      printf '  [%s] %-8s - %b%s\n' "$category" "$name" "$deep_str" "$status_msg"
+    else
+      ((unavail_count++)) || true
+      printf '  [%s] %-8s - %b%s\n' "$category" "$name" "$deep_str" "$status_msg"
+    fi
+  done
+
+  printf '\nEstimated total reclaimable space: ~%s\n' "$(format_bytes "$total_bytes")"
+  printf 'Cleaners: %d available, %d unavailable, %d skipped\n\n' "$runnable_count" "$unavail_count" "$skipped_count"
+
+  if (( runnable_count == 0 )); then
+    printf 'No cleaners available to run.\n'
+    return "$ONE_EXIT_OK"
+  fi
+
+  if [[ "$dry_run" == true ]]; then
+    printf '%b[dry-run]%b Dry run active. Previewed cleaners without executing deletion.\n' "$BLUE" "$RESET"
+    return "$ONE_EXIT_OK"
+  fi
+
+  # Confirmation prompt if not --yes
+  if [[ "$auto_yes" != true ]]; then
+    local response=""
+    if [[ -t 0 ]]; then
+      read -r -p "Proceed with cleanup? [y/N] " response
+    else
+      read -r response || response=""
+    fi
+    case "$response" in
+      y|Y|yes|YES) ;;
+      *)
+        printf 'Aborted.\n'
+        return 0
+        ;;
+    esac
+  fi
+
+  # Execute available cleaners
+  printf '%bExecuting cleaners...%b\n\n' "$BOLD" "$RESET"
+  local passed=0
+  local failed=0
+  local failed_cleaners=()
+
+  for item in "${preview_items[@]}"; do
+    IFS='|' read -r category name is_deep status_msg avail sz <<< "$item"
+    [[ "$avail" != "true" ]] && continue
+
+    printf '==> Running %s cleaner [%s]...\n' "$name" "$category"
+    local exit_code=0
+
+    if [[ "$category" == "System" ]]; then
+      case "$name" in
+        mise)   cleaner_run_mise || exit_code=$? ;;
+        python) cleaner_run_python || exit_code=$? ;;
+        node)   cleaner_run_node_sys || exit_code=$? ;;
+        rust)   cleaner_run_rust_sys || exit_code=$? ;;
+        go)     cleaner_run_go || exit_code=$? ;;
+        dotnet) cleaner_run_dotnet || exit_code=$? ;;
+        docker) cleaner_run_docker || exit_code=$? ;;
+        brew)   cleaner_run_brew || exit_code=$? ;;
+        nono)   cleaner_run_nono || exit_code=$? ;;
+      esac
+    elif [[ "$category" == "Project" ]]; then
+      case "$name" in
+        node) cleaner_run_node_proj "$target_path" "$auto_yes" "$dry_run" || exit_code=$? ;;
+        rust) cleaner_run_rust_proj "$target_path" "$auto_yes" "$dry_run" || exit_code=$? ;;
+      esac
+    fi
+
+    if (( exit_code == 0 )); then
+      printf '  %b[OK]%b %s cleaner succeeded.\n' "$GREEN" "$RESET" "$name"
+      ((passed++)) || true
+    else
+      printf '  %b[FAIL]%b %s cleaner failed with exit code %d.\n' "$RED" "$RESET" "$name" "$exit_code" >&2
+      ((failed++)) || true
+      failed_cleaners+=("$name (exit code $exit_code)")
+    fi
+  done
+
+  printf '\n'
+  if (( failed > 0 )); then
+    printf '%bCleanup finished with failures:%b\n' "$RED" "$RESET" >&2
+    for fc in "${failed_cleaners[@]}"; do
+      printf '  - %s\n' "$fc" >&2
+    done
+    printf 'Summary: %d passed, %d failed, %d skipped/unavailable\n' "$passed" "$failed" "$((unavail_count + skipped_count))" >&2
+    return "$ONE_EXIT_FAILURE"
+  else
+    printf '%bCleanup complete.%b All %d cleaners ran successfully.\n' "$GREEN" "$RESET" "$passed"
+    return 0
+  fi
+}
+
+# --- Main Entry Point ---
+
+main() {
+  if (( $# == 0 )); then
+    show_help
+    exit 0
+  fi
+
+  local cmd="$1"
+  shift
+
+  case "$cmd" in
+    help|-h|--help)
+      show_help
+      exit 0
+      ;;
+    list)
+      cmd_list
+      ;;
+    doctor)
+      cmd_doctor
+      ;;
+    system)
+      local dry_run=false
+      local auto_yes=false
+      local only_cleaners=()
+
+      while (( $# > 0 )); do
+        case "$1" in
+          --dry-run)
+            dry_run=true
+            shift
+            ;;
+          -y|--yes)
+            auto_yes=true
+            shift
+            ;;
+          --only)
+            shift
+            while (( $# > 0 )) && [[ "$1" != -* ]]; do
+              IFS=',' read -ra split_names <<< "$1"
+              for n in "${split_names[@]}"; do
+                [[ -n "$n" ]] && only_cleaners+=("$n")
+              done
+              shift
+            done
+            ;;
+          --only=*)
+            local val="${1#*=}"
+            IFS=',' read -ra split_names <<< "$val"
+            for n in "${split_names[@]}"; do
+              [[ -n "$n" ]] && only_cleaners+=("$n")
+            done
+            shift
+            ;;
+          -h|--help)
+            show_help
+            exit 0
+            ;;
+          *)
+            die "$ONE_EXIT_USAGE" "unexpected argument for system: $1"
+            ;;
+        esac
+      done
+
+      run_cleanup "system" "." "$dry_run" "$auto_yes" false false "${only_cleaners[@]+"${only_cleaners[@]}"}"
+      ;;
+    project)
+      local target_path="."
+      local path_set=false
+      local dry_run=false
+      local auto_yes=false
+      local node_sel=false
+      local rust_sel=false
+
+      while (( $# > 0 )); do
+        case "$1" in
+          --dry-run)
+            dry_run=true
+            shift
+            ;;
+          -y|--yes)
+            auto_yes=true
+            shift
+            ;;
+          --node)
+            node_sel=true
+            shift
+            ;;
+          --rust)
+            rust_sel=true
+            shift
+            ;;
+          --all)
+            node_sel=true
+            rust_sel=true
+            shift
+            ;;
+          -h|--help)
+            show_help
+            exit 0
+            ;;
+          -*)
+            die "$ONE_EXIT_USAGE" "unknown option for project: $1"
+            ;;
+          *)
+            if [[ "$path_set" == true ]]; then
+              die "$ONE_EXIT_USAGE" "unexpected positional argument for project: $1"
+            fi
+            target_path="$1"
+            path_set=true
+            shift
+            ;;
+        esac
+      done
+
+      if [[ "$node_sel" == false && "$rust_sel" == false ]]; then
+        node_sel=true
+        rust_sel=true
+      fi
+
+      if [[ ! -d "$target_path" ]]; then
+        die "$ONE_EXIT_USAGE" "directory not found: $target_path"
+      fi
+
+      run_cleanup "project" "$target_path" "$dry_run" "$auto_yes" "$node_sel" "$rust_sel"
+      ;;
+    all)
+      local target_path="."
+      local path_set=false
+      local dry_run=false
+      local auto_yes=false
+
+      while (( $# > 0 )); do
+        case "$1" in
+          --dry-run)
+            dry_run=true
+            shift
+            ;;
+          -y|--yes)
+            auto_yes=true
+            shift
+            ;;
+          -h|--help)
+            show_help
+            exit 0
+            ;;
+          -*)
+            die "$ONE_EXIT_USAGE" "unknown option for all: $1"
+            ;;
+          *)
+            if [[ "$path_set" == true ]]; then
+              die "$ONE_EXIT_USAGE" "unexpected positional argument for all: $1"
+            fi
+            target_path="$1"
+            path_set=true
+            shift
+            ;;
+        esac
+      done
+
+      if [[ ! -d "$target_path" ]]; then
+        die "$ONE_EXIT_USAGE" "directory not found: $target_path"
+      fi
+
+      run_cleanup "all" "$target_path" "$dry_run" "$auto_yes" true true
+      ;;
+    *)
+      die "$ONE_EXIT_USAGE" "unknown command: $cmd (run 'one help' for usage)"
+      ;;
+  esac
+}
+
+main "$@"
