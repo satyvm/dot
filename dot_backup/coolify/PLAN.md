@@ -31,17 +31,31 @@ Coolify domain.
 
 | Storage | Container path | Owner |
 |---|---|---|
-| `remote-home` | `/home/ubuntu` | shell, chezmoi, editor and agent state |
+| Docker volume `remote-home` | `/home/ubuntu` | shell, chezmoi, editor and agent state |
 | host bind | `/home/ubuntu/dev` | project repositories |
-| `hermes-state` | `/home/ubuntu/.hermes` | Hermes and WebUI state |
-| `ssh-host-keys` | `/etc/ssh/host-keys` | stable SSH fingerprints |
-| `cliproxy-auth` | `/root/.cli-proxy-api` | server provider authentication |
-| `cliproxy-config` | `/config` | generated server proxy configuration |
+| Docker volume `hermes-state` | `/home/ubuntu/.hermes` | Hermes and WebUI state |
+| Docker volume `ssh-host-keys` | `/etc/ssh/host-keys` | stable SSH fingerprints |
+| Docker volume `cliproxy-auth` | `/root/.cli-proxy-api` | server provider authentication |
+| Docker volume `cliproxy-config` | `/config` | generated server proxy configuration |
+| Docker volume `platform-secrets` | `/run/platform-secrets` | proxy client key shared with `hermes-dev` |
+| Docker volume `tea-socket` | `/run/tea` | transient sidecar IPC socket |
 
-The entrypoint verifies that `/home/ubuntu/dev` is a real mount and that its
-numeric owner matches the container `ubuntu` UID/GID. It never recursively
-changes project ownership. The chezmoi repository is cloned once into
-`/home/ubuntu/.local/share/chezmoi` and applied with `aiMode = "remote"`.
+`/home/ubuntu/dev` is the only host filesystem bind. All other listed storage
+is managed inside Docker and does not expose the Coolify host user's home. The
+entrypoint gives the container `ubuntu` user ownership of its Docker-managed
+home while explicitly pruning `/home/ubuntu/dev`, then verifies that the bind's
+numeric owner already matches the container UID/GID.
+
+On the first successful boot, the repository is cloned into
+`/home/ubuntu/.local/share/chezmoi`. The entrypoint runs the repository's real
+`.chezmoi.json.tmpl` through a noninteractive `chezmoi init` with the CLI,
+developer, and AI categories enabled and `aiMode = "remote"`, then applies it.
+An idempotency marker prevents container restarts from re-running bootstrap.
+Later user-initiated configuration updates use `chezmoi update`.
+
+Images and containers are disposable. Rebuilds and redeployments preserve the
+named volumes above, so the Ubuntu home, Hermes documents/state, provider
+authentication, and SSH host identity survive container replacement.
 
 ## Shared MCP and LSP catalog
 
@@ -67,9 +81,9 @@ projects run their terminals, tasks, and language servers inside the
 
 ## Deploy in Coolify
 
-Use a Git-based Docker Compose application whose base directory is
-`dot_backup/coolify` and whose Compose file is
-`hermes_docker_compose.yaml`.
+Use a Git-based Docker Compose application whose base directory is `/`
+(repository root) and whose Compose file is
+`/dot_backup/coolify/hermes_docker_compose.yaml`.
 
 Before the first deployment, run on the host:
 

@@ -39,7 +39,23 @@ if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; 
   grep -q 'published: "22223"' "$rendered"
   grep -q 'source: /home/ubuntu/dev' "$rendered"
   grep -q 'target: /home/ubuntu/dev' "$rendered"
+  bind_count="$(grep -c 'type: bind' "$rendered")"
+  if [[ "$bind_count" -ne 1 ]]; then
+    echo "only /home/ubuntu/dev may be a host bind; found $bind_count binds" >&2
+    exit 1
+  fi
+  grep -q 'source: remote-home' "$rendered"
+  grep -q 'target: /home/ubuntu' "$rendered"
+  grep -q 'source: hermes-state' "$rendered"
   grep -q 'target: /home/ubuntu/.hermes' "$rendered"
+  grep -q 'source: ssh-host-keys' "$rendered"
+  grep -q 'target: /etc/ssh/host-keys' "$rendered"
+  grep -q 'source: cliproxy-auth' "$rendered"
+  grep -q 'target: /root/.cli-proxy-api' "$rendered"
+  grep -q 'source: cliproxy-config' "$rendered"
+  grep -q 'target: /config' "$rendered"
+  grep -q 'source: platform-secrets' "$rendered"
+  grep -q 'source: tea-socket' "$rendered"
   grep -q 'http://cliproxyapi:8317/v1' "$rendered"
   grep -q 'tea-sidecar' "$rendered"
   grep -q 'dockerfile: Dockerfile.tea' "$rendered"
@@ -66,7 +82,19 @@ if grep -q 'tea_sidecar.py' "$compose_file"; then
 fi
 grep -q 'exec ./CLIProxyAPI -config /config/config.yaml' "$compose_file"
 grep -q '/dev/tcp/127.0.0.1/8317' "$compose_file"
-grep -q 'cache/chezmoi' "$stack_dir/entrypoint.sh"
+grep -q 'chezmoi.json' "$stack_dir/entrypoint.sh"
+grep -q 'legacy hand-written chezmoi config' "$stack_dir/entrypoint.sh"
+grep -q 'chezmoi init' "$stack_dir/entrypoint.sh"
+grep -q 'AI deployment mode=remote' "$stack_dir/entrypoint.sh"
+grep -q 'Install developer toolchain=true' "$stack_dir/entrypoint.sh"
+grep -q 'Configure Linux firewall and fail2ban=false' "$stack_dir/entrypoint.sh"
+grep -q 'bootstrap marker is incomplete' "$stack_dir/entrypoint.sh"
+grep -q 'find.*remote_home' "$stack_dir/entrypoint.sh"
+grep -q 'dev_root.*-prune' "$stack_dir/entrypoint.sh"
+if grep -q 'write_chezmoi_config' "$stack_dir/entrypoint.sh"; then
+  echo "remote bootstrap must use chezmoi init, not a hand-written config" >&2
+  exit 1
+fi
 grep -q '/home/linuxbrew/.linuxbrew/bin/herdr' "$stack_dir/Dockerfile"
 grep -q '/home/linuxbrew/.linuxbrew/bin/nono' "$stack_dir/Dockerfile"
 grep -q '/home/linuxbrew/.linuxbrew/bin/crush' "$stack_dir/Dockerfile"

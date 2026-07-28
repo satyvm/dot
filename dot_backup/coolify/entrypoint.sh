@@ -4,9 +4,10 @@ set -euo pipefail
 readonly remote_user="ubuntu"
 readonly remote_home="/home/ubuntu"
 readonly dev_root="/home/ubuntu/dev"
-readonly bootstrap_marker="$remote_home/.local/state/hermes-dev/bootstrap-v1"
+readonly bootstrap_marker="$remote_home/.local/state/hermes-dev/bootstrap-v2"
 readonly chezmoi_source="$remote_home/.local/share/chezmoi"
-readonly chezmoi_config="$remote_home/.config/chezmoi/chezmoi.toml"
+readonly chezmoi_config="$remote_home/.config/chezmoi/chezmoi.json"
+readonly legacy_chezmoi_config="$remote_home/.config/chezmoi/chezmoi.toml"
 
 log() {
   printf 'hermes-dev: %s\n' "$*"
@@ -77,29 +78,37 @@ install_proxy_client_key() {
     "$shared_key" "$remote_home/.config/cli-proxy-api/client-key"
 }
 
-write_chezmoi_config() {
+initialize_chezmoi_config() {
   install -d -o ubuntu -g ubuntu -m 0700 "$(dirname "$chezmoi_config")"
-  if [[ -s "$chezmoi_config" ]]; then
-    return
+
+  if [[ -e "$legacy_chezmoi_config" ]]; then
+    log "preserving the legacy hand-written chezmoi config"
+    mv -f "$legacy_chezmoi_config" \
+      "$legacy_chezmoi_config.pre-bootstrap-v2"
+    chown ubuntu:ubuntu "$legacy_chezmoi_config.pre-bootstrap-v2"
+    chmod 0600 "$legacy_chezmoi_config.pre-bootstrap-v2"
   fi
 
   local git_name="${REMOTE_GIT_NAME:-Satyam}"
   local git_email="${REMOTE_GIT_EMAIL:-75127014+satyvm@users.noreply.github.com}"
-  {
-    printf '%s\n' '[data]'
-    printf '%s\n' 'setupCli = true'
-    printf '%s\n' 'setupDeveloper = true'
-    printf '%s\n' 'setupAi = true'
-    printf '%s\n' 'aiMode = "remote"'
-    printf '%s\n' 'guiTier = "none"'
-    printf '%s\n' 'setupMacos = false'
-    printf '%s\n' 'setupLinuxHardening = false'
-    printf '%s\n' 'setupSshKey = false'
-    printf 'name = %s\n' "$(jq -Rn --arg value "$git_name" '$value')"
-    printf 'email = %s\n' "$(jq -Rn --arg value "$git_email" '$value')"
-  } >"$chezmoi_config"
-  chown ubuntu:ubuntu "$chezmoi_config"
-  chmod 0600 "$chezmoi_config"
+
+  log "initializing remote-dev chezmoi profile"
+  run_as_ubuntu chezmoi init \
+    --source "$chezmoi_source" \
+    --config-path "$chezmoi_config" \
+    --cache "$remote_home/.cache/chezmoi" \
+    --no-tty \
+    --force \
+    --promptBool "Install core CLI setup=true" \
+    --promptBool "Install developer toolchain=true" \
+    --promptBool "Install AI setup=true" \
+    --promptChoice "AI deployment mode=remote" \
+    --promptChoice "GUI tools=none" \
+    --promptBool "Apply macOS customization=false" \
+    --promptBool "Configure Linux firewall and fail2ban=false" \
+    --promptBool "Set up SSH key and GitHub signing=false" \
+    --promptString "Git user name=$git_name" \
+    --promptString "Git email address=$git_email"
 }
 
 setup_gitea_ssh() {
@@ -127,6 +136,14 @@ setup_gitea_ssh() {
 }
 
 bootstrap_dotfiles() {
+  if [[ -e "$bootstrap_marker" ]]; then
+    if [[ -d "$chezmoi_source/.git" && -s "$chezmoi_config" ]]; then
+      log "remote-dev dotfiles are already initialized"
+      return
+    fi
+    log "bootstrap marker is incomplete; rebuilding remote-dev dotfiles"
+  fi
+
   local repository="${REMOTE_DOTFILES_REPO:-https://github.com/satyvm/dot.git}"
   if [[ ! -d "$chezmoi_source/.git" ]]; then
     if [[ -e "$chezmoi_source" ]]; then
@@ -135,30 +152,65 @@ bootstrap_dotfiles() {
     install -d -o ubuntu -g ubuntu -m 0755 "$(dirname "$chezmoi_source")"
     log "cloning dotfiles from $repository"
     run_as_ubuntu git clone --depth=1 "$repository" "$chezmoi_source"
+  else
+    log "refreshing the existing dotfiles checkout"
+    run_as_ubuntu git -C "$chezmoi_source" pull --ff-only
   fi
 
-  write_chezmoi_config
+  initialize_chezmoi_config
   log "applying remote-dev dotfiles"
   run_as_ubuntu chezmoi apply \
     --config "$chezmoi_config" \
-    --source "$chezmoi_source"
+    --source "$chezmoi_source" \
+    --cache "$remote_home/.cache/chezmoi"
 
   install -d -o ubuntu -g ubuntu -m 0755 "$(dirname "$bootstrap_marker")"
   run_as_ubuntu touch "$bootstrap_marker"
 }
 
+normalize_docker_home_ownership() {
+  local uid gid home_marker hermes_marker
+  uid="$(id -u "$remote_user")"
+  gid="$(id -g "$remote_user")"
+  home_marker="$remote_home/.local/state/hermes-dev/home-owner-${uid}-${gid}-v1"
+  hermes_marker="$remote_home/.hermes/.owner-${uid}-${gid}-v1"
+
+  if [[ ! -e "$home_marker" ]]; then
+    log "normalizing Docker-managed home ownership"
+    find "$remote_home" \
+      -path "$dev_root" -prune -o \
+      -path "$remote_home/.hermes" -prune -o \
+      -exec chown -h "$remote_user:$remote_user" {} +
+  fi
+
+  if [[ ! -e "$hermes_marker" ]]; then
+    find "$remote_home/.hermes" \
+      -exec chown -h "$remote_user:$remote_user" {} +
+  fi
+
+  install -d -o ubuntu -g ubuntu -m 0755 \
+    "$(dirname "$home_marker")"
+  run_as_ubuntu touch "$home_marker"
+  run_as_ubuntu touch "$hermes_marker"
+}
+
 prepare_runtime_directories() {
-  # The named home volume is root-owned on first creation. Change only the mount
-  # root and directories owned by this service; never recurse into the dev bind.
+  # Both paths are Docker-managed volumes. The host bind at /home/ubuntu/dev is
+  # explicitly pruned by normalize_docker_home_ownership.
   chown ubuntu:ubuntu "$remote_home"
   chmod 0755 "$remote_home"
+  install -d -o ubuntu -g ubuntu -m 0700 "$remote_home/.hermes"
+  normalize_docker_home_ownership
+
   install -d -o ubuntu -g ubuntu -m 0755 \
     "$remote_home/.cache" \
     "$remote_home/.config" \
-    "$remote_home/.local"
+    "$remote_home/.local" \
+    "$remote_home/.local/bin" \
+    "$remote_home/.local/share" \
+    "$remote_home/.local/state"
   install -d -o ubuntu -g ubuntu -m 0700 \
     "$remote_home/.cache/chezmoi"
-  install -d -o ubuntu -g ubuntu -m 0700 "$remote_home/.hermes"
   install -d -o ubuntu -g ubuntu -m 0755 \
     "$remote_home/.hermes/webui" \
     "$remote_home/.local/state/hermes-dev"

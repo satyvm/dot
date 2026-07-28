@@ -2,6 +2,22 @@
 
 Personal macOS and Linux dotfiles managed with [chezmoi](https://chezmoi.io).
 
+## Quick Start
+
+Run this single command on any macOS or Linux device to set up dotfiles using `.setup.sh`:
+
+```bash
+bash -c "$(curl -fsLS https://raw.githubusercontent.com/satyvm/dot/main/.setup.sh)"
+```
+
+Or manually initialize with `chezmoi`:
+
+```bash
+chezmoi init --apply satyvm/dot
+chezmoi diff
+chezmoi apply
+```
+
 ## Setup choices
 
 `chezmoi init` asks for independent, opt-in categories. There are no machine
@@ -20,12 +36,6 @@ profiles and every selection defaults to off:
 
 Homebrew is a prerequisite on both macOS and Linux. The repository prints a
 clear message and skips package installation if it is unavailable.
-
-```bash
-chezmoi init --apply satyvm/dot
-chezmoi diff
-chezmoi apply
-```
 
 To change choices later, use `chezmoi edit-config`, update the `data` values,
 then run `chezmoi apply`. Disabling a category stops future management; it never

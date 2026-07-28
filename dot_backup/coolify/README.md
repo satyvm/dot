@@ -37,7 +37,8 @@ Deployable Docker Compose application featuring Hermes WebUI, SSH container deve
    - In Coolify, create a new **Docker Compose** service connected to your Git repository (`satyvm/dot`).
    - Base Directory: `/` (repository root)
    - Docker Compose File: `/dot_backup/coolify/hermes_docker_compose.yaml`
-   - Keep the repository root as Coolify's project directory. The Compose build context and sidecar source path are intentionally repository-root-relative.
+   - Keep the repository root as Coolify's project directory. Both image build contexts are intentionally repository-root-relative.
+   - `/home/ubuntu/dev` is the only host bind. `/home/ubuntu` and all service state use Docker-managed named volumes; the Coolify host user's dotfiles are never mounted into the container.
 
 2. **Set Environment Variables in Coolify**:
    Fill in the required runtime secrets (refer to `.env.example`):
@@ -59,7 +60,8 @@ Deployable Docker Compose application featuring Hermes WebUI, SSH container deve
    - Do **not** assign any domain or external port to `cliproxyapi` or `tea-sidecar`.
 
 4. **Deploy**:
-   - Click **Deploy** in Coolify. The initial deployment clones dotfiles and initializes persistent volumes.
+   - Click **Deploy** in Coolify. The initial deployment initializes the Docker-managed home, runs the repository's noninteractive chezmoi profile with `aiMode=remote`, and applies the dotfiles as the container `ubuntu` user.
+   - Later container restarts reuse the successful bootstrap marker. Run `chezmoi update` inside `hermes-dev` when you intentionally want to update the container's dotfiles.
 
 ---
 
@@ -148,7 +150,7 @@ Deployable Docker Compose application featuring Hermes WebUI, SSH container deve
    docker compose \
      --project-directory . \
      -f dot_backup/coolify/hermes_docker_compose.yaml \
-     build --pull --progress=plain hermes-dev
+     build --pull --progress=plain tea-sidecar hermes-dev
    ```
 
    Run these commands from the repository root, not from `dot_backup/coolify`.
