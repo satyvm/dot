@@ -105,6 +105,16 @@ fi
 
 grep -q 'python /apptoo/server.py' "$stack_dir/supervisord.conf"
 grep -q 'PasswordAuthentication no' "$stack_dir/Dockerfile"
+if ! grep -q 'PermitEmptyPasswords no' "$stack_dir/Dockerfile"; then
+  echo "key-only SSH must explicitly reject empty-password login" >&2
+  exit 1
+fi
+if ! grep -q 'passwd --delete ubuntu' "$stack_dir/Dockerfile"; then
+  echo "key-only SSH account must be unlocked after useradd" >&2
+  exit 1
+fi
+grep -q "passwd --status ubuntu.*grep -q '\\^ubuntu NP '" \
+  "$stack_dir/Dockerfile"
 grep -q 'context: ./dot_backup/coolify' "$compose_file"
 grep -q 'dockerfile: Dockerfile.tea' "$compose_file"
 grep -q 'COPY tea_sidecar.py /usr/local/bin/tea-sidecar' \

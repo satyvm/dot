@@ -19,5 +19,10 @@
       "$HOME/.local/share/opencode/auth.json",
       "$HOME/.config/opencode/auth.json"
     ]
+  },
+  "network": {
+    "allow_domain": [
+      "*"
+    ]
   }
 }

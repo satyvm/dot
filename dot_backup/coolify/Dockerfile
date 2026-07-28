@@ -62,6 +62,8 @@ RUN if getent group "${REMOTE_GID}" >/dev/null; then \
     fi \
     && useradd --uid "${REMOTE_UID}" --gid "${REMOTE_GID}" \
       --home-dir /home/ubuntu --create-home --shell /bin/zsh ubuntu \
+    && passwd --delete ubuntu \
+    && passwd --status ubuntu | grep -q '^ubuntu NP ' \
     && install -d -o ubuntu -g ubuntu \
       /home/ubuntu/dev \
       /home/ubuntu/.config \
@@ -140,6 +142,7 @@ RUN install -d /var/run/sshd /etc/ssh/host-keys \
       'HostKey /etc/ssh/host-keys/ssh_host_rsa_key' \
       'PermitRootLogin no' \
       'PasswordAuthentication no' \
+      'PermitEmptyPasswords no' \
       'KbdInteractiveAuthentication no' \
       'PubkeyAuthentication yes' \
       'AllowUsers ubuntu' \
