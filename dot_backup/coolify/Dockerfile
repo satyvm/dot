@@ -84,12 +84,15 @@ RUN sh -c "$(curl -fsLS https://get.chezmoi.io)" -- -b /usr/local/bin \
 
 # Install Linuxbrew for the pinned agent formulas already managed by this
 # repository. The repository's Brewfile remains the user-facing source of truth.
-RUN install -d -o ubuntu -g ubuntu /home/linuxbrew/.linuxbrew/Homebrew \
-    /home/linuxbrew/.linuxbrew/bin \
+RUN install -d -o ubuntu -g ubuntu \
+      /home/linuxbrew \
+      /home/linuxbrew/.linuxbrew \
+      /home/linuxbrew/.linuxbrew/bin \
     && runuser -u ubuntu -- git clone --depth=1 \
       https://github.com/Homebrew/brew \
       /home/linuxbrew/.linuxbrew/Homebrew \
-    && ln -s ../Homebrew/bin/brew /home/linuxbrew/.linuxbrew/bin/brew \
+    && runuser -u ubuntu -- ln -s \
+      ../Homebrew/bin/brew /home/linuxbrew/.linuxbrew/bin/brew \
     && runuser -u ubuntu -- env \
       HOME=/home/ubuntu \
       PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
@@ -104,22 +107,22 @@ RUN install -d -o ubuntu -g ubuntu /home/linuxbrew/.linuxbrew/Homebrew \
       HOMEBREW_NO_ANALYTICS=1 \
       HOMEBREW_NO_AUTO_UPDATE=1 \
       /home/linuxbrew/.linuxbrew/bin/brew install \
-        bat \
-        eza \
-        fd \
-        fzf \
-        gh \
-        git-delta \
-        gopls \
-        herdr \
-        lazygit \
-        neovim \
-        nono \
-        rust-analyzer \
-        starship \
-        uv \
-        zoxide \
-        charmbracelet/tap/crush
+        bat eza fd fzf gh git-delta gopls lazygit neovim rust-analyzer \
+        starship uv zoxide \
+    && runuser -u ubuntu -- env \
+      HOME=/home/ubuntu \
+      PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+      NONINTERACTIVE=1 \
+      HOMEBREW_NO_ANALYTICS=1 \
+      HOMEBREW_NO_AUTO_UPDATE=1 \
+      /home/linuxbrew/.linuxbrew/bin/brew install herdr nono charmbracelet/tap/crush \
+    && runuser -u ubuntu -- env \
+      HOME=/home/ubuntu \
+      PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+      /home/linuxbrew/.linuxbrew/bin/brew config \
+    && test -x /home/linuxbrew/.linuxbrew/bin/herdr \
+    && test -x /home/linuxbrew/.linuxbrew/bin/nono \
+    && test -x /home/linuxbrew/.linuxbrew/bin/crush
 
 # Node-distributed agents and language servers are pinned explicitly.
 RUN npm install --global \

@@ -117,7 +117,7 @@ services:
 
   hermes-dev:
     build:
-      context: dot_backup/coolify
+      context: ./dot_backup/coolify
       dockerfile: Dockerfile
       args:
         REMOTE_UID: ${REMOTE_UID:-1000}

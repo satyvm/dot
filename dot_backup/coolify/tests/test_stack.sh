@@ -8,7 +8,6 @@ export DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAATEST hermes-dev"
 export CLIPROXY_CLIENT_KEY="test-client-key"
 export CLIPROXY_MANAGEMENT_KEY="test-management-key"
 export HERMES_WEBUI_PASSWORD="test-webui-password"
-export SERVER_DEV_PATH="/home/ubuntu/dev"
 export DEV_SSH_PORT="22223"
 
 bash -n "$stack_dir/entrypoint.sh"
@@ -38,6 +37,13 @@ fi
 
 grep -q 'python /apptoo/server.py' "$stack_dir/supervisord.conf"
 grep -q 'PasswordAuthentication no' "$stack_dir/Dockerfile"
+grep -q 'context: ./dot_backup/coolify' "$compose_file"
+grep -q './dot_backup/coolify/tea_sidecar.py:/app/tea_sidecar.py:ro' "$compose_file"
+grep -q '/home/linuxbrew/.linuxbrew/bin/herdr' "$stack_dir/Dockerfile"
+grep -q '/home/linuxbrew/.linuxbrew/bin/nono' "$stack_dir/Dockerfile"
+grep -q '/home/linuxbrew/.linuxbrew/bin/crush' "$stack_dir/Dockerfile"
+grep -q 'install -d -o ubuntu -g ubuntu' "$stack_dir/Dockerfile"
+grep -q '/home/linuxbrew/.linuxbrew' "$stack_dir/Dockerfile"
 
 if rg -n 'npm start|NOPASSWD|chown -R .*dev|0\.0\.0\.0:.*:22' \
   "$stack_dir/Dockerfile" "$stack_dir/entrypoint.sh" \

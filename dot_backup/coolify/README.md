@@ -35,8 +35,9 @@ Deployable Docker Compose application featuring Hermes WebUI, SSH container deve
 
 1. **Create Docker Compose Application**:
    - In Coolify, create a new **Docker Compose** service connected to your Git repository (`satyvm/dot`).
-   - Base Directory: `dot_backup/coolify`
-   - Docker Compose File: `hermes_docker_compose.yaml`
+   - Base Directory: `/` (repository root)
+   - Docker Compose File: `/dot_backup/coolify/hermes_docker_compose.yaml`
+   - Keep the repository root as Coolify's project directory. The Compose build context and sidecar source path are intentionally repository-root-relative.
 
 2. **Set Environment Variables in Coolify**:
    Fill in the required runtime secrets (refer to `.env.example`):
@@ -124,7 +125,37 @@ Deployable Docker Compose application featuring Hermes WebUI, SSH container deve
 4. **Access Hermes WebUI**:
    Open `https://hermes.yourdomain.com` in your browser and log in with your `HERMES_WEBUI_PASSWORD`.
 
-5. **Local Stack Validation Script**:
+5. **Local Colima Build Test (from repository root)**:
    ```bash
-   bash tests/test_stack.sh
+   colima start
+   docker context use colima
+   docker buildx version
+
+   export DEV_SSH_PUBLIC_KEY="$(cat ~/.ssh/hermes_dev_ed25519.pub)"
+   export CLIPROXY_CLIENT_KEY="local-test-client-key"
+   export CLIPROXY_MANAGEMENT_KEY="local-test-management-key"
+   export HERMES_WEBUI_PASSWORD="local-test-webui-password"
+   export GITEA_TOKEN=""
+   export GITEA_URL="https://gitea.satyvm.com"
+   export REMOTE_UID="$(id -u)"
+   export REMOTE_GID="$(id -g)"
+
+   docker compose \
+     --project-directory . \
+     -f dot_backup/coolify/hermes_docker_compose.yaml \
+     config
+
+   docker compose \
+     --project-directory . \
+     -f dot_backup/coolify/hermes_docker_compose.yaml \
+     build --pull --progress=plain hermes-dev
+   ```
+
+   Run these commands from the repository root, not from `dot_backup/coolify`.
+   The explicit `--project-directory .` reproduces Coolify's path resolution.
+
+6. **Static Validation**:
+   ```bash
+   bash dot_backup/coolify/tests/test_stack.sh
+   bash dot_local/bin/tests/test_ax.sh
    ```
