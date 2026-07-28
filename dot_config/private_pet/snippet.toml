@@ -16,3 +16,9 @@
   Output = ""
   Tag = []
   command = "du -sh .[^.]* * | sort -hr"
+
+[[Snippets]]
+  Description = "easily git clone a folder"
+  Output = ""
+  Tag = []
+  command = "npx degit git_url folder"

@@ -136,11 +136,7 @@ setup_gitea_ssh() {
 }
 
 bootstrap_dotfiles() {
-  if [[ -e "$bootstrap_marker" ]]; then
-    if [[ -d "$chezmoi_source/.git" && -s "$chezmoi_config" ]]; then
-      log "remote-dev dotfiles are already initialized"
-      return
-    fi
+  if [[ -e "$bootstrap_marker" && (! -d "$chezmoi_source/.git" || ! -s "$chezmoi_config") ]]; then
     log "bootstrap marker is incomplete; rebuilding remote-dev dotfiles"
   fi
 
@@ -157,7 +153,9 @@ bootstrap_dotfiles() {
     run_as_ubuntu git -C "$chezmoi_source" pull --ff-only
   fi
 
-  initialize_chezmoi_config
+  if [[ ! -s "$chezmoi_config" ]]; then
+    initialize_chezmoi_config
+  fi
   log "applying remote-dev dotfiles"
   run_as_ubuntu chezmoi apply \
     --config "$chezmoi_config" \

@@ -217,6 +217,12 @@ grep -q 'AI deployment mode=remote' "$stack_dir/entrypoint.sh"
 grep -q 'Install developer toolchain=true' "$stack_dir/entrypoint.sh"
 grep -q 'Configure Linux firewall and fail2ban=false' "$stack_dir/entrypoint.sh"
 grep -q 'bootstrap marker is incomplete' "$stack_dir/entrypoint.sh"
+if grep -A5 'bootstrap_dotfiles()' "$stack_dir/entrypoint.sh" | grep -q 'return'; then
+  echo "initialized remote dotfiles must refresh and apply on container restart" >&2
+  exit 1
+fi
+grep -q 'git -C.*pull --ff-only' "$stack_dir/entrypoint.sh"
+grep -q 'if \[\[ ! -s "\$chezmoi_config" \]\]' "$stack_dir/entrypoint.sh"
 grep -q 'find.*remote_home' "$stack_dir/entrypoint.sh"
 grep -q 'dev_root.*-prune' "$stack_dir/entrypoint.sh"
 if grep -q 'write_chezmoi_config' "$stack_dir/entrypoint.sh"; then
