@@ -20,6 +20,13 @@
       "$HOME/.local/share/crush/hyper.json"
     ]
   },
+  "platform_overrides": {
+    "linux": {
+      "security": {
+        "capability_elevation": true
+      }
+    }
+  },
   "network": {
     "allow_domain": [
       "hyper.charm.land"

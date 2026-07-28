@@ -512,6 +512,20 @@ if command -v nono >/dev/null 2>&1; then
       fail "$(basename "$profile_path") passes nono profile validate" "invalid Nono profile"
     fi
   done
+  for profile in default-claude default-crush default-opencode default-pi; do
+    profile_path="$REPO_ROOT/dot_config/nono/profiles/$profile.json"
+    if jq -e '.platform_overrides.linux.security.capability_elevation == true' "$profile_path" >/dev/null; then
+      pass "$profile enables supervised deny enforcement only on Linux"
+    else
+      fail "$profile enables supervised deny enforcement only on Linux" "$(cat "$profile_path")"
+    fi
+    resolved_profile="$(nono profile show "$profile_path" --json)"
+    if jq -e '.security.capability_elevation != true and (.filesystem.deny | length > 0)' <<<"$resolved_profile" >/dev/null; then
+      pass "$profile preserves native macOS Seatbelt deny enforcement"
+    else
+      fail "$profile preserves native macOS Seatbelt deny enforcement" "$resolved_profile"
+    fi
+  done
   EFFECTIVE_PROFILE="$(nono profile show "$REPO_ROOT/dot_config/nono/profiles/default-opencode.json" --json)"
   assert_contains "$EFFECTIVE_PROFILE" '"network_profile": "developer"' "effective policy permits general developer networking"
   assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.ssh\"" "effective policy denies SSH material"

@@ -23,15 +23,18 @@ else
   warn "jq or the managed MCP catalog is missing; Claude MCP sync was skipped"
 fi
 
-# Hermes keeps MCP definitions in the same mutable YAML document as WebUI and
-# provider settings. Merge only mcp_servers with Hermes' own Python/YAML runtime
-# and atomically replace the file.
+# Hermes keeps MCP definitions and provider settings in the same mutable YAML document.
+# Merge mcp_servers and sync provider/model config with Hermes' Python/YAML runtime.
+{{- $proxyUrl := "http://127.0.0.1:8317/v1" }}
+{{- if eq .aiMode "remote" }}
+{{- $proxyUrl = "http://cliproxyapi:8317/v1" }}
+{{- end }}
 hermes_python="${HERMES_WEBUI_PYTHON:-python3}"
 hermes_config="$HOME/.hermes/config.yaml"
-if command -v hermes >/dev/null 2>&1 &&
-  "$hermes_python" -c 'import yaml' >/dev/null 2>&1 &&
-  [[ -s "$managed_mcp" ]]; then
-  HERMES_MANAGED_MCP="$managed_mcp" HERMES_CONFIG="$hermes_config" \
+if command -v hermes >/dev/null 2>&1 && \
+   "$hermes_python" -c 'import yaml' >/dev/null 2>&1 && \
+   [[ -s "$managed_mcp" ]]; then
+  HERMES_MANAGED_MCP="$managed_mcp" HERMES_CONFIG="$hermes_config" HERMES_PROXY_URL="{{ $proxyUrl }}" \
     "$hermes_python" - <<'PY'
 import json
 import os
@@ -42,6 +45,7 @@ import yaml
 
 managed_path = Path(os.environ["HERMES_MANAGED_MCP"])
 config_path = Path(os.environ["HERMES_CONFIG"])
+proxy_url = os.environ.get("HERMES_PROXY_URL", "http://127.0.0.1:8317/v1")
 managed = json.loads(managed_path.read_text())["mcpServers"]
 servers = {
     name: {
@@ -59,6 +63,76 @@ if not isinstance(config, dict):
     raise SystemExit(f"{config_path} must contain a YAML mapping")
 config["mcp_servers"] = servers
 
+provider_name = "CLIProxyAPI"
+provider_id = "custom:cliproxyapi"
+
+model_config = config.get("model", {})
+if not isinstance(model_config, dict):
+    model_config = {}
+model_config.update({
+    "default": "balanced",
+    "provider": provider_id,
+    "base_url": proxy_url,
+    "api_mode": "chat_completions",
+})
+model_config.pop("model", None)
+config["model"] = model_config
+config.pop("provider", None)
+
+model_aliases = config.get("model_aliases", {})
+if not isinstance(model_aliases, dict):
+    model_aliases = {}
+
+canonical_aliases = {
+    "frontier": "frontier",
+    "balanced": "balanced",
+    "fast": "fast",
+    "light": "light",
+    "claude-opus-4-6-thinking": "claude-opus-4-6-thinking",
+    "gemini-3.6-flash-high": "gemini-3.6-flash-high",
+    "gemini-3.5-flash-high": "gemini-3.5-flash-high",
+    "gemini-3.5-flash-low": "gemini-3.5-flash-low",
+    "gemini-3.5-flash-extra-low": "gemini-3.5-flash-extra-low",
+    "gpt-5.6-sol": "gpt-5.6-sol",
+    "gpt-5.6-terra": "gpt-5.6-terra",
+    "gpt-5.4-mini": "gpt-5.4-mini",
+}
+for alias_key, model_name in canonical_aliases.items():
+    model_aliases[alias_key] = {
+        "model": model_name,
+        "provider": provider_id,
+        "base_url": proxy_url,
+    }
+config["model_aliases"] = model_aliases
+
+custom_providers = config.get("custom_providers", [])
+if not isinstance(custom_providers, list):
+    custom_providers = []
+custom_cfg = next(
+    (
+        entry
+        for entry in custom_providers
+        if isinstance(entry, dict)
+        and (
+            str(entry.get("name", "")).strip().lower() == provider_name.lower()
+            or str(entry.get("base_url", "")).rstrip("/") == proxy_url.rstrip("/")
+        )
+    ),
+    None,
+)
+if custom_cfg is None:
+    custom_cfg = {}
+    custom_providers.append(custom_cfg)
+custom_cfg.update({
+    "name": provider_name,
+    "base_url": proxy_url,
+    "key_env": "OPENAI_API_KEY",
+    "api_mode": "chat_completions",
+})
+custom_cfg.pop("api_base", None)
+custom_cfg.pop("api_key", None)
+config["custom_providers"] = custom_providers
+
 config_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
 handle, temporary = tempfile.mkstemp(
     prefix=".config.", suffix=".yaml", dir=config_path.parent
@@ -71,6 +145,25 @@ try:
 finally:
     if os.path.exists(temporary):
         os.unlink(temporary)
+
+env_path = config_path.parent / ".env"
+env_lines = []
+if env_path.exists():
+    env_lines = env_path.read_text().splitlines()
+env_dict = {}
+for line in env_lines:
+    if "=" in line and not line.strip().startswith("#"):
+        k, v = line.split("=", 1)
+        env_dict[k.strip()] = v.strip()
+
+env_dict["OPENAI_API_BASE"] = proxy_url
+env_dict["OPENAI_BASE_URL"] = proxy_url
+if os.environ.get("OPENAI_API_KEY"):
+    env_dict["OPENAI_API_KEY"] = os.environ["OPENAI_API_KEY"]
+
+new_env = "\n".join(f"{k}={v}" for k, v in env_dict.items()) + "\n"
+env_path.write_text(new_env)
+os.chmod(env_path, 0o600)
 PY
 elif command -v hermes >/dev/null 2>&1; then
   warn "Hermes Python/YAML runtime is unavailable; Hermes MCP sync was skipped"

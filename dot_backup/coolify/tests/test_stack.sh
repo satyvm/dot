@@ -7,6 +7,9 @@ pycache_dir="$(mktemp -d "${TMPDIR:-/tmp}/hermes-pycache.XXXXXX")"
 rendered=""
 remote_config=""
 remote_destination=""
+rendered_setup=""
+hermes_test_home=""
+hermes_test_bin=""
 
 cleanup() {
   rm -rf "$pycache_dir"
@@ -18,6 +21,15 @@ cleanup() {
   fi
   if [[ -n "$remote_destination" ]]; then
     rm -rf "$remote_destination"
+  fi
+  if [[ -n "$rendered_setup" ]]; then
+    rm -f "$rendered_setup"
+  fi
+  if [[ -n "$hermes_test_home" ]]; then
+    rm -rf "$hermes_test_home"
+  fi
+  if [[ -n "$hermes_test_bin" ]]; then
+    rm -rf "$hermes_test_bin"
   fi
 }
 trap cleanup EXIT
@@ -41,7 +53,7 @@ if command -v chezmoi >/dev/null 2>&1; then
     '{"data":{"setupCli":true,"setupDeveloper":true,"setupAi":true,"aiMode":"remote","guiTier":"none","setupMacos":false,"setupLinuxHardening":false,"setupSshKey":false,"name":"Satyam","email":"test@example.com"}}' \
     >"$remote_config"
   remote_managed="$(
-    chezmoi managed \
+    HOME="$remote_destination" chezmoi managed \
       --config "$remote_config" \
       --config-format json \
       --source "$stack_dir/../.." \
@@ -57,6 +69,73 @@ if command -v chezmoi >/dev/null 2>&1; then
     exit 1
   fi
   grep -qx 'setup-ai-agent-platform.sh' <<<"$remote_managed"
+
+  rendered_setup="$(mktemp "${TMPDIR:-/tmp}/hermes-setup-script.XXXXXX")"
+  HOME="$remote_destination" chezmoi execute-template \
+    --config "$remote_config" \
+    --config-format json \
+    --source "$stack_dir/../.." \
+    <"$stack_dir/../../run_onchange_after_setup-ai-agent-platform.sh.tmpl" \
+    >"$rendered_setup"
+  bash -n "$rendered_setup"
+
+  hermes_test_home="$(mktemp -d "${TMPDIR:-/tmp}/hermes-test-home.XXXXXX")"
+  hermes_test_bin="$(mktemp -d "${TMPDIR:-/tmp}/hermes-test-bin.XXXXXX")"
+  mkdir -p "$hermes_test_home/.config/ai-tools"
+  printf '%s\n' '{"mcpServers":{"filesystem":{"command":"mcp-server","args":["/workspace"]}}}' \
+    >"$hermes_test_home/.config/ai-tools/claude-mcp.json"
+  for command_name in hermes herdr claude pi opencode; do
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$hermes_test_bin/$command_name"
+    chmod 0755 "$hermes_test_bin/$command_name"
+  done
+  hermes_python=""
+  for candidate in python3 python; do
+    candidate_path="$(command -v "$candidate" 2>/dev/null || true)"
+    if [[ -n "$candidate_path" ]] && "$candidate_path" -c 'import yaml' >/dev/null 2>&1; then
+      hermes_python="$candidate_path"
+      break
+    fi
+  done
+  if [[ -n "$hermes_python" ]]; then
+    HOME="$hermes_test_home" \
+      PATH="$hermes_test_bin:$PATH" \
+      HERMES_WEBUI_PYTHON="$hermes_python" \
+      OPENAI_API_KEY="$CLIPROXY_CLIENT_KEY" \
+      bash "$rendered_setup"
+    HERMES_TEST_CONFIG="$hermes_test_home/.hermes/config.yaml" "$hermes_python" - <<'PY'
+import os
+from pathlib import Path
+
+import yaml
+
+config = yaml.safe_load(Path(os.environ["HERMES_TEST_CONFIG"]).read_text())
+assert config["model"] == {
+    "default": "balanced",
+    "provider": "custom:cliproxyapi",
+    "base_url": "http://cliproxyapi:8317/v1",
+    "api_mode": "chat_completions",
+}
+assert "provider" not in config
+provider = config["custom_providers"][0]
+assert provider == {
+    "name": "CLIProxyAPI",
+    "base_url": "http://cliproxyapi:8317/v1",
+    "key_env": "OPENAI_API_KEY",
+    "api_mode": "chat_completions",
+}
+for alias, entry in config["model_aliases"].items():
+    assert isinstance(entry, dict), alias
+    assert entry["provider"] == "custom:cliproxyapi", alias
+    assert entry["base_url"] == "http://cliproxyapi:8317/v1", alias
+assert config["model_aliases"]["frontier"]["model"] == "frontier"
+assert config["model_aliases"]["balanced"]["model"] == "balanced"
+assert config["mcp_servers"]["filesystem"]["command"] == "mcp-server"
+PY
+  else
+    grep -q 'provider_id = "custom:cliproxyapi"' "$rendered_setup"
+    grep -q 'custom_providers = config.get("custom_providers", \[\])' "$rendered_setup"
+    grep -q '"key_env": "OPENAI_API_KEY"' "$rendered_setup"
+  fi
 fi
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
@@ -104,6 +183,12 @@ else
 fi
 
 grep -q 'python /apptoo/server.py' "$stack_dir/supervisord.conf"
+grep -q 'HERMES_WEBUI_AGENT_DIR="/opt/hermes-agent"' "$stack_dir/supervisord.conf"
+grep -q 'HERMES_WEBUI_AGENT_DIR: /opt/hermes-agent' "$compose_file"
+grep -q 'HERMES_WEBUI_PYTHON: /opt/hermes-venv/bin/python' "$compose_file"
+grep -q 'ln -s "${agent_site}" /opt/hermes-agent' "$stack_dir/Dockerfile"
+grep -q 'test -f /opt/hermes-agent/run_agent.py' "$stack_dir/Dockerfile"
+grep -q "from run_agent import AIAgent" "$stack_dir/Dockerfile"
 grep -q 'PasswordAuthentication no' "$stack_dir/Dockerfile"
 if ! grep -q 'PermitEmptyPasswords no' "$stack_dir/Dockerfile"; then
   echo "key-only SSH must explicitly reject empty-password login" >&2

@@ -18,6 +18,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HERMES_WEBUI_DEFAULT_WORKSPACE=/home/ubuntu/dev \
     HERMES_WEBUI_HOST=0.0.0.0 \
     HERMES_WEBUI_PORT=8787 \
+    HERMES_WEBUI_AGENT_DIR=/opt/hermes-agent \
     HERMES_WEBUI_PYTHON=/opt/hermes-venv/bin/python \
     PATH=/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/opt/hermes-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -76,7 +77,12 @@ RUN if getent group "${REMOTE_GID}" >/dev/null; then \
 # server.py is deliberately launched with this interpreter.
 RUN python3 -m venv /opt/hermes-venv \
     && /opt/hermes-venv/bin/pip install --no-cache-dir \
-      "hermes-agent==${HERMES_AGENT_VERSION}"
+      "hermes-agent==${HERMES_AGENT_VERSION}" \
+      pyyaml python-dotenv openai pydantic httpx requests \
+    && agent_site="$(/opt/hermes-venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')" \
+    && ln -s "${agent_site}" /opt/hermes-agent \
+    && test -f /opt/hermes-agent/run_agent.py \
+    && /opt/hermes-venv/bin/python -c 'from run_agent import AIAgent'
 
 # Install chezmoi and age without architecture-specific archives.
 RUN sh -c "$(curl -fsLS https://get.chezmoi.io)" -- -b /usr/local/bin \

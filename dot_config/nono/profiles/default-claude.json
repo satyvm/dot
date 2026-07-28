@@ -38,5 +38,12 @@
     "deny": [
       "$HOME/.claude/.credentials.json"
     ]
+  },
+  "platform_overrides": {
+    "linux": {
+      "security": {
+        "capability_elevation": true
+      }
+    }
   }
 }

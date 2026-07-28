@@ -22,5 +22,12 @@
       "$HOME/.pi/agent/auth.json",
       "$HOME/.pi/agent/credentials.json"
     ]
+  },
+  "platform_overrides": {
+    "linux": {
+      "security": {
+        "capability_elevation": true
+      }
+    }
   }
 }

@@ -20,6 +20,13 @@
       "$HOME/.config/opencode/auth.json"
     ]
   },
+  "platform_overrides": {
+    "linux": {
+      "security": {
+        "capability_elevation": true
+      }
+    }
+  },
   "network": {
     "allow_domain": [
       "*"
