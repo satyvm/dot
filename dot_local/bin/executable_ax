@@ -654,6 +654,9 @@ launch_agent() {
     if [[ -n "${TEA_SOCKET_PATH:-}" ]]; then
       socket_args+=(--allow-unix-socket "$TEA_SOCKET_PATH")
     fi
+    if [[ "${AX_PLATFORM:-$(uname -s)}" != "Darwin" && "$PWD" -ef "$HOME" && -d "$HOME/dev" ]]; then
+      cd "$HOME/dev"
+    fi
     run_command=(nono run --profile "$profile" --allow-cwd ${socket_args[@]+"${socket_args[@]}"} -- "$binary" "$@")
   fi
 

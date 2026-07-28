@@ -13,7 +13,7 @@ FAKE_BIN="$FIXTURE_ROOT/bin"
 CONFIG_HOME="$FIXTURE_ROOT/config"
 STATE_HOME="$FIXTURE_ROOT/state"
 HOME_DIR="$FIXTURE_ROOT/home"
-mkdir -p "$FAKE_BIN" "$CONFIG_HOME/agents" "$CONFIG_HOME/ax" "$CONFIG_HOME/cli-proxy-api" "$CONFIG_HOME/crush" "$CONFIG_HOME/nono/profiles" "$STATE_HOME" "$HOME_DIR/.local/bin"
+mkdir -p "$FAKE_BIN" "$CONFIG_HOME/agents" "$CONFIG_HOME/ax" "$CONFIG_HOME/cli-proxy-api" "$CONFIG_HOME/crush" "$CONFIG_HOME/nono/profiles" "$STATE_HOME" "$HOME_DIR/.local/bin" "$HOME_DIR/dev"
 printf '%s\n' '# Universal test context' >"$CONFIG_HOME/agents/universal_context.md"
 
 cat >"$CONFIG_HOME/ax/models.json" <<'JSON'
@@ -90,7 +90,7 @@ if [[ "${1:-}" == "rollback" ]]; then
   echo "nono rollback $*"
   exit
 fi
-printf 'nono'
+printf 'nono cwd=<%s>' "$PWD"
 for arg in "$@"; do printf ' <%s>' "$arg"; done
 printf '\n'
 SH
@@ -227,8 +227,8 @@ run_ax() {
 
 printf 'TAP version 13\n'
 
-OUTPUT="$(run_ax claude --resume 'session id' --flag='two words')"
-assert_contains "$OUTPUT" "nono <run> <--profile> <default-claude> <--allow-cwd> <--> <$FAKE_BIN/claude>" "safe launch selects the Claude profile"
+OUTPUT="$(cd "$HOME_DIR" && AX_PLATFORM=Linux run_ax claude --resume 'session id' --flag='two words')"
+assert_contains "$OUTPUT" "/home/dev> <run> <--profile> <default-claude> <--allow-cwd> <--> <$FAKE_BIN/claude>" "Linux home launches use the safe development workspace"
 assert_contains "$OUTPUT" "<--settings> <{\"availableModels\":[\"frontier\",\"balanced\",\"fast\",\"light\"]}>" "Claude receives the canonical role allowlist"
 assert_contains "$OUTPUT" "<--append-system-prompt-file> <$CONFIG_HOME/agents/universal_context.md>" "Claude receives universal context as a system-prompt file"
 assert_contains "$OUTPUT" "<--resume> <session id> <--flag=two words>" "safe launch preserves Claude arguments"
@@ -266,7 +266,7 @@ assert_status 0 "$STATUS" "legacy positional direct is forwarded instead of bypa
 assert_contains "$OUTPUT" "<direct>" "sandbox bypass requires the explicit --direct flag"
 
 OUTPUT="$(AX_MODEL=frontier run_ax opencode)"
-assert_contains "$OUTPUT" "nono <run> <--profile> <default-opencode>" "OpenCode selects its agent-specific profile"
+assert_contains "$OUTPUT" "<run> <--profile> <default-opencode>" "OpenCode selects its agent-specific profile"
 assert_contains "$OUTPUT" "<--model> <cliproxy/frontier>" "OpenCode receives an explicit canonical role override"
 
 OUTPUT="$(AX_MODEL='raw:experimental/model' run_ax pi --resume 'native id')"
@@ -559,6 +559,13 @@ if command -v nono >/dev/null 2>&1; then
     pass "shared Cargo grants avoid Linux credential overlap"
   else
     fail "shared Cargo grants avoid Linux credential overlap" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-agent.json")"
+  fi
+  if jq -e '
+    any(.filesystem.read[]; type == "object" and .path == "/usr/share/locale/locale.alias" and .when == "linux")
+  ' "$REPO_ROOT/dot_config/nono/profiles/default-agent.json" >/dev/null; then
+    pass "Linux agents can read the system locale alias"
+  else
+    fail "Linux agents can read the system locale alias" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-agent.json")"
   fi
   if REPO_ROOT="$REPO_ROOT" python3 - <<'PY'
 import json

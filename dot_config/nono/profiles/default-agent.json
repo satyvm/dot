@@ -23,6 +23,10 @@
       "$HOME/.agents/skills",
       "$HOME/.config/agents/skills",
       "$HOME/.config/agents/universal_context.md",
+      {
+        "path": "/usr/share/locale/locale.alias",
+        "when": "linux"
+      },
       "$HOME/.codex/skills",
       "$HOME/.local/share/fnm",
       "$HOME/.local/state/fnm_multishells",
