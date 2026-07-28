@@ -66,6 +66,7 @@ services:
       cliproxy-init:
         condition: service_completed_successfully
     command:
+      - ./CLIProxyAPI
       - -config
       - /config/config.yaml
     environment:
@@ -80,10 +81,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - >-
-          curl --fail --silent
-          -H "Authorization: Bearer $${CLIPROXY_CLIENT_KEY}"
-          http://127.0.0.1:8317/v1/models >/dev/null
+        - bash -ec 'exec 3<>/dev/tcp/127.0.0.1/8317'
       interval: 10s
       timeout: 5s
       start_period: 20s
