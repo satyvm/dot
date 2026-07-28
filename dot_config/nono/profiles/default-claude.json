@@ -23,7 +23,30 @@
       "$HOME/.claude/telemetry"
     ],
     "read": [
-      "$HOME/.claude"
+      {
+        "path": "$HOME/.claude",
+        "when": "macos"
+      },
+      {
+        "path": "$HOME/.claude/agents",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.claude/commands",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.claude/plugins",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.claude/skills",
+        "when": "linux"
+      }
+    ],
+    "read_file": [
+      "$HOME/.claude/CLAUDE.md",
+      "$HOME/.claude/settings.json"
     ],
     "allow_file": [
       "$HOME/.claude.json",
@@ -33,7 +56,8 @@
       "$HOME/.claude/daemon.lock",
       "$HOME/.claude/daemon.log",
       "$HOME/.claude/daemon.status.json",
-      "$HOME/.claude/history.jsonl"
+      "$HOME/.claude/history.jsonl",
+      "$HOME/.claude/settings.local.json"
     ],
     "deny": [
       "$HOME/.claude/.credentials.json"

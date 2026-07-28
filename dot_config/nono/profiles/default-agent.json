@@ -30,7 +30,22 @@
       "$HOME/.local/state/mise",
       "$HOME/.fnm",
       "$HOME/.bun",
-      "$HOME/.cargo",
+      {
+        "path": "$HOME/.cargo",
+        "when": "macos"
+      },
+      {
+        "path": "$HOME/.cargo/bin",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.cargo/git",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.cargo/registry",
+        "when": "linux"
+      },
       "$HOME/.rustup",
       "$HOME/.go"
     ],

@@ -10,12 +10,27 @@
       "$HOME/.pi/agent/sessions"
     ],
     "read": [
-      "$HOME/.pi/agent"
+      {
+        "path": "$HOME/.pi/agent",
+        "when": "macos"
+      },
+      {
+        "path": "$HOME/.pi/agent/extensions",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.pi/agent/skills",
+        "when": "linux"
+      }
+    ],
+    "read_file": [
+      "$HOME/.pi/agent/models.json"
     ],
     "allow_file": [
       "$HOME/.pi/agent/auth.json.lock",
       "$HOME/.pi/agent/models-store.json",
       "$HOME/.pi/agent/models-store.json.lock",
+      "$HOME/.pi/agent/settings.json",
       "$HOME/.pi/agent/settings.json.lock"
     ],
     "deny": [

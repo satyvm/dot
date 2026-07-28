@@ -7,12 +7,34 @@
   "extends": "default-agent",
   "filesystem": {
     "allow": [
-      "$HOME/.local/share/crush",
+      {
+        "path": "$HOME/.local/share/crush",
+        "when": "macos"
+      },
+      {
+        "path": "$HOME/.local/share/crush/logs",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.local/share/crush/sessions",
+        "when": "linux"
+      },
       "$HOME/.local/state/crush",
       "$HOME/.cache/crush"
     ],
     "read": [
-      "$HOME/.config/crush"
+      {
+        "path": "$HOME/.config/crush",
+        "when": "macos"
+      }
+    ],
+    "read_file": [
+      "$HOME/.config/crush/crush.json"
+    ],
+    "allow_file": [
+      "$HOME/.local/share/crush/crush.db",
+      "$HOME/.local/share/crush/crush.db-shm",
+      "$HOME/.local/share/crush/crush.db-wal"
     ],
     "deny": [
       "$HOME/.config/crush/auth.json",

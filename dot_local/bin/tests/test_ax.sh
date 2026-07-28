@@ -526,6 +526,88 @@ if command -v nono >/dev/null 2>&1; then
       fail "$profile preserves native macOS Seatbelt deny enforcement" "$resolved_profile"
     fi
   done
+  if jq -e '
+    any(.filesystem.read[]; type == "object" and .path == "$HOME/.claude" and .when == "macos") and
+    any(.filesystem.read[]; type == "object" and .path == "$HOME/.claude/skills" and .when == "linux")
+  ' "$REPO_ROOT/dot_config/nono/profiles/default-claude.json" >/dev/null; then
+    pass "Claude splits state grants by platform"
+  else
+    fail "Claude splits state grants by platform" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-claude.json")"
+  fi
+  if jq -e '
+    any(.filesystem.allow[]; type == "object" and .path == "$HOME/.local/share/opencode" and .when == "macos") and
+    any(.filesystem.allow[]; type == "object" and .path == "$HOME/.local/share/opencode/storage" and .when == "linux") and
+    any(.filesystem.read[]; type == "object" and .path == "$HOME/.config/opencode" and .when == "macos")
+  ' "$REPO_ROOT/dot_config/nono/profiles/default-opencode.json" >/dev/null; then
+    pass "OpenCode splits state grants by platform"
+  else
+    fail "OpenCode splits state grants by platform" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-opencode.json")"
+  fi
+  if jq -e '
+    any(.filesystem.allow[]; type == "object" and .path == "$HOME/.local/share/crush" and .when == "macos") and
+    any(.filesystem.allow[]; type == "object" and .path == "$HOME/.local/share/crush/sessions" and .when == "linux") and
+    any(.filesystem.read[]; type == "object" and .path == "$HOME/.config/crush" and .when == "macos")
+  ' "$REPO_ROOT/dot_config/nono/profiles/default-crush.json" >/dev/null; then
+    pass "Crush splits state grants by platform"
+  else
+    fail "Crush splits state grants by platform" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-crush.json")"
+  fi
+  if jq -e '
+    any(.filesystem.read[]; type == "object" and .path == "$HOME/.cargo" and .when == "macos") and
+    any(.filesystem.read[]; type == "object" and .path == "$HOME/.cargo/registry" and .when == "linux")
+  ' "$REPO_ROOT/dot_config/nono/profiles/default-agent.json" >/dev/null; then
+    pass "shared Cargo grants avoid Linux credential overlap"
+  else
+    fail "shared Cargo grants avoid Linux credential overlap" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-agent.json")"
+  fi
+  if REPO_ROOT="$REPO_ROOT" python3 - <<'PY'
+import json
+import os
+from pathlib import PurePosixPath
+
+root = os.environ["REPO_ROOT"]
+profile_names = ["default-agent", "default-claude", "default-crush", "default-opencode", "default-pi"]
+profiles = {}
+for name in profile_names:
+    path = os.path.join(root, "dot_config", "nono", "profiles", f"{name}.json")
+    with open(path) as stream:
+        profiles[name] = json.load(stream)
+
+def linux_paths(entries):
+    paths = []
+    for entry in entries or []:
+        if isinstance(entry, str):
+            paths.append(entry)
+        elif isinstance(entry, dict) and entry.get("when") == "linux":
+            paths.append(entry["path"])
+    return paths
+
+def merged(name):
+    profile = profiles[name]
+    filesystem = {key: [] for key in ("allow", "read", "write", "allow_file", "read_file", "write_file", "deny")}
+    parent = profile.get("extends")
+    if parent in profiles:
+        filesystem = merged(parent)
+    own = profile.get("filesystem", {})
+    for key in filesystem:
+        filesystem[key] = filesystem[key] + linux_paths(own.get(key, []))
+    return filesystem
+
+for name in profile_names[1:]:
+    filesystem = merged(name)
+    parents = filesystem["allow"] + filesystem["read"] + filesystem["write"]
+    for denied in filesystem["deny"]:
+        denied_path = PurePosixPath(denied)
+        for parent in parents:
+            parent_path = PurePosixPath(parent)
+            if denied_path != parent_path and parent_path in denied_path.parents:
+                raise SystemExit(f"{name}: deny {denied} overlaps Linux grant {parent}")
+PY
+  then
+    pass "Linux profiles contain no Landlock deny-overlap"
+  else
+    fail "Linux profiles contain no Landlock deny-overlap" "platform-specific profile conflict"
+  fi
   EFFECTIVE_PROFILE="$(nono profile show "$REPO_ROOT/dot_config/nono/profiles/default-opencode.json" --json)"
   assert_contains "$EFFECTIVE_PROFILE" '"network_profile": "developer"' "effective policy permits general developer networking"
   assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.ssh\"" "effective policy denies SSH material"
@@ -542,11 +624,22 @@ if command -v nono >/dev/null 2>&1; then
   PI_EFFECTIVE="$(nono profile show "$REPO_ROOT/dot_config/nono/profiles/default-pi.json" --json)"
   if jq -e '
     (.filesystem.read | index("$HOME/.pi/agent")) != null and
-    (.filesystem.allow | index("$HOME/.pi/agent")) == null
+    (.filesystem.allow | index("$HOME/.pi/agent")) == null and
+    (.filesystem.read_file | index("$HOME/.pi/agent/models.json")) != null and
+    (.filesystem.allow_file | index("$HOME/.pi/agent/settings.json")) != null
   ' <<<"$PI_EFFECTIVE" >/dev/null; then
-    pass "Pi generated config and integration directory are read-only"
+    pass "Pi preserves native macOS state access"
   else
-    fail "Pi generated config and integration directory are read-only" "$PI_EFFECTIVE"
+    fail "Pi preserves native macOS state access" "$PI_EFFECTIVE"
+  fi
+  if jq -e '
+    any(.filesystem.read[]; type == "object" and .path == "$HOME/.pi/agent" and .when == "macos") and
+    any(.filesystem.read[]; type == "object" and .path == "$HOME/.pi/agent/extensions" and .when == "linux") and
+    any(.filesystem.read[]; type == "object" and .path == "$HOME/.pi/agent/skills" and .when == "linux")
+  ' "$REPO_ROOT/dot_config/nono/profiles/default-pi.json" >/dev/null; then
+    pass "Pi splits state grants by platform"
+  else
+    fail "Pi splits state grants by platform" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-pi.json")"
   fi
   CLAUDE_EFFECTIVE="$(nono profile show "$REPO_ROOT/dot_config/nono/profiles/default-claude.json" --json)"
   if jq -e '

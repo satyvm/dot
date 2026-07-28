@@ -7,13 +7,60 @@
   "extends": "default-agent",
   "filesystem": {
     "allow": [
-      "$HOME/.local/share/opencode",
+      {
+        "path": "$HOME/.local/share/opencode",
+        "when": "macos"
+      },
+      {
+        "path": "$HOME/.local/share/opencode/log",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.local/share/opencode/repos",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.local/share/opencode/storage",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.local/share/opencode/worktree",
+        "when": "linux"
+      },
       "$HOME/.local/state/opencode",
       "$HOME/.cache/opencode",
       "$HOME/.local/share/opentui"
     ],
     "read": [
-      "$HOME/.config/opencode"
+      {
+        "path": "$HOME/.config/opencode",
+        "when": "macos"
+      },
+      {
+        "path": "$HOME/.config/opencode/agents",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.config/opencode/commands",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.config/opencode/plugins",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME/.config/opencode/skills",
+        "when": "linux"
+      }
+    ],
+    "read_file": [
+      "$HOME/.config/opencode/opencode.json",
+      "$HOME/.config/opencode/opencode.jsonc"
+    ],
+    "allow_file": [
+      "$HOME/.local/share/opencode/opencode.db",
+      "$HOME/.local/share/opencode/opencode.db-shm",
+      "$HOME/.local/share/opencode/opencode.db-wal"
     ],
     "deny": [
       "$HOME/.local/share/opencode/auth.json",
