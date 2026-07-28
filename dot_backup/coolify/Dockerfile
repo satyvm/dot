@@ -19,7 +19,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HERMES_WEBUI_HOST=0.0.0.0 \
     HERMES_WEBUI_PORT=8787 \
     HERMES_WEBUI_PYTHON=/opt/hermes-venv/bin/python \
-    PATH=/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/opt/hermes-venv/bin:/usr/local/bin:/usr/bin:/bin
+    PATH=/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/opt/hermes-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
