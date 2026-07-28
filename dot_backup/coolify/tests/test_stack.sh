@@ -5,11 +5,19 @@ stack_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 compose_file="$stack_dir/hermes_docker_compose.yaml"
 pycache_dir="$(mktemp -d "${TMPDIR:-/tmp}/hermes-pycache.XXXXXX")"
 rendered=""
+remote_config=""
+remote_destination=""
 
 cleanup() {
   rm -rf "$pycache_dir"
   if [[ -n "$rendered" ]]; then
     rm -f "$rendered"
+  fi
+  if [[ -n "$remote_config" ]]; then
+    rm -f "$remote_config"
+  fi
+  if [[ -n "$remote_destination" ]]; then
+    rm -rf "$remote_destination"
   fi
 }
 trap cleanup EXIT
@@ -25,6 +33,31 @@ bash -n "$stack_dir/entrypoint.sh"
 python3 -m py_compile "$stack_dir/tea_sidecar.py"
 python3 -m py_compile "$stack_dir/gitea_ai_cli.py"
 shellcheck "$stack_dir/entrypoint.sh"
+
+if command -v chezmoi >/dev/null 2>&1; then
+  remote_config="$(mktemp "${TMPDIR:-/tmp}/hermes-remote-config.XXXXXX")"
+  remote_destination="$(mktemp -d "${TMPDIR:-/tmp}/hermes-remote-home.XXXXXX")"
+  printf '%s\n' \
+    '{"data":{"setupCli":true,"setupDeveloper":true,"setupAi":true,"aiMode":"remote","guiTier":"none","setupMacos":false,"setupLinuxHardening":false,"setupSshKey":false,"name":"Satyam","email":"test@example.com"}}' \
+    >"$remote_config"
+  remote_managed="$(
+    chezmoi managed \
+      --config "$remote_config" \
+      --config-format json \
+      --source "$stack_dir/../.." \
+      --destination "$remote_destination" \
+      --refresh-externals=never
+  )"
+  if grep -qx 'brew-packages.sh' <<<"$remote_managed"; then
+    echo "remote profile must not run the host Homebrew package installer" >&2
+    exit 1
+  fi
+  if grep -qx 'install-tools.sh' <<<"$remote_managed"; then
+    echo "remote profile must use image-baked developer tools" >&2
+    exit 1
+  fi
+  grep -qx 'setup-ai-agent-platform.sh' <<<"$remote_managed"
+fi
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   rendered="$(mktemp "${TMPDIR:-/tmp}/hermes-compose.XXXXXX")"

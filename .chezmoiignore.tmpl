@@ -17,25 +17,25 @@ AGENTS.md
 
 # The repository uses Homebrew on both supported platforms; the former APT and
 # GUI-launch scripts are intentionally retired.
-run_onchange_apt-packages.sh.tmpl
-run_once_after_setup-zend.sh.tmpl
+apt-packages.sh
+setup-zend.sh
 
 {{- if not (or .setupCli .setupAi) }}
-dot_zshrc
-dot_zshenv
-dot_dotfiles
+.zshrc
+.zshenv
+.dotfiles
 .config/nvim
 .config/tmux
 .config/starship
 .config/private_pet
-run_once_after_setup-shell.sh.tmpl
+setup-shell.sh
 {{- end }}
 
 {{- if or (not .setupDeveloper) (eq .aiMode "remote") }}
-run_once_after_install-tools.sh.tmpl
+install-tools.sh
 {{- end }}
 {{- if eq .aiMode "remote" }}
-run_onchange_brew-packages.sh.tmpl
+brew-packages.sh
 {{- end }}
 
 {{- if not .setupAi }}
@@ -54,7 +54,7 @@ run_onchange_brew-packages.sh.tmpl
 .local/bin/crush
 .local/bin/opencode
 .local/bin/pi
-run_onchange_after_setup-ai-agent-platform.sh.tmpl
+setup-ai-agent-platform.sh
 {{- end }}
 {{- if ne .chezmoi.os "darwin" }}
 .zed
@@ -76,15 +76,15 @@ run_onchange_after_setup-ai-agent-platform.sh.tmpl
 {{- end }}
 
 {{- if and (not .setupCli) (not .setupAi) (eq .guiTier "none") }}
-run_onchange_brew-packages.sh.tmpl
+brew-packages.sh
 {{- end }}
 
 {{- if or (ne .chezmoi.os "darwin") (not .setupMacos) }}
-run_once_after_setup-macos.sh.tmpl
+setup-macos.sh
 {{- end }}
 {{- if or (ne .chezmoi.os "linux") (not .setupLinuxHardening) }}
-run_once_after_setup-linux.sh.tmpl
+setup-linux.sh
 {{- end }}
 {{- if not .setupSshKey }}
-run_once_after_setup-ssh-key.sh.tmpl
+setup-ssh-key.sh
 {{- end }}
