@@ -13,13 +13,13 @@ only through Git:
 
 The Compose application contains:
 
-1. `cliproxy-init`, a one-shot service that creates the server-only proxy config
-   and shared client key with restrictive permissions.
-2. `cliproxyapi`, which is reachable only as `http://cliproxyapi:8317` on the
+1. `cliproxyapi`, whose startup command creates the server-only proxy config and
+   shared client key with restrictive permissions before replacing itself with
+   the proxy process. It is reachable only as `http://cliproxyapi:8317` on the
    private Compose network.
-3. `tea-sidecar`, a Python microservice exposing `/run/tea/tea.sock` to handle
+2. `tea-sidecar`, a Python microservice exposing `/run/tea/tea.sock` to handle
    Gitea `ai` account API calls securely without leaking tokens to agents.
-4. `hermes-dev`, a custom image containing Hermes Agent, Hermes WebUI, OpenSSH,
+3. `hermes-dev`, a custom image containing Hermes Agent, Hermes WebUI, OpenSSH,
    chezmoi, `ax`, Nono, Herdr, Claude Code, Pi, OpenCode, Crush, MCP runtimes,
    and the shared LSP toolchain.
 

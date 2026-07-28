@@ -1,15 +1,9 @@
 services:
-  cliproxy-init:
-    image: alpine:3.22.1
-    restart: "no"
-    environment:
-      CLIPROXY_CLIENT_KEY: ${CLIPROXY_CLIENT_KEY:?}
-      CLIPROXY_MANAGEMENT_KEY: ${CLIPROXY_MANAGEMENT_KEY:?}
-    volumes:
-      - cliproxy-config:/config
-      - platform-secrets:/secrets
+  cliproxyapi:
+    image: eceasy/cli-proxy-api:v7.2.95
+    restart: unless-stopped
     command:
-      - /bin/sh
+      - /bin/bash
       - -euc
       - |
         umask 077
@@ -58,24 +52,16 @@ services:
               force-mapping: true
         EOF
         chmod 0600 /config/config.yaml /secrets/client-key
-
-  cliproxyapi:
-    image: eceasy/cli-proxy-api:v7.2.95
-    restart: unless-stopped
-    depends_on:
-      cliproxy-init:
-        condition: service_completed_successfully
-    command:
-      - ./CLIProxyAPI
-      - -config
-      - /config/config.yaml
+        exec ./CLIProxyAPI -config /config/config.yaml
     environment:
       CLIPROXY_CLIENT_KEY: ${CLIPROXY_CLIENT_KEY:?}
+      CLIPROXY_MANAGEMENT_KEY: ${CLIPROXY_MANAGEMENT_KEY:?}
       DEPLOY: cloud
       PORT: "8317"
     volumes:
-      - cliproxy-config:/config:ro
+      - cliproxy-config:/config
       - cliproxy-auth:/root/.cli-proxy-api
+      - platform-secrets:/secrets
     networks:
       - hermes-net
     healthcheck:
