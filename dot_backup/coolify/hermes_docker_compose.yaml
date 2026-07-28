@@ -105,7 +105,7 @@ services:
       GITEA_URL: ${GITEA_URL:-https://gitea.satyvm.com}
       TEA_SOCKET_PATH: /run/tea/tea.sock
     volumes:
-      - ./tea_sidecar.py:/app/tea_sidecar.py:ro
+      - ./dot_backup/coolify/tea_sidecar.py:/app/tea_sidecar.py:ro
       - tea-socket:/run/tea
     networks:
       - hermes-net
@@ -117,7 +117,7 @@ services:
 
   hermes-dev:
     build:
-      context: .
+      context: dot_backup/coolify
       dockerfile: Dockerfile
       args:
         REMOTE_UID: ${REMOTE_UID:-1000}
