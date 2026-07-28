@@ -42,9 +42,12 @@ if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; 
   grep -q 'target: /home/ubuntu/.hermes' "$rendered"
   grep -q 'http://cliproxyapi:8317/v1' "$rendered"
   grep -q 'tea-sidecar' "$rendered"
-  grep -q 'source: tea-sidecar-script' "$rendered"
-  grep -q 'target: /tea_sidecar.py' "$rendered"
+  grep -q 'dockerfile: Dockerfile.tea' "$rendered"
   grep -q '/run/tea/tea.sock' "$rendered"
+  if grep -q 'tea_sidecar.py' "$rendered"; then
+    echo "tea sidecar script must be baked into its image, not mounted at runtime" >&2
+    exit 1
+  fi
 else
   grep -q '22223' "$compose_file"
   grep -q 'tea-sidecar' "$compose_file"
@@ -54,10 +57,11 @@ fi
 grep -q 'python /apptoo/server.py' "$stack_dir/supervisord.conf"
 grep -q 'PasswordAuthentication no' "$stack_dir/Dockerfile"
 grep -q 'context: ./dot_backup/coolify' "$compose_file"
-grep -q 'tea-sidecar-script:' "$compose_file"
-grep -q 'file: ./dot_backup/coolify/tea_sidecar.py' "$compose_file"
-if grep -q 'tea_sidecar.py:.*tea_sidecar.py' "$compose_file"; then
-  echo "tea sidecar script must use a Compose config, not a bind mount" >&2
+grep -q 'dockerfile: Dockerfile.tea' "$compose_file"
+grep -q 'COPY tea_sidecar.py /usr/local/bin/tea-sidecar' \
+  "$stack_dir/Dockerfile.tea"
+if grep -q 'tea_sidecar.py' "$compose_file"; then
+  echo "tea sidecar script must not use a runtime file mount" >&2
   exit 1
 fi
 grep -q 'exec ./CLIProxyAPI -config /config/config.yaml' "$compose_file"

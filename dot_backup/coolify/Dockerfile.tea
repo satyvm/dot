@@ -1,0 +1,9 @@
+FROM python:3.11-alpine
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+COPY tea_sidecar.py /usr/local/bin/tea-sidecar
+RUN chmod 0555 /usr/local/bin/tea-sidecar
+
+ENTRYPOINT ["python3", "/usr/local/bin/tea-sidecar"]

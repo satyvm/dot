@@ -79,23 +79,28 @@ services:
           cpus: "1.0"
 
   tea-sidecar:
-    image: python:3.11-alpine
+    build:
+      context: ./dot_backup/coolify
+      dockerfile: Dockerfile.tea
     restart: unless-stopped
-    command:
-      - python3
-      - /tea_sidecar.py
     environment:
       GITEA_TOKEN: ${GITEA_TOKEN:-}
       GITEA_URL: ${GITEA_URL:-https://gitea.satyvm.com}
       TEA_SOCKET_PATH: /run/tea/tea.sock
-    configs:
-      - source: tea-sidecar-script
-        target: /tea_sidecar.py
-        mode: 0444
     volumes:
       - tea-socket:/run/tea
     networks:
       - hermes-net
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - import socket; s = socket.socket(socket.AF_UNIX); s.settimeout(2); s.connect("/run/tea/tea.sock"); s.close()
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
     deploy:
       resources:
         limits:
@@ -116,7 +121,7 @@ services:
       cliproxyapi:
         condition: service_healthy
       tea-sidecar:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "127.0.0.1:${DEV_SSH_PORT:-22223}:22"
     environment:
@@ -165,10 +170,6 @@ services:
 networks:
   hermes-net:
     driver: bridge
-
-configs:
-  tea-sidecar-script:
-    file: ./dot_backup/coolify/tea_sidecar.py
 
 volumes:
   remote-home:
