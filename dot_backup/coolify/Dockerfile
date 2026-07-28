@@ -27,9 +27,11 @@ RUN apt-get update \
       ca-certificates \
       curl \
       fd-find \
+      file \
       git \
       gzip \
       jq \
+      locales \
       openssh-server \
       procps \
       python3-venv \
@@ -90,6 +92,15 @@ RUN install -d -o ubuntu -g ubuntu /home/linuxbrew/.linuxbrew/Homebrew \
     && ln -s ../Homebrew/bin/brew /home/linuxbrew/.linuxbrew/bin/brew \
     && runuser -u ubuntu -- env \
       HOME=/home/ubuntu \
+      PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+      NONINTERACTIVE=1 \
+      HOMEBREW_NO_ANALYTICS=1 \
+      HOMEBREW_NO_AUTO_UPDATE=1 \
+      /home/linuxbrew/.linuxbrew/bin/brew tap charmbracelet/tap \
+    && runuser -u ubuntu -- env \
+      HOME=/home/ubuntu \
+      PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+      NONINTERACTIVE=1 \
       HOMEBREW_NO_ANALYTICS=1 \
       HOMEBREW_NO_AUTO_UPDATE=1 \
       /home/linuxbrew/.linuxbrew/bin/brew install \
