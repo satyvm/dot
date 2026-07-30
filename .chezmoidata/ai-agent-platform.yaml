@@ -9,47 +9,122 @@ aiAgentPlatform:
       target: gpt-5.6-sol
       provider: codex
       displayName: Frontier
-      contextWindow: 200000
-      maxTokens: 32768
+      contextWindow: 372000
+      maxTokens: 128000
       reasoning: true
+      reasoningSuffix: xhigh
       input: [text, image]
     balanced:
       alias: balanced
-      target: gemini-3.6-flash-high
-      provider: antigravity
+      target: gpt-5.6-terra
+      provider: codex
       displayName: Balanced
-      contextWindow: 1048576
-      maxTokens: 65536
+      contextWindow: 372000
+      maxTokens: 128000
       reasoning: true
+      reasoningSuffix: xhigh
       input: [text, image]
     fast:
       alias: fast
-      target: gpt-5.6-terra
-      provider: codex
+      target: gemini-3.6-flash-high
+      provider: antigravity
       displayName: Fast
       contextWindow: 1048576
       maxTokens: 65536
       reasoning: true
+      reasoningSuffix: max
       input: [text, image]
     light:
       alias: light
       target: gpt-5.4-mini
       provider: codex
       displayName: Light
+      contextWindow: 400000
+      maxTokens: 128000
+      reasoning: true
+      reasoningSuffix: xhigh
+      input: [text, image]
+  catalog:
+    gpt-5.6-luna:
+      alias: gpt-5.6-luna
+      target: gpt-5.6-luna
+      provider: codex
+      displayName: GPT 5.6 Luna
+      contextWindow: 372000
+      maxTokens: 128000
+      reasoning: true
+      reasoningSuffix: xhigh
+      input: [text, image]
+    gpt-5.4:
+      alias: gpt-5.4
+      target: gpt-5.4
+      provider: codex
+      displayName: GPT 5.4
+      contextWindow: 1050000
+      maxTokens: 128000
+      reasoning: true
+      reasoningSuffix: xhigh
+      input: [text, image]
+    gemini-3.1-pro-low:
+      alias: gemini-3.1-pro-low
+      target: gemini-3.1-pro-low
+      provider: antigravity
+      displayName: Gemini 3.1 Pro Low
+      contextWindow: 1048576
+      maxTokens: 65535
+      reasoning: true
+      reasoningSuffix: max
+      input: [text, image]
+    gemini-3-flash-agent:
+      alias: gemini-3-flash-agent
+      target: gemini-3-flash-agent
+      provider: antigravity
+      displayName: Gemini 3 Flash Agent
+      contextWindow: 1048576
+      maxTokens: 65536
+      reasoning: true
+      reasoningSuffix: max
+      input: [text, image]
+    gemini-3.5-flash-lite:
+      alias: gemini-3.5-flash-lite
+      target: gemini-3.5-flash-lite
+      provider: antigravity
+      displayName: Gemini 3.5 Flash Lite
       contextWindow: 1048576
       maxTokens: 32768
-      reasoning: false
+      reasoning: true
+      reasoningSuffix: max
+      input: [text, image]
+    claude-sonnet-4-6:
+      alias: claude-sonnet-4-6
+      target: claude-sonnet-4-6
+      provider: antigravity
+      displayName: Claude Sonnet 4.6
+      contextWindow: 200000
+      maxTokens: 64000
+      reasoning: true
+      reasoningSuffix: max
+      input: [text, image]
+    gpt-oss-120b-medium:
+      alias: gpt-oss-120b-medium
+      target: gpt-oss-120b-medium
+      provider: antigravity
+      displayName: GPT OSS 120B Medium
+      contextWindow: 114000
+      maxTokens: 32768
+      reasoning: true
+      reasoningSuffix: max
       input: [text]
   alternatives:
     frontier:
       - provider: codex
         target: gpt-5.6-sol
     balanced:
-      - provider: codex
-        target: gpt-5.6-terra
+      - provider: antigravity
+        target: gemini-3.6-flash-high
     fast:
       - provider: codex
-        target: gpt-5.6-luna
+        target: gpt-5.6-terra
     light:
       - provider: antigravity
         target: gemini-3.1-flash-lite
@@ -58,10 +133,10 @@ aiAgentPlatform:
       defaultRole: balanced
       profile: default-claude
     pi:
-      defaultRole: balanced
+      defaultRole: fast
       profile: default-pi
     opencode:
-      defaultRole: balanced
+      defaultRole: frontier
       profile: default-opencode
     crush:
       defaultRole: balanced

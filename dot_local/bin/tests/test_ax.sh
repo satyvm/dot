@@ -21,10 +21,13 @@ cat >"$CONFIG_HOME/ax/models.json" <<'JSON'
   "version": 1,
   "proxy": {"url": "http://127.0.0.1:8317", "channel": "antigravity"},
   "roles": {
-    "frontier": {"alias": "frontier", "target": "upstream-frontier", "provider": "antigravity", "displayName": "Frontier", "contextWindow": 200000, "maxTokens": 32768, "reasoning": true, "input": ["text", "image"]},
-    "balanced": {"alias": "balanced", "target": "upstream-balanced", "provider": "antigravity", "displayName": "Balanced", "contextWindow": 1000000, "maxTokens": 65536, "reasoning": true, "input": ["text", "image"]},
-    "fast": {"alias": "fast", "target": "upstream-fast", "provider": "antigravity", "displayName": "Fast", "contextWindow": 1000000, "maxTokens": 65536, "reasoning": true, "input": ["text", "image"]},
-    "light": {"alias": "light", "target": "upstream-light", "provider": "antigravity", "displayName": "Light", "contextWindow": 1000000, "maxTokens": 32768, "reasoning": false, "input": ["text"]}
+    "frontier": {"alias": "frontier", "target": "upstream-frontier", "provider": "codex", "displayName": "Frontier", "contextWindow": 200000, "maxTokens": 32768, "reasoning": true, "reasoningSuffix": "xhigh", "input": ["text", "image"]},
+    "balanced": {"alias": "balanced", "target": "upstream-balanced", "provider": "codex", "displayName": "Balanced", "contextWindow": 1000000, "maxTokens": 65536, "reasoning": true, "reasoningSuffix": "xhigh", "input": ["text", "image"]},
+    "fast": {"alias": "fast", "target": "upstream-fast", "provider": "antigravity", "displayName": "Fast", "contextWindow": 1000000, "maxTokens": 65536, "reasoning": true, "reasoningSuffix": "max", "input": ["text", "image"]},
+    "light": {"alias": "light", "target": "upstream-light", "provider": "codex", "displayName": "Light", "contextWindow": 1000000, "maxTokens": 32768, "reasoning": true, "reasoningSuffix": "xhigh", "input": ["text"]}
+  },
+  "catalog": {
+    "gpt-5.6-luna": {"alias": "gpt-5.6-luna", "target": "upstream-luna", "provider": "codex", "displayName": "GPT Luna", "contextWindow": 200000, "maxTokens": 32768, "reasoning": true, "reasoningSuffix": "xhigh", "input": ["text", "image"]}
   },
   "agents": {
     "claude": {"defaultRole": "balanced", "profile": "default-claude"},
@@ -62,14 +65,29 @@ cat >"$CONFIG_HOME/crush/crush.json" <<'JSON'
 JSON
 printf '%s\n' 'test-client-key' >"$CONFIG_HOME/cli-proxy-api/client-key"
 printf '{}\n' >"$CONFIG_HOME/cli-proxy-api/antigravity-test.json"
+printf '{}\n' >"$CONFIG_HOME/cli-proxy-api/codex-test.json"
 
 cat >"$FAKE_BIN/curl" <<'SH'
 #!/usr/bin/env bash
 if [[ "$*" == *"/v1/models"* ]]; then
-  if [[ "${AX_TEST_HIDE_MODEL:-}" == "balanced" ]]; then
+  if [[ -n "${AX_TEST_CURL_COUNT_FILE:-}" ]]; then
+    count=0
+    [[ -r "$AX_TEST_CURL_COUNT_FILE" ]] && read -r count <"$AX_TEST_CURL_COUNT_FILE"
+    count=$((count + 1))
+    printf '%s\n' "$count" >"$AX_TEST_CURL_COUNT_FILE"
+    if [[ "${AX_TEST_MALFORMED_SYNC:-}" == "1" && "$count" -ge 4 ]]; then
+      printf '%s\n' '{"data":'
+      exit 0
+    fi
+  fi
+  if [[ "${AX_TEST_EMPTY_MODELS:-}" == "1" ]]; then
+    printf '%s\n' '{"data":[]}'
+  elif [[ "${AX_TEST_UNMANAGED_MODELS:-}" == "1" ]]; then
+    printf '%s\n' '{"data":[{"id":"unmanaged-only","owned_by":"unknown"}]}'
+  elif [[ "${AX_TEST_HIDE_MODEL:-}" == "balanced" ]]; then
     printf '%s\n' '{"data":[{"id":"frontier","owned_by":"antigravity"},{"id":"fast","owned_by":"antigravity"},{"id":"light","owned_by":"antigravity"}]}'
   else
-    printf '%s\n' '{"data":[{"id":"frontier","owned_by":"antigravity"},{"id":"balanced","owned_by":"antigravity"},{"id":"fast","owned_by":"antigravity"},{"id":"light","owned_by":"antigravity"},{"id":"experimental/model","owned_by":"antigravity"}]}'
+    printf '%s\n' '{"data":[{"id":"frontier","owned_by":"antigravity"},{"id":"balanced","owned_by":"antigravity"},{"id":"fast","owned_by":"antigravity"},{"id":"light","owned_by":"antigravity"},{"id":"gpt-5.6-sol","owned_by":"openai"},{"id":"gpt-5.6-luna","owned_by":"openai"},{"id":"gemini-3.6-flash-high","owned_by":"antigravity"},{"id":"experimental/model","owned_by":"antigravity"},{"id":"future-model(preview)","owned_by":"openai"},{"id":"unrelated-anthropic-model","owned_by":"anthropic"}]}'
   fi
   exit 0
 fi
@@ -89,6 +107,10 @@ fi
 if [[ "${1:-}" == "rollback" ]]; then
   echo "nono rollback $*"
   exit
+fi
+if [[ -n "${OPENCODE_CONFIG_CONTENT:-}" ]]; then
+  printf ' opencode_live_model=%s' "$(/usr/bin/jq -r '.provider.cliproxy.models | has("experimental/model(max)")' <<<"$OPENCODE_CONFIG_CONTENT")"
+  printf ' opencode_parenthetical_model=%s' "$(/usr/bin/jq -r '.provider.cliproxy.models | has("future-model(preview)(xhigh)")' <<<"$OPENCODE_CONFIG_CONTENT")"
 fi
 printf 'nono cwd=<%s>' "$PWD"
 for arg in "$@"; do printf ' <%s>' "$arg"; done
@@ -119,6 +141,11 @@ fi
 printf 'crush_config=%s\n' "${CRUSH_GLOBAL_CONFIG:-}"
 if [[ -n "${CRUSH_GLOBAL_CONFIG:-}" ]]; then
   printf 'crush_model=%s\n' "$(/usr/bin/jq -r '.models.large.model' "$CRUSH_GLOBAL_CONFIG")"
+  printf 'crush_discovery=%s\n' "$(/usr/bin/jq -r '.providers.cliproxy.discover_models' "$CRUSH_GLOBAL_CONFIG")"
+fi
+if [[ "$(basename "$0")" == "opencode" && -n "${OPENCODE_CONFIG_CONTENT:-}" ]]; then
+  printf 'opencode_live_model=%s\n' "$(/usr/bin/jq -r '.provider.cliproxy.models | has("experimental/model(max)")' <<<"$OPENCODE_CONFIG_CONTENT")"
+  printf 'opencode_parenthetical_model=%s\n' "$(/usr/bin/jq -r '.provider.cliproxy.models | has("future-model(preview)(xhigh)")' <<<"$OPENCODE_CONFIG_CONTENT")"
 fi
 index=0
 for arg in "$@"; do
@@ -229,7 +256,7 @@ printf 'TAP version 13\n'
 
 OUTPUT="$(cd "$HOME_DIR" && AX_PLATFORM=Linux run_ax claude --resume 'session id' --flag='two words')"
 assert_contains "$OUTPUT" "/home/dev> <run> <--profile> <default-claude> <--allow-cwd> <--> <$FAKE_BIN/claude>" "Linux home launches use the safe development workspace"
-assert_contains "$OUTPUT" "<--settings> <{\"availableModels\":[\"frontier\",\"balanced\",\"fast\",\"light\"]}>" "Claude receives the canonical role allowlist"
+assert_contains "$OUTPUT" "<--settings> <{\"availableModels\":[\"frontier\",\"balanced\",\"fast\",\"light\"]}>" "Claude receives the canonical four-role allowlist"
 assert_contains "$OUTPUT" "<--append-system-prompt-file> <$CONFIG_HOME/agents/universal_context.md>" "Claude receives universal context as a system-prompt file"
 assert_contains "$OUTPUT" "<--resume> <session id> <--flag=two words>" "safe launch preserves Claude arguments"
 
@@ -248,15 +275,43 @@ assert_contains "$OUTPUT" "<--allow-unix-socket> <$FIXTURE_ROOT/tea.sock>" "Tea 
 OUTPUT="$(run_ax pi --direct --session 'path with spaces')"
 assert_contains "$OUTPUT" "agent=pi" "direct launch resolves the real Pi binary without shim recursion"
 assert_contains "$OUTPUT" "pi_agent_dir=$HOME_DIR/.pi/agent" "Pi uses its documented global agent directory"
-assert_contains "$OUTPUT" "arg[0]=<--append-system-prompt>" "Pi receives universal context through its system-prompt flag"
-assert_contains "$OUTPUT" "arg[1]=<$CONFIG_HOME/agents/universal_context.md>" "Pi receives the universal context file path"
+assert_contains "$OUTPUT" "arg[0]=<--model>" "Pi receives an explicit maximum-reasoning default"
+assert_contains "$OUTPUT" "arg[1]=<cliproxy/balanced(xhigh)>" "Pi's canonical default uses the registry reasoning policy"
+assert_contains "$OUTPUT" "arg[2]=<--append-system-prompt>" "Pi receives universal context through its system-prompt flag"
+assert_contains "$OUTPUT" "arg[3]=<$CONFIG_HOME/agents/universal_context.md>" "Pi receives the universal context file path"
 if [[ -d "$HOME_DIR/.pi/agent/sessions" ]]; then
   pass "Pi session root exists before the sandbox starts"
 else
   fail "Pi session root exists before the sandbox starts" "missing: $HOME_DIR/.pi/agent/sessions"
 fi
-assert_contains "$OUTPUT" "arg[2]=<--session>" "direct launch preserves the session flag"
-assert_contains "$OUTPUT" "arg[3]=<path with spaces>" "direct launch preserves a spaced session identifier"
+if [[ -f "$HOME_DIR/.pi/agent/models.json" ]] && jq -e '.providers.cliproxy.models[] | select(.id == "gpt-5.6-sol(xhigh)")' "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
+  pass "Pi live catalog includes real Codex model names with maximum reasoning"
+else
+  fail "Pi live catalog includes real Codex model names with maximum reasoning" "missing generated Codex model"
+fi
+if jq -e '.providers.cliproxy.models[] | select(.id == "future-model(preview)(xhigh)")' \
+  "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
+  pass "Pi preserves parenthetical live IDs when adding a recognized reasoning suffix"
+else
+  fail "Pi preserves parenthetical live IDs when adding a recognized reasoning suffix" "missing parenthetical model"
+fi
+if jq -e '
+  .providers.cliproxy.models[] |
+  select(.id == "experimental/model(max)") |
+  (has("contextWindow") or has("maxTokens") or has("input")) | not
+' "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
+  pass "Pi live discovery leaves unknown capability metadata to client defaults"
+else
+  fail "Pi live discovery leaves unknown capability metadata to client defaults" "live model contains guessed metadata"
+fi
+if jq -e 'all(.providers.cliproxy.models[]; .id != "unrelated-anthropic-model")' \
+  "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
+  pass "Pi live discovery filters models outside Codex and Antigravity ownership"
+else
+  fail "Pi live discovery filters models outside Codex and Antigravity ownership" "unrelated model was injected"
+fi
+assert_contains "$OUTPUT" "arg[4]=<--session>" "direct launch preserves the session flag"
+assert_contains "$OUTPUT" "arg[5]=<path with spaces>" "direct launch preserves a spaced session identifier"
 
 set +e
 OUTPUT="$(run_ax claude direct 2>&1)"
@@ -267,7 +322,38 @@ assert_contains "$OUTPUT" "<direct>" "sandbox bypass requires the explicit --dir
 
 OUTPUT="$(AX_MODEL=frontier run_ax opencode)"
 assert_contains "$OUTPUT" "<run> <--profile> <default-opencode>" "OpenCode selects its agent-specific profile"
-assert_contains "$OUTPUT" "<--model> <cliproxy/frontier>" "OpenCode receives an explicit canonical role override"
+assert_contains "$OUTPUT" "<--model> <cliproxy/frontier(xhigh)>" "OpenCode applies the canonical role's maximum reasoning policy"
+assert_contains "$OUTPUT" "opencode_live_model=true" "OpenCode receives live proxy models through an ephemeral config merge"
+
+OUTPUT="$(AX_MODEL=gpt-5.6-sol run_ax opencode)"
+assert_contains "$OUTPUT" "<--model> <cliproxy/gpt-5.6-sol(xhigh)>" "OpenCode accepts a live Codex model by its real name at maximum reasoning"
+
+OUTPUT="$(AX_MODEL='future-model(preview)' run_ax opencode)"
+assert_contains "$OUTPUT" "<--model> <cliproxy/future-model(preview)(xhigh)>" "OpenCode preserves parenthetical live IDs when adding reasoning"
+assert_contains "$OUTPUT" "opencode_parenthetical_model=true" "OpenCode synchronizes the suffixed parenthetical live ID"
+
+OUTPUT="$(AX_MODEL=gemini-3.6-flash-high run_ax pi)"
+assert_contains "$OUTPUT" "<--model> <cliproxy/gemini-3.6-flash-high(max)>" "Pi accepts a live Antigravity model by its real name at maximum thinking"
+
+OUTPUT="$(run_ax pi --direct)"
+assert_contains "$OUTPUT" "arg[1]=<cliproxy/balanced(xhigh)>" "Pi defaults also receive maximum reasoning"
+
+OUTPUT="$(AX_MODEL=fast run_ax claude --direct)"
+assert_contains "$OUTPUT" "arg[0]=<--model>" "Claude accepts the canonical fast role override"
+assert_contains "$OUTPUT" "arg[1]=<fast>" "Claude passes the fast role to Claude Code"
+
+set +e
+OUTPUT="$(AX_MODEL=gpt-5.6-luna run_ax claude --direct 2>&1)"
+STATUS=$?
+set -e
+assert_status 64 "$STATUS" "Claude rejects catalog models outside its canonical allowlist"
+assert_contains "$OUTPUT" "Claude model must be one of" "Claude's restricted-model error names the allowlist"
+
+set +e
+OUTPUT="$(AX_MODEL='raw:experimental/model' run_ax claude --direct 2>&1)"
+STATUS=$?
+set -e
+assert_status 64 "$STATUS" "Claude rejects the raw-model escape hatch"
 
 OUTPUT="$(AX_MODEL='raw:experimental/model' run_ax pi --resume 'native id')"
 assert_contains "$OUTPUT" "<--model> <cliproxy/experimental/model>" "Pi receives an explicit raw-model override"
@@ -275,7 +361,40 @@ assert_contains "$OUTPUT" "<--resume> <native id>" "raw-model selection preserve
 
 OUTPUT="$(AX_MODEL='raw:experimental/model' run_ax crush --direct --continue)"
 assert_contains "$OUTPUT" "crush_model=experimental/model" "Crush receives an explicit raw-model override"
+assert_contains "$OUTPUT" "crush_discovery=true" "Crush enables native live model discovery"
 assert_contains "$OUTPUT" "arg[0]=<--continue>" "raw-model selection preserves Crush continue arguments"
+
+OUTPUT="$(AX_MODEL='experimental/model' run_ax crush --direct)"
+assert_contains "$OUTPUT" "crush_model=experimental/model(max)" "Crush applies Antigravity maximum reasoning to live models"
+
+set +e
+OUTPUT="$(AX_MODEL='gpt-5.6-sol(garbage)' run_ax pi --direct 2>&1)"
+STATUS=$?
+set -e
+assert_status 64 "$STATUS" "malformed reasoning suffixes are not accepted through a matching base model"
+
+jq '.providers.user = {"baseUrl":"https://example.invalid/v1","models":[]}' \
+  "$HOME_DIR/.pi/agent/models.json" >"$FIXTURE_ROOT/pi-models-with-user.json"
+mv "$FIXTURE_ROOT/pi-models-with-user.json" "$HOME_DIR/.pi/agent/models.json"
+OUTPUT="$(run_ax pi --direct)"
+if jq -e '.providers.user.baseUrl == "https://example.invalid/v1"' \
+  "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
+  pass "PI model sync preserves unrelated user providers"
+else
+  fail "PI model sync preserves unrelated user providers" "user provider was overwritten"
+fi
+
+PI_MODELS_BEFORE="$(shasum -a 256 "$HOME_DIR/.pi/agent/models.json" | awk '{print $1}')"
+CURL_COUNT_FILE="$FIXTURE_ROOT/curl-count"
+printf '0\n' >"$CURL_COUNT_FILE"
+OUTPUT="$(AX_TEST_CURL_COUNT_FILE="$CURL_COUNT_FILE" AX_TEST_MALFORMED_SYNC=1 run_ax pi --direct 2>&1)"
+PI_MODELS_AFTER="$(shasum -a 256 "$HOME_DIR/.pi/agent/models.json" | awk '{print $1}')"
+assert_contains "$OUTPUT" "PI model sync skipped" "malformed live JSON produces an actionable PI sync warning"
+if [[ "$PI_MODELS_BEFORE" == "$PI_MODELS_AFTER" ]]; then
+  pass "malformed live JSON preserves PI's existing models file atomically"
+else
+  fail "malformed live JSON preserves PI's existing models file atomically" "models.json changed"
+fi
 
 set +e
 OUTPUT="$(AX_MODEL=missing run_ax crush 2>&1)"
@@ -302,6 +421,25 @@ fi
 
 OUTPUT="$(run_ax models live)"
 assert_contains "$OUTPUT" "frontier" "models live reads the proxy catalog"
+assert_contains "$OUTPUT" "gpt-5.6-luna" "models live includes original non-role model IDs"
+
+OUTPUT="$(run_ax models sync)"
+assert_contains "$OUTPUT" "models: valid" "models sync validates before rendering"
+assert_contains "$OUTPUT" "chezmoi-apply=$CONFIG_HOME/ax/models.json" "models sync applies the managed client configurations"
+
+set +e
+OUTPUT="$(AX_TEST_EMPTY_MODELS=1 run_ax models live 2>&1)"
+STATUS=$?
+set -e
+assert_status 69 "$STATUS" "models live fails when no provider models are available"
+assert_contains "$OUTPUT" "no models are advertised" "empty live catalog points to provider authentication"
+
+set +e
+OUTPUT="$(AX_TEST_UNMANAGED_MODELS=1 run_ax models live 2>&1)"
+STATUS=$?
+set -e
+assert_status 69 "$STATUS" "models live fails when proxy aliases drift from the managed catalog"
+assert_contains "$OUTPUT" "none match the managed catalog" "unmanaged live catalog points to alias synchronization"
 
 OUTPUT="$(run_ax doctor)"
 assert_contains "$OUTPUT" "proxy: ready" "doctor reports proxy readiness"
@@ -347,8 +485,9 @@ else
   fail "Codex OAuth writes a provider credential" "missing Codex credential fixture"
 fi
 
-OUTPUT="$(AX_PLATFORM=Linux run_ax auth setup)"
-assert_contains "$OUTPUT" "managed by the Compose sidecar" "remote auth setup preserves the Compose-managed client key"
+OUTPUT="$(AX_PLATFORM=Linux run_ax auth setup codex)"
+assert_contains "$OUTPUT" "docker exec -it" "remote auth setup prints the Docker-host login command"
+assert_contains "$OUTPUT" "-codex-login" "remote auth setup names the requested provider login flag"
 
 mv "$CONFIG_HOME/cli-proxy-api/antigravity-test.json" "$FIXTURE_ROOT/antigravity-test.json"
 printf '{}\n' >"$CONFIG_HOME/cli-proxy-api/codex-stale.json"
@@ -378,7 +517,7 @@ for agent in claude pi opencode crush; do
 done
 
 INVALID_REGISTRY="$FIXTURE_ROOT/invalid-models.json"
-jq '.roles.fast.target = .roles.balanced.target' "$CONFIG_HOME/ax/models.json" >"$INVALID_REGISTRY"
+jq '.roles.frontier.target = .roles.balanced.target' "$CONFIG_HOME/ax/models.json" >"$INVALID_REGISTRY"
 set +e
 OUTPUT="$(AX_REGISTRY_PATH="$INVALID_REGISTRY" run_ax models validate 2>&1)"
 STATUS=$?
@@ -399,6 +538,20 @@ STATUS=$?
 set -e
 assert_status 78 "$STATUS" "registry validation rejects incomplete capability metadata"
 
+jq '.roles.light.reasoningSuffix = "ultra"' "$CONFIG_HOME/ax/models.json" >"$INVALID_REGISTRY"
+set +e
+OUTPUT="$(AX_REGISTRY_PATH="$INVALID_REGISTRY" run_ax models validate 2>&1)"
+STATUS=$?
+set -e
+assert_status 78 "$STATUS" "registry validation rejects unsupported reasoning suffixes"
+
+jq '.catalog["gpt-5.6-luna"].provider = "unknown-provider"' "$CONFIG_HOME/ax/models.json" >"$INVALID_REGISTRY"
+set +e
+OUTPUT="$(AX_REGISTRY_PATH="$INVALID_REGISTRY" run_ax models validate 2>&1)"
+STATUS=$?
+set -e
+assert_status 78 "$STATUS" "registry validation rejects unknown catalog providers"
+
 jq '.alternatives.balanced[0].provider = "unknown-provider"' "$CONFIG_HOME/ax/models.json" >"$INVALID_REGISTRY"
 set +e
 OUTPUT="$(AX_REGISTRY_PATH="$INVALID_REGISTRY" run_ax models validate 2>&1)"
@@ -412,6 +565,24 @@ OUTPUT="$(AX_REGISTRY_PATH="$INVALID_REGISTRY" run_ax models validate 2>&1)"
 STATUS=$?
 set -e
 assert_status 78 "$STATUS" "registry validation rejects duplicate aliases"
+
+jq '.catalog["gpt-5.6-luna"].provider = .roles.frontier.provider | .catalog["gpt-5.6-luna"].target = .roles.frontier.target' "$CONFIG_HOME/ax/models.json" >"$INVALID_REGISTRY"
+set +e
+OUTPUT="$(AX_REGISTRY_PATH="$INVALID_REGISTRY" run_ax models validate 2>&1)"
+STATUS=$?
+set -e
+assert_status 78 "$STATUS" "registry validation rejects duplicate targets across roles and catalog"
+
+jq '
+  .catalog["upstream-frontier"] =
+    (.catalog["gpt-5.6-luna"] | .alias = "upstream-frontier") |
+  del(.catalog["gpt-5.6-luna"])
+' "$CONFIG_HOME/ax/models.json" >"$INVALID_REGISTRY"
+set +e
+OUTPUT="$(AX_REGISTRY_PATH="$INVALID_REGISTRY" run_ax models validate 2>&1)"
+STATUS=$?
+set -e
+assert_status 78 "$STATUS" "registry validation rejects alias-to-target ID collisions"
 
 MIXED_REGISTRY="$FIXTURE_ROOT/mixed-provider-models.json"
 jq '
@@ -457,14 +628,30 @@ if command -v chezmoi >/dev/null 2>&1; then
   fi
   assert_contains "$(cat "$RENDER_ROOT/proxy.yaml")" 'host: "127.0.0.1"' "CLIProxyAPI binds only to IPv4 loopback"
   assert_contains "$(cat "$RENDER_ROOT/proxy.yaml")" 'codex:' "CLIProxyAPI renders Codex aliases alongside Antigravity aliases"
-  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"model": "cliproxy/balanced"' "OpenCode receives the canonical balanced default"
+  assert_contains "$(cat "$RENDER_ROOT/proxy.yaml")" 'fork: true' "CLIProxyAPI preserves real upstream model names alongside canonical aliases"
+  PROXY_JSON="$(ruby -ryaml -rjson -e 'print JSON.generate(YAML.safe_load(File.read(ARGV[0]), aliases: false))' "$RENDER_ROOT/proxy.yaml")"
+  if jq -e '
+    [."oauth-model-alias"[] | .[]] as $aliases |
+    ($aliases | length == 4) and
+    ([$aliases[].alias] | sort == ["balanced", "fast", "frontier", "light"]) and
+    all($aliases[]; .fork == true and ."force-mapping" == true) and
+    ([$aliases[] | select(.name == .alias)] | length == 0)
+  ' <<<"$PROXY_JSON" >/dev/null; then
+    pass "CLIProxyAPI renders four non-conflicting forked role aliases"
+  else
+    fail "CLIProxyAPI renders four non-conflicting forked role aliases" "$PROXY_JSON"
+  fi
+  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"model": "cliproxy/frontier"' "OpenCode receives the canonical frontier default"
+  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"gpt-5.6-luna": {' "OpenCode receives original model IDs in the broader catalog"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"small_model": "cliproxy/light"' "OpenCode keeps background tasks on the canonical light model"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"npm": "@ai-sdk/openai-compatible"' "OpenCode uses the proxy's Chat Completions protocol"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '/.config/agents/universal_context.md"' "OpenCode loads the universal context as an instruction file"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"extensions": [".go"]' "OpenCode maps Go files to gopls"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"extensions": [".ts",".tsx",".js",".jsx",".mjs",".cjs",".mts",".cts"]' "OpenCode maps JavaScript and TypeScript files to vtsls"
-  assert_contains "$(cat "$RENDER_ROOT/pi-settings.json")" '"defaultModel": "balanced"' "Pi receives the canonical balanced default"
+  assert_contains "$(cat "$RENDER_ROOT/pi-settings.json")" '"defaultModel": "fast"' "Pi receives the canonical fast default"
+  assert_contains "$(cat "$RENDER_ROOT/pi-settings.json")" '"cliproxy/gpt-5.6-luna"' "Pi enables original model IDs in the broader catalog"
   assert_contains "$(cat "$RENDER_ROOT/crush.json")" '"model": "balanced"' "Crush receives the canonical balanced default"
+  assert_contains "$(cat "$RENDER_ROOT/crush.json")" '"id": "gpt-5.6-luna"' "Crush receives original model IDs in the broader catalog"
   assert_contains "$(cat "$RENDER_ROOT/crush.json")" '/.config/agents/universal_context.md"' "Crush loads the universal context through context_paths"
   assert_contains "$(cat "$RENDER_ROOT/claude-mcp.json")" '"@upstash/context7-mcp@2.1.1"' "local Claude MCP uses the supported Context7 server"
   assert_contains "$(cat "$RENDER_ROOT/zed.json")" '"host": "hermes-dev"' "Zed renders the remote development SSH alias"
@@ -561,11 +748,32 @@ if command -v nono >/dev/null 2>&1; then
     fail "shared Cargo grants avoid Linux credential overlap" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-agent.json")"
   fi
   if jq -e '
-    any(.filesystem.read[]; type == "object" and .path == "/usr/share/locale/locale.alias" and .when == "linux")
+    any(.filesystem.read_file[]; type == "object" and .path == "/usr/share/locale/locale.alias" and .when == "linux") and
+    any(.filesystem.read[]; type == "object" and .path == "/sys/fs/cgroup" and .when == "linux") and
+    any(.filesystem.read[]; type == "object" and .path == "/sys/devices/system/cpu" and .when == "linux") and
+    any(.filesystem.read_file[]; type == "object" and .path == "/sys/kernel/mm/transparent_hugepage/enabled" and .when == "linux") and
+    any(.filesystem.read_file[]; type == "object" and .path == "/sys/kernel/mm/transparent_hugepage/hpage_pmd_size" and .when == "linux") and
+    any(.filesystem.read_file[]; type == "object" and .path == "/proc/sys/vm/mmap_min_addr" and .when == "linux") and
+    any(.filesystem.read_file[]; type == "object" and .path == "/proc/sys/vm/overcommit_memory" and .when == "linux") and
+    any(.filesystem.read_file[]; type == "object" and .path == "/proc/version_signature" and .when == "linux") and
+    any(.filesystem.read_file[]; type == "object" and .path == "/etc/passwd" and .when == "linux") and
+    (all(.filesystem.read[]; if type == "object" then .path != "/proc" else . != "/proc" end))
   ' "$REPO_ROOT/dot_config/nono/profiles/default-agent.json" >/dev/null; then
-    pass "Linux agents can read the system locale alias"
+    pass "Linux agents receive narrow runtime metadata grants without broad procfs access"
   else
-    fail "Linux agents can read the system locale alias" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-agent.json")"
+    fail "Linux agents receive narrow runtime metadata grants without broad procfs access" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-agent.json")"
+  fi
+  if jq -e '
+    any(.filesystem.suppress_save_prompt[]; type == "object" and .path == "/" and .when == "linux") and
+    any(.filesystem.suppress_save_prompt[]; type == "object" and .path == "/home" and .when == "linux") and
+    any(.filesystem.suppress_save_prompt[]; type == "object" and .path == "$HOME" and .when == "linux")
+  ' "$REPO_ROOT/dot_config/nono/profiles/default-opencode.json" >/dev/null &&
+    jq -e '
+      any(.filesystem.suppress_save_prompt[]; type == "object" and .path == "/proc" and .when == "linux")
+    ' "$REPO_ROOT/dot_config/nono/profiles/default-crush.json" >/dev/null; then
+    pass "known client metadata probes cannot trigger unsafe grant-save prompts"
+  else
+    fail "known client metadata probes cannot trigger unsafe grant-save prompts" "missing suppress_save_prompt entries"
   fi
   if REPO_ROOT="$REPO_ROOT" python3 - <<'PY'
 import json

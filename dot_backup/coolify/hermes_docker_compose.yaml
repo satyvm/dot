@@ -34,21 +34,26 @@ services:
         ws-auth: true
         oauth-model-alias:
           antigravity:
-            - name: "claude-opus-4-6-thinking"
-              alias: "frontier"
-              display-name: "Frontier"
-              force-mapping: true
             - name: "gemini-3.6-flash-high"
-              alias: "balanced"
-              display-name: "Balanced"
-              force-mapping: true
-            - name: "gemini-3.5-flash-low"
               alias: "fast"
               display-name: "Fast"
+              fork: true
               force-mapping: true
-            - name: "gemini-3.5-flash-extra-low"
+          codex:
+            - name: "gpt-5.6-sol"
+              alias: "frontier"
+              display-name: "Frontier"
+              fork: true
+              force-mapping: true
+            - name: "gpt-5.6-terra"
+              alias: "balanced"
+              display-name: "Balanced"
+              fork: true
+              force-mapping: true
+            - name: "gpt-5.4-mini"
               alias: "light"
               display-name: "Light"
+              fork: true
               force-mapping: true
         EOF
         chmod 0600 /config/config.yaml /secrets/client-key

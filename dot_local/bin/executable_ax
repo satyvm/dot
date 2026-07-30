@@ -5,6 +5,7 @@ readonly AX_EXIT_USAGE=64
 readonly AX_EXIT_UNAVAILABLE=69
 readonly AX_EXIT_CONFIG=78
 readonly AX_REQUIRED_ROLES='["frontier","balanced","fast","light"]'
+readonly AX_CLAUDE_MODELS='["frontier","balanced","fast","light"]'
 readonly AX_REQUIRED_AGENTS='["claude","pi","opencode","crush"]'
 
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -66,23 +67,56 @@ validate_models() {
         (.contextWindow | type == "number" and . > 0) and
         (.maxTokens | type == "number" and . > 0) and
         (.reasoning | type == "boolean") and
+        (if .reasoning then
+          (.reasoningSuffix | type == "string" and IN("xhigh", "max"))
+        else
+          ((.reasoningSuffix // "") == "")
+        end) and
         (.input | type == "array" and length > 0 and all(.[]; . == "text" or . == "image"));
+      def valid_provider:
+        IN("vertex", "aistudio", "antigravity", "claude", "codex", "kimi", "xai");
+      def exposed_ids:
+        . as $entry |
+        ($entry.value.reasoningSuffix // "") as $suffix |
+        (([$entry.key, $entry.value.alias, $entry.value.target] +
+          (if $suffix != "" then
+            [
+              ($entry.key + "(" + $suffix + ")"),
+              ($entry.value.alias + "(" + $suffix + ")"),
+              ($entry.value.target + "(" + $suffix + ")")
+            ]
+          else [] end)) | unique[]) as $id |
+        {
+          id: $id,
+          mapping: ([$entry.value.provider, $entry.value.target] | join(":"))
+        };
       (.version | type == "number") and
       (.proxy.url | nonempty_string) and
-      (.proxy.channel | IN("vertex", "aistudio", "antigravity", "claude", "codex", "kimi", "xai")) and
+      (.proxy.channel | valid_provider) and
       ((.roles | keys | sort) == ($required_roles | sort)) and
       (all(.roles | to_entries[]; .key == .value.alias)) and
       (([.roles[].alias] | unique | length) == (.roles | length)) and
-      (all(.roles[]; valid_metadata and (.provider | IN("vertex", "aistudio", "antigravity", "claude", "codex", "kimi", "xai")))) and
+      (all(.roles[]; valid_metadata and (.provider | valid_provider))) and
       (([.roles[] | [.provider, .target] | join(":")] | unique | length) == (.roles | length)) and
+      (.catalog | type == "object") and
+      (all(.catalog | to_entries[]; .key == .value.alias)) and
+      (all(.catalog[]; valid_metadata and (.provider | valid_provider))) and
+      (([.catalog[] | [.provider, .target] | join(":")] | unique | length) == (.catalog | length)) and
+      (([.roles[], .catalog[]] | map([.provider, .target] | join(":")) | unique | length) == ((.roles | length) + (.catalog | length))) and
+      (([.roles[].alias, .catalog[].alias] | unique | length) == ((.roles | length) + (.catalog | length))) and
+      ([((.roles + .catalog) | to_entries[]) | exposed_ids] |
+        group_by(.id) |
+        all(.[]; ([.[].mapping] | unique | length) == 1)) and
       ((.agents | keys | sort) == ($required_agents | sort)) and
       (all(.agents[]; ((.defaultRole as $role | $required_roles | index($role)) != null) and (.profile | nonempty_string))) and
       (all(.classes[]?[]?; . as $role | $required_roles | index($role) != null)) and
       (.classes.claude.normal == .agents.claude.defaultRole) and
+      ((.classes.claude | keys | sort) == (["fast", "large", "normal", "small"] | sort)) and
+      (all(.classes.claude[]; . as $role | $required_roles | index($role) != null)) and
       (.classes.crush.large == .agents.crush.defaultRole) and
       (all(.alternatives | keys[]; . as $role | $required_roles | index($role) != null)) and
       (all(.alternatives[]?[]?;
-        (.provider | IN("vertex", "aistudio", "antigravity", "claude", "codex", "kimi", "xai")) and
+        (.provider | valid_provider) and
         (.target | nonempty_string))) and
       (.minimumVersions | type == "object") and
       (all(.minimumVersions[]; nonempty_string))
@@ -180,10 +214,27 @@ proxy_ready() {
 
 proxy_has_model() {
   local base_url="$1" model_id="$2"
+  local base_name=""
+  if [[ "$model_id" =~ ^(.+)\((minimal|low|medium|high|xhigh|max)\)$ ]]; then
+    base_name="${BASH_REMATCH[1]}"
+  fi
   curl --silent --fail --max-time 2 \
     -H "Authorization: Bearer $proxy_key" \
     "$base_url/v1/models" |
-    jq -e --arg model_id "$model_id" 'any(.data[]?; .id == $model_id)' >/dev/null 2>&1
+    jq -e --arg model_id "$model_id" --arg base_name "$base_name" \
+      'any(.data[]?; .id == $model_id or ($base_name != "" and .id == $base_name))' >/dev/null 2>&1
+}
+
+proxy_model_owner() {
+  local base_url="$1" model_id="$2"
+  if [[ "$model_id" =~ ^(.+)\((minimal|low|medium|high|xhigh|max)\)$ ]]; then
+    model_id="${BASH_REMATCH[1]}"
+  fi
+  curl --silent --fail --max-time 2 \
+    -H "Authorization: Bearer $proxy_key" \
+    "$base_url/v1/models" |
+    jq -r --arg model_id "$model_id" \
+      'first(.data[]? | select(.id == $model_id) | .owned_by) // ""' 2>/dev/null
 }
 
 ensure_proxy() {
@@ -215,13 +266,30 @@ ensure_proxy() {
 
 models_live() {
   load_models
-  local base_url
+  local base_url response
   base_url="$(proxy_url)"
   ensure_proxy
-  curl --silent --fail --max-time 2 \
+  response="$(curl --silent --fail --max-time 2 \
     -H "Authorization: Bearer $proxy_key" \
-    "$base_url/v1/models" |
-    jq -r '.data[] | "\(.id)\t\(.owned_by // "unknown")"'
+    "$base_url/v1/models")"
+  if ! jq -e '.data | type == "array" and length > 0' <<<"$response" >/dev/null; then
+    die "$AX_EXIT_UNAVAILABLE" "no models are advertised by CLIProxyAPI; authenticate at least one provider channel"
+  fi
+  local managed_response
+  managed_response="$(jq -r --slurpfile registry "$models_file" '
+    ([($registry[0].roles + $registry[0].catalog) | to_entries[] |
+      (.key, .value.target)] | unique) as $managed |
+    .data[] |
+    select(
+      (.id | type == "string" and length > 0) and
+      (.id as $id | (($managed | index($id)) != null) or
+        (.owned_by == "antigravity" or .owned_by == "openai" or .owned_by == "codex"))
+    ) |
+    "\([.id, (.owned_by // "unknown")] | join("\t"))"
+  ' <<<"$response")"
+  [[ -n "$managed_response" ]] ||
+    die "$AX_EXIT_UNAVAILABLE" "CLIProxyAPI advertises models, but none match the managed catalog; synchronize proxy aliases"
+  printf '%s\n' "$managed_response"
 }
 
 models_edit() {
@@ -282,11 +350,23 @@ ensure_management_key_hash() {
 }
 
 auth_setup() {
+  local channel="${1:-}"
   if [[ "${AX_PLATFORM:-$(uname -s)}" != "Darwin" ]]; then
     read_proxy_key ||
       die "$AX_EXIT_CONFIG" "remote proxy client key is missing; redeploy hermes-dev with CLIPROXY_CLIENT_KEY configured"
-    printf 'Remote CLIProxyAPI authentication is managed by the Compose sidecar.\n'
-    printf 'Client key: configured\n'
+    channel="${channel:-antigravity}"
+    local login_flag
+    case "$channel" in
+      antigravity) login_flag="-antigravity-login" ;;
+      claude) login_flag="-claude-login" ;;
+      codex) login_flag="-codex-login" ;;
+      kimi) login_flag="-kimi-login" ;;
+      xai) login_flag="-xai-login" ;;
+      *) die "$AX_EXIT_CONFIG" "CLIProxyAPI has no interactive login flow configured for channel: $channel" ;;
+    esac
+    printf 'Run this on the Docker host, then complete the OAuth callback flow:\n'
+    printf '%s\n' "proxy_id=\$(docker ps -qf 'name=cliproxyapi-')"
+    printf '%s %s\n' "docker exec -it \"\$proxy_id\" /CLIProxyAPI/CLIProxyAPI -config /config/config.yaml -no-browser" "$login_flag"
     return 0
   fi
 
@@ -301,8 +381,8 @@ auth_setup() {
   chezmoi apply "$config_home/cli-proxy-api/config.yaml"
 
   load_models
-  local channel login_flag
-  channel="${1:-$(jq -r '.proxy.channel' "$models_file")}" 
+  local login_flag
+  channel="${channel:-$(jq -r '.proxy.channel' "$models_file")}"
   case "$channel" in
     antigravity) login_flag="-antigravity-login" ;;
     claude) login_flag="-claude-login" ;;
@@ -524,6 +604,184 @@ resolve_agent_binary() {
     die "$AX_EXIT_UNAVAILABLE" "real agent binary not found outside managed shims: $agent"
 }
 
+sync_pi_models() {
+  local base_url="$1" dir="$2"
+  local target_file="$dir/models.json"
+  mkdir -p "$dir"
+  local live_json current_json="{}" temporary
+  if ! live_json="$(curl --silent --fail --max-time 2 \
+    -H "Authorization: Bearer $proxy_key" "$base_url/v1/models" 2>/dev/null)" ||
+    ! jq -e '
+      .data | type == "array" and
+      all(.[]; (.id | type == "string" and length > 0) and
+        ((.owned_by // "") | type == "string"))
+    ' <<<"$live_json" >/dev/null 2>&1; then
+    printf 'ax: warning: PI model sync skipped because CLIProxyAPI returned an invalid catalog\n' >&2
+    return 0
+  fi
+  if [[ -e "$target_file" ]]; then
+    if ! current_json="$(jq -ce 'select(type == "object")' "$target_file" 2>/dev/null)"; then
+      printf 'ax: warning: PI model sync preserved invalid existing config: %s\n' "$target_file" >&2
+      return 0
+    fi
+  fi
+  temporary="$(mktemp "$dir/.models.json.ax.XXXXXX")"
+  if jq -n --slurpfile registry "$models_file" \
+    --argjson live "$live_json" --argjson current "$current_json" --arg base_url "$base_url" '
+    (($registry[0].roles + $registry[0].catalog) as $rawModels |
+     reduce ($rawModels | keys[]) as $key ({};
+       .[$key] = $rawModels[$key] |
+       (if $rawModels[$key].target then .[$rawModels[$key].target] = $rawModels[$key] else . end) |
+       (if (($rawModels[$key].reasoningSuffix // "") | length) > 0 then
+         ("(" + $rawModels[$key].reasoningSuffix + ")") as $suffix |
+         .[$key + $suffix] = $rawModels[$key] |
+         (if $rawModels[$key].target then .[$rawModels[$key].target + $suffix] = $rawModels[$key] else . end)
+       else . end)
+     )
+    ) as $baseDict |
+    ([($registry[0].roles + $registry[0].catalog) | to_entries[] |
+      (.key, .value.target)] | unique) as $managedIDs |
+    (reduce (($live.data // [])[] | select(
+      .id as $id |
+      (($managedIDs | index($id)) != null) or
+      (.owned_by == "antigravity" or .owned_by == "openai" or .owned_by == "codex")
+    )) as $m ($baseDict;
+      . as $curr |
+      ($m.id) as $id |
+      ($curr[$id] // {"displayName": $id, "reasoning": true}) as $item |
+      (if ($id | test("\\((minimal|low|medium|high|xhigh|max)\\)$") | not) and ($item.reasoning // true) then
+        (if ($m.owned_by == "antigravity" or ($id | startswith("gemini-")) or ($id | startswith("claude-")) or ($id | startswith("gpt-oss-"))) then "(max)" else "(xhigh)" end) as $suffix |
+        .[$id] = $item | .[$id + $suffix] = ($item + {"displayName": (($item.displayName // $id) + " " + $suffix)})
+      else
+        .[$id] = $item
+      end)
+    )) as $expanded |
+    $current + {
+      "providers": (($current.providers // {}) + {
+        "cliproxy": {
+          "baseUrl": ($base_url + "/v1"),
+          "api": "openai-completions",
+          "apiKey": "$OPENAI_API_KEY",
+          "compat": {
+            "maxTokensField": "max_tokens"
+          },
+          "models": [
+            $expanded | keys | .[] as $id | ({
+              "id": $id,
+              "name": (($expanded[$id].displayName // $id) + " (" + $id + ")"),
+              "reasoning": ($expanded[$id].reasoning // true)
+            } +
+            (if $expanded[$id].input then {
+              "input": $expanded[$id].input
+            } else {} end) +
+            (if $expanded[$id].contextWindow then {
+              "contextWindow": $expanded[$id].contextWindow
+            } else {} end) +
+            (if $expanded[$id].maxTokens then {
+              "maxTokens": $expanded[$id].maxTokens
+            } else {} end))
+          ]
+        }
+      })
+    }
+  ' >"$temporary" &&
+    jq -e '
+      .providers.cliproxy as $provider |
+      ($provider.baseUrl | type == "string" and length > 0) and
+      ($provider.models | type == "array" and length > 0 and
+        all(.[]; (.id | type == "string" and length > 0) and
+          ((.contextWindow? // 1) | type == "number" and . > 0) and
+          ((.maxTokens? // 1) | type == "number" and . > 0)))
+    ' "$temporary" >/dev/null; then
+    chmod 0600 "$temporary"
+    mv -f "$temporary" "$target_file"
+  else
+    rm -f "$temporary"
+    printf 'ax: warning: PI model sync failed validation; existing config was preserved\n' >&2
+    return 0
+  fi
+}
+
+sync_opencode_models() {
+  local base_url="$1" live_json managed_config current_config="${OPENCODE_CONFIG_CONTENT:-{}}"
+  if ! live_json="$(curl --silent --fail --max-time 2 \
+    -H "Authorization: Bearer $proxy_key" "$base_url/v1/models" 2>/dev/null)" ||
+    ! jq -e '
+      .data | type == "array" and
+      all(.[]; (.id | type == "string" and length > 0) and
+        ((.owned_by // "") | type == "string"))
+    ' <<<"$live_json" >/dev/null 2>&1; then
+    printf 'ax: warning: OpenCode model sync skipped because CLIProxyAPI returned an invalid catalog\n' >&2
+    return 0
+  fi
+  if ! jq -e 'type == "object"' <<<"$current_config" >/dev/null 2>&1; then
+    die "$AX_EXIT_CONFIG" "OPENCODE_CONFIG_CONTENT must contain a JSON object"
+  fi
+  managed_config="$(jq -cn --slurpfile registry "$models_file" --argjson live "$live_json" '
+    (($registry[0].roles + $registry[0].catalog) as $rawModels |
+     reduce ($rawModels | keys[]) as $key ({};
+       .[$key] = $rawModels[$key] |
+       (if $rawModels[$key].target then .[$rawModels[$key].target] = $rawModels[$key] else . end) |
+       (if (($rawModels[$key].reasoningSuffix // "") | length) > 0 then
+         ("(" + $rawModels[$key].reasoningSuffix + ")") as $suffix |
+         .[$key + $suffix] = $rawModels[$key] |
+         (if $rawModels[$key].target then .[$rawModels[$key].target + $suffix] = $rawModels[$key] else . end)
+       else . end)
+     )
+    ) as $baseDict |
+    ([($registry[0].roles + $registry[0].catalog) | to_entries[] |
+      (.key, .value.target)] | unique) as $managedIDs |
+    (reduce (($live.data // [])[] | select(
+      .id as $id |
+      (($managedIDs | index($id)) != null) or
+      (.owned_by == "antigravity" or .owned_by == "openai" or .owned_by == "codex")
+    )) as $m ($baseDict;
+      . as $curr |
+      ($m.id) as $id |
+      ($curr[$id] // {"displayName": $id, "reasoning": true}) as $item |
+      (if ($id | test("\\((minimal|low|medium|high|xhigh|max)\\)$") | not) and ($item.reasoning // true) then
+        (if ($m.owned_by == "antigravity" or ($id | startswith("gemini-")) or ($id | startswith("claude-")) or ($id | startswith("gpt-oss-"))) then "(max)" else "(xhigh)" end) as $suffix |
+        .[$id] = $item | .[$id + $suffix] = $item
+      else
+        .[$id] = $item
+      end)
+    )) as $expanded |
+    {
+      "provider": {
+        "cliproxy": {
+          "models": (
+            $expanded | with_entries(
+              .key as $id |
+              .value as $item |
+              .value = ({
+                "id": $id,
+                "name": (($item.displayName // $id) + " (" + $id + ")"),
+                "reasoning": ($item.reasoning // true)
+              } +
+              (if ($item.contextWindow and $item.maxTokens) then {
+                "limit": {
+                  "context": $item.contextWindow,
+                  "output": $item.maxTokens
+                }
+              } else {} end) +
+              (if $item.input then {
+                "modalities": {
+                  "input": $item.input,
+                  "output": ["text"]
+                }
+              } else {} end))
+            )
+          )
+        }
+      }
+    }
+  ')"
+  export OPENCODE_CONFIG_CONTENT
+  OPENCODE_CONFIG_CONTENT="$(jq -cn \
+    --argjson current "$current_config" --argjson managed "$managed_config" \
+    '$current * $managed')"
+}
+
 configure_environment() {
   local agent="$1" role="$2" model_id="$3" base_url="$4"
   export AX_MODEL_ROLE="$role"
@@ -542,6 +800,15 @@ configure_environment() {
   export OPENAI_MODEL="$model_id"
   if [[ "$agent" == "opencode" ]]; then
     export OPENCODE_EXPERIMENTAL_LSP_TOOL=true
+    mkdir -p \
+      "$HOME/.cache/opencode" \
+      "$HOME/.local/share/opencode/log" \
+      "$HOME/.local/share/opencode/repos" \
+      "$HOME/.local/share/opencode/storage" \
+      "$HOME/.local/share/opencode/worktree" \
+      "$HOME/.local/share/opentui" \
+      "$HOME/.local/state/opencode"
+    sync_opencode_models "$base_url"
   fi
   export ANTHROPIC_MODEL="$model_id"
   export ANTHROPIC_DEFAULT_OPUS_MODEL
@@ -553,8 +820,40 @@ configure_environment() {
   export ANTHROPIC_SMALL_FAST_MODEL
   ANTHROPIC_SMALL_FAST_MODEL="$(jq -r '.classes.claude.small' "$models_file")"
   if [[ "$agent" == "pi" ]]; then
-    export PI_CODING_AGENT_DIR="$HOME/.pi/agent"
+    export PI_CODING_AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
     mkdir -p "$PI_CODING_AGENT_DIR/sessions"
+    sync_pi_models "$base_url" "$PI_CODING_AGENT_DIR"
+  fi
+}
+
+resolve_target_model() {
+  local model_id="$1" agent="$2" role="${3:-}"
+  if [[ "$agent" == "claude" || "$role" == "raw" ]]; then
+    printf '%s\n' "$model_id"
+    return 0
+  fi
+  if [[ "$model_id" =~ ^.+\((minimal|low|medium|high|xhigh|max)\)$ ]]; then
+    printf '%s\n' "$model_id"
+    return 0
+  fi
+
+  local suffix
+  suffix="$(jq -r --arg model "$model_id" '
+    (.roles[$model] // .catalog[$model] // {}) | .reasoningSuffix // ""
+  ' "$models_file")"
+  if [[ -n "$suffix" ]]; then
+    printf '%s(%s)\n' "$model_id" "$suffix"
+    return 0
+  fi
+
+  local owner=""
+  if [[ "$role" == "live" ]]; then
+    owner="$(proxy_model_owner "$(proxy_url)" "$model_id" || true)"
+  fi
+  if [[ "$owner" == "antigravity" || "$model_id" == gemini-* || "$model_id" == claude-* || "$model_id" == gpt-oss-* ]]; then
+    printf '%s(max)\n' "$model_id"
+  else
+    printf '%s(xhigh)\n' "$model_id"
   fi
 }
 
@@ -577,21 +876,34 @@ launch_agent() {
   [[ -n "${AX_MODEL+x}" ]] && model_override=true
   local requested="${AX_MODEL:-$(jq -r --arg agent "$agent" '.agents[$agent].defaultRole' "$models_file")}"
   local role model_id
+  read_proxy_key || die "$AX_EXIT_CONFIG" "proxy client key is missing; run: ax auth setup"
+  local base_url
+  base_url="$(proxy_url)"
+
+  if [[ "$agent" == "claude" ]] &&
+    ! jq -e --arg role "$requested" '.roles[$role]' "$models_file" >/dev/null 2>&1; then
+    die "$AX_EXIT_USAGE" "Claude model must be one of: frontier, balanced, fast, light"
+  fi
+
   if [[ "$requested" == raw:* ]]; then
     role="raw"
     model_id="${requested#raw:}"
     [[ -n "$model_id" ]] || die "$AX_EXIT_USAGE" "raw model override is empty"
-  elif jq -e --arg role "$requested" '.roles[$role]' "$models_file" >/dev/null; then
+  elif jq -e --arg role "$requested" '.roles[$role]' "$models_file" >/dev/null 2>&1; then
     role="$requested"
+    model_id="$requested"
+  elif jq -e --arg model "$requested" '.catalog[$model]' "$models_file" >/dev/null 2>&1; then
+    role="catalog"
+    model_id="$requested"
+  elif proxy_has_model "$base_url" "$requested" 2>/dev/null; then
+    role="live"
     model_id="$requested"
   else
     die "$AX_EXIT_USAGE" "unknown model role: $requested"
   fi
 
-  read_proxy_key || die "$AX_EXIT_CONFIG" "proxy client key is missing; run: ax auth setup"
   ensure_proxy "$model_id"
-  local base_url binary
-  base_url="$(proxy_url)"
+  local binary
   binary="$(resolve_agent_binary "$agent")"
   configure_environment "$agent" "$role" "$model_id" "$base_url"
 
@@ -607,34 +919,29 @@ launch_agent() {
     esac
   fi
   if [[ "$agent" == "claude" ]]; then
-    set -- --settings "{\"availableModels\":$AX_REQUIRED_ROLES}" "$@"
+    set -- --settings "{\"availableModels\":$AX_CLAUDE_MODELS}" "$@"
   fi
-  if [[ "$model_override" == true ]]; then
+  if [[ "$agent" != "claude" || "$model_override" == true ]]; then
+    local target_model
+    target_model="$(resolve_target_model "$model_id" "$agent" "$role")"
     case "$agent" in
       claude)
         set -- --model "$model_id" "$@"
         ;;
       pi)
-        set -- --model "cliproxy/$model_id" "$@"
+        set -- --model "cliproxy/$target_model" "$@"
         ;;
       opencode)
-        set -- --model "cliproxy/$model_id" "$@"
+        set -- --model "cliproxy/$target_model" "$@"
         ;;
       crush)
         local crush_config="$config_home/crush/crush.json"
         [[ -r "$crush_config" ]] || die "$AX_EXIT_CONFIG" "Crush config is missing: $crush_config"
         mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/crush"
         crush_override_file="$(mktemp "${XDG_CACHE_HOME:-$HOME/.cache}/crush/ax-model.XXXXXX.json")"
-        jq --arg model "$model_id" --arg role "$role" '
+        jq --arg model "$target_model" '
           .models.large.model = $model |
-          if $role == "raw" then
-            .providers.cliproxy.models += [{
-              "id": $model,
-              "name": ("Raw: " + $model),
-              "context_window": 200000,
-              "default_max_tokens": 32768
-            }]
-          else . end
+          .providers.cliproxy.discover_models = true
         ' "$crush_config" >"$crush_override_file"
         export CRUSH_GLOBAL_CONFIG="$crush_override_file"
         ;;

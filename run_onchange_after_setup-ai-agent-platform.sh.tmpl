@@ -29,6 +29,7 @@ fi
 {{- if eq .aiMode "remote" }}
 {{- $proxyUrl = "http://cliproxyapi:8317/v1" }}
 {{- end }}
+{{- $managedModels := merge (deepCopy .aiAgentPlatform.roles) (deepCopy .aiAgentPlatform.catalog) }}
 hermes_python="${HERMES_WEBUI_PYTHON:-python3}"
 hermes_config="$HOME/.hermes/config.yaml"
 if command -v hermes >/dev/null 2>&1 && \
@@ -78,25 +79,46 @@ model_config.update({
 model_config.pop("model", None)
 config["model"] = model_config
 config.pop("provider", None)
+config["fallback_providers"] = [
+    {
+        "provider": "custom",
+        "model": "gemini-3-flash-agent",
+        "base_url": proxy_url,
+        "key_env": "OPENAI_API_KEY",
+    },
+    {
+        "provider": "custom",
+        "model": "gpt-5.6-luna",
+        "base_url": proxy_url,
+        "key_env": "OPENAI_API_KEY",
+    },
+]
 
 model_aliases = config.get("model_aliases", {})
 if not isinstance(model_aliases, dict):
     model_aliases = {}
 
-canonical_aliases = {
-    "frontier": "frontier",
-    "balanced": "balanced",
-    "fast": "fast",
-    "light": "light",
-    "claude-opus-4-6-thinking": "claude-opus-4-6-thinking",
-    "gemini-3.6-flash-high": "gemini-3.6-flash-high",
-    "gemini-3.5-flash-high": "gemini-3.5-flash-high",
-    "gemini-3.5-flash-low": "gemini-3.5-flash-low",
-    "gemini-3.5-flash-extra-low": "gemini-3.5-flash-extra-low",
-    "gpt-5.6-sol": "gpt-5.6-sol",
-    "gpt-5.6-terra": "gpt-5.6-terra",
-    "gpt-5.4-mini": "gpt-5.4-mini",
-}
+canonical_aliases = {}
+{{- $rawModels := merge (deepCopy .aiAgentPlatform.roles) (deepCopy .aiAgentPlatform.catalog) }}
+{{- range $key, $model := $rawModels }}
+{{- if $model.reasoningSuffix }}
+{{- $suffix := printf "(%s)" $model.reasoningSuffix }}
+canonical_aliases[{{ $key | quote }}] = {{ (printf "%s%s" $key $suffix) | quote }}
+{{- if and $model.target (ne $model.target $key) }}
+canonical_aliases[{{ $model.target | quote }}] = {{ (printf "%s%s" $model.target $suffix) | quote }}
+{{- end }}
+{{- else }}
+canonical_aliases[{{ $key | quote }}] = {{ $key | quote }}
+{{- if and $model.target (ne $model.target $key) }}
+canonical_aliases[{{ $model.target | quote }}] = {{ $model.target | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
+managed_aliases = set(canonical_aliases)
+for alias_key in list(model_aliases):
+    entry = model_aliases.get(alias_key)
+    if isinstance(entry, dict) and entry.get("provider") == provider_id and alias_key not in managed_aliases:
+        del model_aliases[alias_key]
 for alias_key, model_name in canonical_aliases.items():
     model_aliases[alias_key] = {
         "model": model_name,
@@ -128,6 +150,28 @@ custom_cfg.update({
     "base_url": proxy_url,
     "key_env": "OPENAI_API_KEY",
     "api_mode": "chat_completions",
+    "discover_models": True,
+    "models": {
+{{- $rawModels := merge (deepCopy .aiAgentPlatform.roles) (deepCopy .aiAgentPlatform.catalog) -}}
+{{- $expanded := dict -}}
+{{- range $key, $model := $rawModels -}}
+  {{- $_ := set $expanded $key $model -}}
+  {{- if $model.target -}}
+    {{- $_ := set $expanded $model.target $model -}}
+  {{- end -}}
+  {{- if $model.reasoningSuffix -}}
+    {{- $suffix := printf "(%s)" $model.reasoningSuffix -}}
+    {{- $_ := set $expanded (printf "%s%s" $key $suffix) $model -}}
+    {{- if $model.target -}}
+      {{- $_ := set $expanded (printf "%s%s" $model.target $suffix) $model -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- range $modelID := keys $expanded | sortAlpha }}
+{{- $model := index $expanded $modelID }}
+        {{ $modelID | quote }}: {"context_length": {{ $model.contextWindow }}},
+{{- end }}
+    },
 })
 custom_cfg.pop("api_base", None)
 custom_cfg.pop("api_key", None)

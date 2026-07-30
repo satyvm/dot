@@ -22,11 +22,6 @@
     "read": [
       "$HOME/.agents/skills",
       "$HOME/.config/agents/skills",
-      "$HOME/.config/agents/universal_context.md",
-      {
-        "path": "/usr/share/locale/locale.alias",
-        "when": "linux"
-      },
       "$HOME/.codex/skills",
       "$HOME/.local/share/fnm",
       "$HOME/.local/state/fnm_multishells",
@@ -51,7 +46,50 @@
         "when": "linux"
       },
       "$HOME/.rustup",
-      "$HOME/.go"
+      "$HOME/.go",
+      {
+        "path": "/sys/fs/cgroup",
+        "when": "linux"
+      },
+      {
+        "path": "/sys/devices/system/cpu",
+        "when": "linux"
+      }
+    ],
+    "read_file": [
+      "$HOME/.config/agents/universal_context.md",
+      {
+        "path": "/usr/share/locale/locale.alias",
+        "when": "linux"
+      },
+      {
+        "path": "/etc/locale.alias",
+        "when": "linux"
+      },
+      {
+        "path": "/sys/kernel/mm/transparent_hugepage/enabled",
+        "when": "linux"
+      },
+      {
+        "path": "/proc/sys/vm/mmap_min_addr",
+        "when": "linux"
+      },
+      {
+        "path": "/proc/sys/vm/overcommit_memory",
+        "when": "linux"
+      },
+      {
+        "path": "/proc/version_signature",
+        "when": "linux"
+      },
+      {
+        "path": "/etc/passwd",
+        "when": "linux"
+      },
+      {
+        "path": "/sys/kernel/mm/transparent_hugepage/hpage_pmd_size",
+        "when": "linux"
+      }
     ],
     "deny": [
       "$HOME/.ssh",

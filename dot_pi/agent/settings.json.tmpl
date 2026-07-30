@@ -2,12 +2,14 @@
   "theme": "dark",
   "defaultProvider": "cliproxy",
   "defaultModel": "{{ .aiAgentPlatform.agents.pi.defaultRole }}",
-  "defaultThinkingLevel": "medium",
+  "defaultThinkingLevel": "max",
   "enabledModels": [
-    "cliproxy/frontier",
-    "cliproxy/balanced",
-    "cliproxy/fast",
-    "cliproxy/light"
+    "cliproxy/*",
+{{- $rawModels := merge (deepCopy .aiAgentPlatform.roles) (deepCopy .aiAgentPlatform.catalog) -}}
+{{- $modelKeys := concat (list "frontier" "balanced" "fast" "light") (keys .aiAgentPlatform.catalog | sortAlpha) -}}
+{{- range $index, $modelID := $modelKeys }}
+    "cliproxy/{{ $modelID }}"{{ if lt $index (sub (len $modelKeys) 1) }},{{ end }}
+{{- end }}
   ],
   "terminal": {
     "showTerminalProgress": true

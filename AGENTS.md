@@ -148,12 +148,12 @@ Starship must be last — it replaces PS1.
 | `ec` | `$EDITOR ~/.local/share/chezmoi` (edit dotfiles) |
 | `vec` | `$VISUAL ~/.local/share/chezmoi` |
 
-## Package Management
+## Package & Toolchain Management
 
 - **macOS**: Homebrew (Brewfile in `run_onchange_brew-packages.sh.tmpl`)
 - **Linux**: Homebrew packages (Linuxbrew)
-
-Package sets vary by profile — dev profile gets the most, server skips GUIs. Docker included on dev + server profiles.
+- **Local Toolchains**: `mise` is used per project folder (via `mise.toml` / `.mise.toml`) to maintain and isolate runtime tools and SDK versions.
+- **Docker**: Container engine on macOS is started and managed via **Colima** (`colima start`, `docker context use colima`), not Docker Desktop.
 
 ## Git Configuration
 
@@ -196,5 +196,5 @@ Backups are timestamped (`local_DDMMYY`). Auto-detects first non-system volume i
 7. **AI platform tests are shell-based** — run
    `bash dot_local/bin/tests/test_ax.sh`; also validate repository rendering with
    `chezmoi diff` or `chezmoi apply --dry-run`.
-8. **Docker on macOS** uses Colima, not Docker Desktop.
+8. **Docker on macOS** is started and managed with Colima (`colima start`), not Docker Desktop.
 9. **fzf initialization is deferred** via precmd hook for faster shell startup.

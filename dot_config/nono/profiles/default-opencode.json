@@ -65,6 +65,20 @@
     "deny": [
       "$HOME/.local/share/opencode/auth.json",
       "$HOME/.config/opencode/auth.json"
+    ],
+    "suppress_save_prompt": [
+      {
+        "path": "/",
+        "when": "linux"
+      },
+      {
+        "path": "/home",
+        "when": "linux"
+      },
+      {
+        "path": "$HOME",
+        "when": "linux"
+      }
     ]
   },
   "platform_overrides": {

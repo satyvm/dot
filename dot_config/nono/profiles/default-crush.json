@@ -40,6 +40,12 @@
       "$HOME/.config/crush/auth.json",
       "$HOME/.local/share/crush/auth.json",
       "$HOME/.local/share/crush/hyper.json"
+    ],
+    "suppress_save_prompt": [
+      {
+        "path": "/proc",
+        "when": "linux"
+      }
     ]
   },
   "platform_overrides": {

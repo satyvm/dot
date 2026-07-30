@@ -35,7 +35,9 @@ routing:
 ws-auth: true
 oauth-model-alias:
 {{- $aliases := dict -}}
-{{- range $role, $model := .aiAgentPlatform.roles }}
+{{- $models := .aiAgentPlatform.roles -}}
+{{- range $modelID := keys $models | sortAlpha }}
+  {{- $model := index $models $modelID -}}
   {{- $existing := default (list) (get $aliases $model.provider) -}}
   {{- $_ := set $aliases $model.provider (append $existing $model) -}}
 {{- end }}
@@ -45,7 +47,7 @@ oauth-model-alias:
     - name: {{ $model.target | quote }}
       alias: {{ $model.alias | quote }}
       display-name: {{ $model.displayName | quote }}
-      fork: false
+      fork: true
       force-mapping: true
 {{- end }}
 {{- end }}

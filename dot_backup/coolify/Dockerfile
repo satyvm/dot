@@ -1,5 +1,5 @@
 ARG HERMES_WEBUI_VERSION=0.51.92
-FROM node:22.17.0-bookworm-slim AS node-runtime
+FROM node:22.19.0-bookworm-slim AS node-runtime
 
 FROM ghcr.io/nesquena/hermes-webui:${HERMES_WEBUI_VERSION}
 
@@ -161,7 +161,19 @@ RUN install -d /var/run/sshd /etc/ssh/host-keys \
 COPY supervisord.conf /etc/supervisor/conf.d/hermes-dev.conf
 COPY entrypoint.sh /usr/local/bin/hermes-dev-entrypoint
 COPY gitea_ai_cli.py /usr/local/bin/gitea-ai
-RUN chmod 0555 /usr/local/bin/hermes-dev-entrypoint /usr/local/bin/gitea-ai \
+RUN install -d -o ubuntu -g ubuntu \
+      /home/ubuntu/.cache/opencode \
+      /home/ubuntu/.config/opencode/agents \
+      /home/ubuntu/.config/opencode/commands \
+      /home/ubuntu/.config/opencode/plugins \
+      /home/ubuntu/.config/opencode/skills \
+      /home/ubuntu/.local/share/opencode/log \
+      /home/ubuntu/.local/share/opencode/repos \
+      /home/ubuntu/.local/share/opencode/storage \
+      /home/ubuntu/.local/share/opencode/worktree \
+      /home/ubuntu/.local/share/opentui \
+      /home/ubuntu/.local/state/opencode \
+    && chmod 0555 /usr/local/bin/hermes-dev-entrypoint /usr/local/bin/gitea-ai \
     && ln -s /usr/local/bin/gitea-ai /usr/local/bin/tea-ai
 
 EXPOSE 22 8787

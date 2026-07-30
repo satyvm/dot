@@ -42,22 +42,38 @@
         "chunkTimeout": 60000
       },
       "models": {
-{{- $roles := .aiAgentPlatform.roles -}}
-{{- range $index, $role := list "frontier" "balanced" "fast" "light" }}
-        "{{ $role }}": {
-          "id": "{{ $role }}",
-          "name": "{{ (index $roles $role).displayName }}",
-          "family": "canonical",
+{{- $rawModels := merge (deepCopy .aiAgentPlatform.roles) (deepCopy .aiAgentPlatform.catalog) -}}
+{{- $expanded := dict -}}
+{{- range $key, $model := $rawModels -}}
+  {{- $_ := set $expanded $key $model -}}
+  {{- if $model.target -}}
+    {{- $_ := set $expanded $model.target $model -}}
+  {{- end -}}
+  {{- if $model.reasoningSuffix -}}
+    {{- $suffix := printf "(%s)" $model.reasoningSuffix -}}
+    {{- $_ := set $expanded (printf "%s%s" $key $suffix) $model -}}
+    {{- if $model.target -}}
+      {{- $_ := set $expanded (printf "%s%s" $model.target $suffix) $model -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $modelKeys := keys $expanded | sortAlpha -}}
+{{- range $index, $modelID := $modelKeys }}
+{{- $model := index $expanded $modelID }}
+        "{{ $modelID }}": {
+          "id": "{{ $modelID }}",
+          "name": "{{ $model.displayName }} ({{ $modelID }})",
+          "family": "managed",
           "limit": {
-            "context": {{ (index $roles $role).contextWindow }},
-            "output": {{ (index $roles $role).maxTokens }}
+            "context": {{ $model.contextWindow }},
+            "output": {{ $model.maxTokens }}
           },
           "modalities": {
-            "input": {{ (index $roles $role).input | toJson }},
+            "input": {{ $model.input | toJson }},
             "output": ["text"]
           },
-          "reasoning": {{ (index $roles $role).reasoning }}
-        }{{ if lt $index 3 }},{{ end }}
+          "reasoning": {{ $model.reasoning }}
+        }{{ if lt $index (sub (len $modelKeys) 1) }},{{ end }}
 {{- end }}
       }
     }

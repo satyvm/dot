@@ -26,7 +26,7 @@ Deployable Docker Compose application featuring Hermes WebUI, SSH container deve
    Log into your self-hosted Gitea (`https://gitea.satyvm.com`) as user `ai`:
    - Navigate to **Settings -> Applications -> Generate New Token**.
    - Name: `tea-sidecar`
-   - Permissions: `repository` (read/write), `issue` (write), `pull_request` (write).
+   - Permissions: `user` (read/write), `repository` (read/write), `issue` (write), `pull_request` (write).
    - Copy the generated token string.
 
 ---
@@ -98,11 +98,15 @@ Deployable Docker Compose application featuring Hermes WebUI, SSH container deve
    Add this public key to `https://gitea.satyvm.com` under **User Settings -> SSH / GPG Keys** for user `ai`.
 
 3. **Authenticate AI Model Providers**:
-   SSH into the container and set up your CLIProxyAPI provider OAuth channels:
+   Provider OAuth state belongs to the CLIProxyAPI sidecar. From the Docker host, run both login flows:
    ```bash
-   ssh hermes-dev
-   ax auth setup
+   proxy_id=$(docker ps -qf 'name=cliproxyapi-')
+   docker exec -it "$proxy_id" \
+     /CLIProxyAPI/CLIProxyAPI -config /config/config.yaml -no-browser -antigravity-login
+   docker exec -it "$proxy_id" \
+     /CLIProxyAPI/CLIProxyAPI -config /config/config.yaml -no-browser -codex-login
    ```
+   If the browser callback cannot reach the container, paste the complete final localhost callback URL into the waiting command. Inside `hermes-dev`, `ax auth setup antigravity` or `ax auth setup codex` prints the corresponding Docker-host command.
 
 ---
 

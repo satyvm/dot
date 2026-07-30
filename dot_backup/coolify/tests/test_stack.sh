@@ -5,6 +5,7 @@ stack_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 compose_file="$stack_dir/hermes_docker_compose.yaml"
 pycache_dir="$(mktemp -d "${TMPDIR:-/tmp}/hermes-pycache.XXXXXX")"
 rendered=""
+rendered_json=""
 remote_config=""
 remote_destination=""
 rendered_setup=""
@@ -15,6 +16,9 @@ cleanup() {
   rm -rf "$pycache_dir"
   if [[ -n "$rendered" ]]; then
     rm -f "$rendered"
+  fi
+  if [[ -n "$rendered_json" ]]; then
+    rm -f "$rendered_json"
   fi
   if [[ -n "$remote_config" ]]; then
     rm -f "$remote_config"
@@ -117,30 +121,53 @@ assert config["model"] == {
 }
 assert "provider" not in config
 provider = config["custom_providers"][0]
-assert provider == {
-    "name": "CLIProxyAPI",
-    "base_url": "http://cliproxyapi:8317/v1",
-    "key_env": "OPENAI_API_KEY",
-    "api_mode": "chat_completions",
-}
+assert provider["name"] == "CLIProxyAPI"
+assert provider["base_url"] == "http://cliproxyapi:8317/v1"
+assert provider["key_env"] == "OPENAI_API_KEY"
+assert provider["api_mode"] == "chat_completions"
+assert provider["discover_models"] is True
+assert "frontier" in provider["models"]
+assert "gpt-5.6-luna" in provider["models"]
+assert "gpt-image-2" not in provider["models"]
+assert config["fallback_providers"] == [
+    {
+        "provider": "custom",
+        "model": "gemini-3-flash-agent",
+        "base_url": "http://cliproxyapi:8317/v1",
+        "key_env": "OPENAI_API_KEY",
+    },
+    {
+        "provider": "custom",
+        "model": "gpt-5.6-luna",
+        "base_url": "http://cliproxyapi:8317/v1",
+        "key_env": "OPENAI_API_KEY",
+    },
+]
 for alias, entry in config["model_aliases"].items():
     assert isinstance(entry, dict), alias
     assert entry["provider"] == "custom:cliproxyapi", alias
     assert entry["base_url"] == "http://cliproxyapi:8317/v1", alias
-assert config["model_aliases"]["frontier"]["model"] == "frontier"
-assert config["model_aliases"]["balanced"]["model"] == "balanced"
+    assert entry["model"] != alias, alias
+assert config["model_aliases"]["frontier"]["model"] == "frontier(xhigh)"
+assert config["model_aliases"]["balanced"]["model"] == "balanced(xhigh)"
+assert config["model_aliases"]["gpt-5.6-luna"]["model"] == "gpt-5.6-luna(xhigh)"
+assert config["model_aliases"]["gpt-5.6-sol"]["model"] == "gpt-5.6-sol(xhigh)"
 assert config["mcp_servers"]["filesystem"]["command"] == "mcp-server"
 PY
   else
     grep -q 'provider_id = "custom:cliproxyapi"' "$rendered_setup"
     grep -q 'custom_providers = config.get("custom_providers", \[\])' "$rendered_setup"
     grep -q '"key_env": "OPENAI_API_KEY"' "$rendered_setup"
+    grep -q '"discover_models": True' "$rendered_setup"
+    grep -q 'canonical_aliases\["gpt-5.6-sol"\] = "gpt-5.6-sol(xhigh)"' "$rendered_setup"
   fi
 fi
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   rendered="$(mktemp "${TMPDIR:-/tmp}/hermes-compose.XXXXXX")"
+  rendered_json="$(mktemp "${TMPDIR:-/tmp}/hermes-compose.XXXXXX.json")"
   docker compose -f "$compose_file" config >"$rendered"
+  docker compose -f "$compose_file" config --format json >"$rendered_json"
 
   if grep -q 'cliproxy-init' "$rendered"; then
     echo "one-shot cliproxy-init must not be present" >&2
@@ -167,6 +194,22 @@ if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; 
   grep -q 'source: cliproxy-config' "$rendered"
   grep -q 'target: /config' "$rendered"
   grep -q 'source: platform-secrets' "$rendered"
+  jq -e '
+    .services.cliproxyapi.command[2] as $command |
+    all(
+      [
+        ["frontier", "gpt-5.6-sol"],
+        ["balanced", "gpt-5.6-terra"],
+        ["fast", "gemini-3.6-flash-high"],
+        ["light", "gpt-5.4-mini"]
+      ][];
+      . as [$alias, $name] |
+      ($command | contains("alias: \"" + $alias + "\"")) and
+      ($command | contains("name: \"" + $name + "\""))
+    ) and
+    ([.services.cliproxyapi.command[2] | scan("fork: true")] | length == 4)
+  ' "$rendered_json" >/dev/null
+
   grep -q 'source: tea-socket' "$rendered"
   grep -q 'http://cliproxyapi:8317/v1' "$rendered"
   grep -q 'tea-sidecar' "$rendered"
@@ -186,9 +229,14 @@ grep -q 'python /apptoo/server.py' "$stack_dir/supervisord.conf"
 grep -q 'HERMES_WEBUI_AGENT_DIR="/opt/hermes-agent"' "$stack_dir/supervisord.conf"
 grep -q 'HERMES_WEBUI_AGENT_DIR: /opt/hermes-agent' "$compose_file"
 grep -q 'HERMES_WEBUI_PYTHON: /opt/hermes-venv/bin/python' "$compose_file"
+# shellcheck disable=SC2016 # Verify the Dockerfile's literal shell expression.
 grep -q 'ln -s "${agent_site}" /opt/hermes-agent' "$stack_dir/Dockerfile"
 grep -q 'test -f /opt/hermes-agent/run_agent.py' "$stack_dir/Dockerfile"
 grep -q "from run_agent import AIAgent" "$stack_dir/Dockerfile"
+grep -q '^FROM node:22\.19\.0-bookworm-slim AS node-runtime$' "$stack_dir/Dockerfile"
+grep -q '/home/ubuntu/.config/opencode/agents' "$stack_dir/Dockerfile"
+grep -q '/home/ubuntu/.local/share/opencode/log' "$stack_dir/Dockerfile"
+grep -q '/home/ubuntu/.local/state/opencode' "$stack_dir/Dockerfile"
 grep -q 'PasswordAuthentication no' "$stack_dir/Dockerfile"
 if ! grep -q 'PermitEmptyPasswords no' "$stack_dir/Dockerfile"; then
   echo "key-only SSH must explicitly reject empty-password login" >&2
@@ -222,6 +270,7 @@ if grep -A5 'bootstrap_dotfiles()' "$stack_dir/entrypoint.sh" | grep -q 'return'
   exit 1
 fi
 grep -q 'git -C.*pull --ff-only' "$stack_dir/entrypoint.sh"
+# shellcheck disable=SC2016 # Verify the entrypoint's literal shell expression.
 grep -q 'if \[\[ ! -s "\$chezmoi_config" \]\]' "$stack_dir/entrypoint.sh"
 grep -q 'find.*remote_home' "$stack_dir/entrypoint.sh"
 grep -q 'dev_root.*-prune' "$stack_dir/entrypoint.sh"

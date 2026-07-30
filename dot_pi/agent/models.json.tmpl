@@ -8,17 +8,32 @@
         "maxTokensField": "max_tokens"
       },
       "models": [
-{{- $roles := .aiAgentPlatform.roles -}}
-{{- range $index, $role := list "frontier" "balanced" "fast" "light" -}}
-{{- $model := index $roles $role }}
+{{- $rawModels := merge (deepCopy .aiAgentPlatform.roles) (deepCopy .aiAgentPlatform.catalog) -}}
+{{- $expanded := dict -}}
+{{- range $key, $model := $rawModels -}}
+  {{- $_ := set $expanded $key $model -}}
+  {{- if $model.target -}}
+    {{- $_ := set $expanded $model.target $model -}}
+  {{- end -}}
+  {{- if $model.reasoningSuffix -}}
+    {{- $suffix := printf "(%s)" $model.reasoningSuffix -}}
+    {{- $_ := set $expanded (printf "%s%s" $key $suffix) $model -}}
+    {{- if $model.target -}}
+      {{- $_ := set $expanded (printf "%s%s" $model.target $suffix) $model -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $modelKeys := keys $expanded | sortAlpha -}}
+{{- range $index, $modelID := $modelKeys -}}
+{{- $model := index $expanded $modelID }}
         {
-          "id": "{{ $role }}",
-          "name": "{{ $model.displayName }}",
+          "id": "{{ $modelID }}",
+          "name": "{{ $model.displayName }} ({{ $modelID }})",
           "input": {{ $model.input | toJson }},
           "reasoning": {{ $model.reasoning }},
           "contextWindow": {{ $model.contextWindow }},
           "maxTokens": {{ $model.maxTokens }}
-        }{{ if lt $index 3 }},{{ end }}
+        }{{ if lt $index (sub (len $modelKeys) 1) }},{{ end }}
 {{- end }}
       ]
     }

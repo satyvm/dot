@@ -22,6 +22,9 @@ Apply this baseline alongside the nearest project `AGENTS.md`. Project instructi
   - **`nono`**: System sandbox runner enforcing per-agent security boundaries (`~/.config/nono/profiles/`).
   - **`herdr`**: Multi-agent session orchestrator. When active, `HERDR_SOCKET_PATH` is dynamically granted to the `nono` sandbox.
   - **`cliproxyapi`**: Local API proxy running on port 8317 to route requests to backend model channels securely.
+- **Toolchain & Container Management**:
+  - **`mise`**: Used locally per directory/repository (via `mise.toml`, `.mise.toml`, or `.tool-versions`) to manage and isolate tool and runtime versions, backed by global shims (`~/.local/share/mise/shims`).
+  - **Docker**: Container runtime on macOS is managed and started via **Colima** (`colima start`, `docker context use colima`).
 - **Language intelligence**: `gopls`, `pyright-langserver`, `rust-analyzer`, and `vtsls` are available on `PATH` for Go, Python, Rust, and JavaScript/TypeScript. Use the project's typecheck or lint command for final verification. OpenCode also exposes its configured experimental LSP tool when launched through `ax`; agents without a native LSP tool can invoke these servers or the project's checker through Bash.
 
 ## Sandbox Boundary & Security Policy
