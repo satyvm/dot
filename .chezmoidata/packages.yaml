@@ -481,7 +481,7 @@ packages:
       providers: {uv: {name: isort, version: "6.0.1"}}
     - id: cargo-clean-all
       feature: developer
-      providers: {cargo: {name: cargo-clean-all, version: "0.3.1"}}
+      providers: {cargo: {name: cargo-clean-all, version: "0.6.4"}}
     - id: cargo-cache
       feature: developer
       providers: {cargo: {name: cargo-cache, version: "0.8.3"}}

@@ -50,8 +50,10 @@ On the first successful boot, the repository is cloned into
 `/home/ubuntu/.local/share/chezmoi`. The entrypoint runs the repository's real
 `.chezmoi.json.tmpl` through a noninteractive `chezmoi init` with the CLI,
 developer, and AI categories enabled and `aiMode = "remote"`, then applies it.
-An idempotency marker prevents container restarts from re-running bootstrap.
-Later user-initiated configuration updates use `chezmoi update`.
+On later starts, the entrypoint fast-forward pulls the checkout, regenerates
+that fixed profile, and force-applies managed files without a TTY. The
+idempotency marker records a completed bootstrap but does not suppress this
+convergent startup synchronization.
 
 Images and containers are disposable. Rebuilds and redeployments preserve the
 named volumes above, so the Ubuntu home, Hermes documents/state, provider

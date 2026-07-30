@@ -231,6 +231,7 @@ fi
 mac_config="$fixture_root/mac-workstation.json"
 make_config "$mac_config" workstation darwin arm64
 mac_brew="$(render_template "$mac_config" run_onchange_before_install-homebrew-packages.sh.tmpl)"
+mac_developer="$(render_template "$mac_config" run_onchange_after_install-developer-tools.sh.tmpl)"
 if grep -q '^brew "git"$' <<<"$mac_brew"; then
   pass "macOS renders Git through Brew"
 else
@@ -240,6 +241,48 @@ if grep -q '^cask "ghostty"$' <<<"$mac_brew"; then
   pass "macOS workstation renders GUI casks"
 else
   fail "macOS workstation renders GUI casks"
+fi
+if grep -qxF 'cargo install "cargo-clean-all" --version "0.6.4" --locked' <<<"$mac_developer"; then
+  pass "developer tools render a published cargo-clean-all release"
+else
+  fail "developer tools render a published cargo-clean-all release"
+fi
+
+pi_home="$fixture_root/pi-home"
+mkdir -p "$pi_home/.pi/agent"
+HOME="$pi_home" chezmoi apply \
+  --config "$mac_config" \
+  --config-format json \
+  --source "$repo_root" \
+  --destination "$pi_home" \
+  --cache "$host_cache" \
+  --exclude=externals \
+  --refresh-externals=never \
+  "$pi_home/.pi/agent/models.json" \
+  "$pi_home/.pi/agent/settings.json"
+jq '.providers.cliproxy.models += [{"id":"pi-live","name":"Pi Live","reasoning":true}]' \
+  "$pi_home/.pi/agent/models.json" >"$pi_home/.pi/agent/models.json.tmp"
+mv "$pi_home/.pi/agent/models.json.tmp" "$pi_home/.pi/agent/models.json"
+jq '.lastChangelogVersion = "test"' \
+  "$pi_home/.pi/agent/settings.json" >"$pi_home/.pi/agent/settings.json.tmp"
+mv "$pi_home/.pi/agent/settings.json.tmp" "$pi_home/.pi/agent/settings.json"
+chmod 0600 "$pi_home/.pi/agent/models.json"
+pi_drift="$(
+  HOME="$pi_home" chezmoi diff \
+    --config "$mac_config" \
+    --config-format json \
+    --source "$repo_root" \
+    --destination "$pi_home" \
+    --cache "$host_cache" \
+    --exclude=externals \
+    --refresh-externals=never \
+    "$pi_home/.pi/agent/models.json" \
+    "$pi_home/.pi/agent/settings.json"
+)"
+if [[ -z "$pi_drift" ]]; then
+  pass "Pi-owned runtime state does not drift after Chezmoi seeds it"
+else
+  fail "Pi-owned runtime state does not drift after Chezmoi seeds it" "$pi_drift"
 fi
 
 container_config="$fixture_root/container.json"

@@ -242,7 +242,13 @@ chezmoi apply
 chezmoi update
 ```
 
-On container startup, the entrypoint refreshes the existing dotfiles checkout with a fast-forward-only pull and applies it. This keeps persistent volumes aligned with the deployed dotfiles source.
+On container startup, the entrypoint refreshes the existing dotfiles checkout
+with a fast-forward-only pull, regenerates the fixed noninteractive `container`
+profile, and force-applies it without refreshing externals. This keeps
+persistent volumes aligned with the deployed dotfiles source and prevents
+changes to genuinely managed files from blocking startup on a TTY prompt.
+Mutable Pi model and settings files are seeded with Chezmoi `create_` entries,
+so Pi can update them without creating managed-file drift.
 
 Configuration ownership rules:
 

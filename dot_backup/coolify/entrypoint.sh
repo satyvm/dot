@@ -147,11 +147,12 @@ bootstrap_dotfiles() {
     run_as_ubuntu git -C "$chezmoi_source" pull --ff-only
   fi
 
-  if [[ ! -s "$chezmoi_config" ]]; then
-    initialize_chezmoi_config
-  fi
+  initialize_chezmoi_config
   log "applying remote-dev dotfiles"
   run_as_ubuntu chezmoi apply \
+    --force \
+    --no-tty \
+    --refresh-externals=never \
     --config "$chezmoi_config" \
     --source "$chezmoi_source" \
     --cache "$remote_home/.cache/chezmoi"

@@ -61,7 +61,8 @@ Deployable Docker Compose application featuring Hermes WebUI, SSH container deve
 
 4. **Deploy**:
    - Click **Deploy** in Coolify. The initial deployment initializes the Docker-managed home, runs the repository's noninteractive chezmoi profile with `aiMode=remote`, and applies the dotfiles as the container `ubuntu` user.
-   - Later container restarts reuse the successful bootstrap marker. Run `chezmoi update` inside `hermes-dev` when you intentionally want to update the container's dotfiles.
+   - On every later restart, the entrypoint fast-forward pulls the existing checkout, regenerates the fixed `container` profile, and force-applies managed files without a TTY. Startup therefore cannot block on an interactive Chezmoi conflict.
+   - Pi's mutable model catalog and settings are seeded with Chezmoi `create_` entries and remain runtime-owned after creation. Make durable changes to genuinely managed files in this repository; mutable runtime state and the named volumes remain persistent across restarts.
 
 ---
 

@@ -271,8 +271,19 @@ if grep -A5 'bootstrap_dotfiles()' "$stack_dir/entrypoint.sh" | grep -q 'return'
   exit 1
 fi
 grep -q 'git -C.*pull --ff-only' "$stack_dir/entrypoint.sh"
-# shellcheck disable=SC2016 # Verify the entrypoint's literal shell expression.
-grep -q 'if \[\[ ! -s "\$chezmoi_config" \]\]' "$stack_dir/entrypoint.sh"
+apply_block="$(grep -A8 'run_as_ubuntu chezmoi apply' "$stack_dir/entrypoint.sh")"
+for required_flag in --force --no-tty '--refresh-externals=never'; do
+  if ! grep -q -- "$required_flag" <<<"$apply_block"; then
+    echo "remote chezmoi apply must include $required_flag for unattended conflict recovery" >&2
+    exit 1
+  fi
+done
+if grep -A2 'if \[\[ ! -s "\$chezmoi_config" \]\]' \
+    "$stack_dir/entrypoint.sh" | grep -q 'initialize_chezmoi_config'; then
+  echo "remote chezmoi config must be regenerated after every source refresh" >&2
+  exit 1
+fi
+grep -q '^  initialize_chezmoi_config$' "$stack_dir/entrypoint.sh"
 grep -q 'find.*remote_home' "$stack_dir/entrypoint.sh"
 grep -q 'dev_root.*-prune' "$stack_dir/entrypoint.sh"
 if grep -q 'write_chezmoi_config' "$stack_dir/entrypoint.sh"; then
