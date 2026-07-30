@@ -99,14 +99,8 @@ initialize_chezmoi_config() {
     --cache "$remote_home/.cache/chezmoi" \
     --no-tty \
     --force \
-    --promptBool "Install core CLI setup=true" \
-    --promptBool "Install developer toolchain=true" \
-    --promptBool "Install AI setup=true" \
-    --promptChoice "AI deployment mode=remote" \
-    --promptChoice "GUI tools=none" \
-    --promptBool "Apply macOS customization=false" \
-    --promptBool "Configure Linux firewall and fail2ban=false" \
-    --promptBool "Set up SSH key and GitHub signing=false" \
+    --promptChoice "Machine preset=container" \
+    --promptBool "Customize preset features=false" \
     --promptString "Git user name=$git_name" \
     --promptString "Git email address=$git_email"
 }

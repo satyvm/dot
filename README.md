@@ -1,83 +1,260 @@
 # satyvm / dot
 
-Personal macOS and Linux dotfiles managed with [chezmoi](https://chezmoi.io).
+Personal macOS and Debian/Ubuntu dotfiles managed with
+[Chezmoi](https://www.chezmoi.io/). The same source supports `amd64` and
+`arm64`, interactive setup, and explicit unattended machine configs.
 
-## Quick Start
+## Goals and guarantees
 
-Run this single command on any macOS or Linux device to set up dotfiles using `.setup.sh`:
+- Preserve an existing macOS installation unless its config is explicitly
+  migrated to the new machine model.
+- Reproduce laptop, workstation, server, and container profiles on macOS or
+  Debian/Ubuntu without duplicating platform logic.
+- Keep package selection in one inventory and render the appropriate apt,
+  Homebrew, cask, mise, npm, uv, or cargo provider.
+- Keep account enrollment, key upload, App Store installation, and destructive
+  cleanup out of automatic `chezmoi apply`.
+- Reject unsupported operating systems, distributions, architectures, and real
+  provisioning failures instead of silently continuing.
+
+Old-style configs form a compatibility lane: their existing managed files
+render byte-for-byte as before, and they do not select the new provisioning
+scripts or explicit helper commands. A normal update therefore cannot replay
+package installation or macOS defaults on an existing Mac. Migration is an
+explicit, reviewable operation described below.
+
+## Quick start
 
 ```bash
 bash -c "$(curl -fsLS https://raw.githubusercontent.com/satyvm/dot/main/.setup.sh)"
 ```
 
-Or manually initialize with `chezmoi`:
+Run Linux setup as a regular sudo-capable user; Linuxbrew refuses to run as
+root. The bootstrap:
+
+1. validates macOS or Debian/Ubuntu and `amd64` or `arm64`;
+2. installs the OS bootstrap dependencies;
+3. installs or discovers Homebrew through `brew shellenv`;
+4. installs Chezmoi and initializes or updates this source;
+5. fails immediately on a real bootstrap or package error.
+
+## Machine model
+
+Setup starts with one preset:
+
+| Preset | Default intent |
+|---|---|
+| `laptop` | CLI, development, local AI, focused GUI, OS defaults, SSH signing |
+| `workstation` | CLI, development, local AI, full GUI, OS defaults, SSH signing |
+| `server` | Headless CLI, Linux hardening, SSH signing |
+| `container` | Image-baked development and remote AI; no host package installers |
+
+The next question offers feature overrides for CLI, developer tools, AI and its
+mode, GUI tier, OS customization, Linux hardening, and SSH signing.
+
+`.chezmoi.json.tmpl` records host facts and choices. The reusable
+`.chezmoitemplates/machine` template resolves them into one object containing:
+
+- OS, architecture, distro, Homebrew prefix, package mode, and development root;
+- feature values;
+- predicates such as `manageHostPackages`, `manageSystemPackages`, `manageGui`,
+  `manageShell`, and `manageLocalProxy`.
+
+Templates consume this resolved object instead of inventing platform or profile
+logic independently. Substantially different platform behavior stays in
+separate rendered scripts, while shared configuration consumes readable
+machine predicates.
+
+## Package providers
+
+`.chezmoidata/packages.yaml` is the canonical application inventory:
+
+- `apt` installs Debian/Ubuntu system dependencies, services, hardening tools,
+  Zsh, and the Linux Docker packages;
+- Homebrew installs portable CLI applications on macOS and Linux;
+- casks install macOS GUI applications;
+- mise, npm, uv, and cargo entries carry exact versions;
+- third-party Homebrew formulae carry tap and trust metadata.
+
+The Brew renderer taps and grants formula-level trust before evaluating its
+Brewfile. This is how `charmbracelet/tap/crush` works on Linux without trusting
+the entire tap implicitly.
+
+Chezmoi `run_onchange` scripts render the selected inventory. `run_once` is
+reserved for genuine migrations, not mutable package versions.
+
+Provider order on Linux is intentional:
+
+- apt owns bootstrap packages, Zsh, Docker packages, firewall tools, and system
+  services;
+- Linuxbrew owns portable user-facing CLI applications;
+- pinned secondary providers own developer runtimes and tools.
+
+## Debian/Ubuntu behavior
+
+Linux hosts must be Debian or Ubuntu. Both `amd64` and `arm64` are supported.
+Homebrew is installed at the prefix reported by `brew shellenv`; templates use
+the derived prefix rather than assuming an Apple Silicon Mac.
+Run the bootstrap as a regular sudo-capable user because Linuxbrew does not
+support running as root.
+
+The `server` preset installs UFW and fail2ban through apt before applying their
+configuration. The firewall preserves the active SSH connection's server port,
+falls back to the configured `sshd` port, and finally to port 22. Set
+`DOTFILES_SSH_PORT` during apply to override detection. Hardening is disabled in
+containers. Portable tools remain Linuxbrew packages so their names and
+versions track the macOS CLI setup.
+
+The Crush trust failure is handled before Brew evaluates the generated
+Brewfile:
 
 ```bash
-chezmoi init --apply satyvm/dot
-chezmoi diff
-chezmoi apply
+brew tap charmbracelet/tap
+brew trust --formula charmbracelet/tap/crush
 ```
 
-## Setup choices
+Only the formula is trusted; the entire third-party tap is not granted blanket
+trust.
 
-`chezmoi init` asks for independent, opt-in categories. There are no machine
-profiles and every selection defaults to off:
+## Unattended setup
 
-| Choice | What it manages |
-|---|---|
-| Core CLI | Shell, Git workflow, Neovim, tmux, and terminal utilities |
-| Developer toolchain | Runtimes, Docker, PostgreSQL, compilers, cloud and Kubernetes tools; requires CLI |
-| AI setup | Claude Code, OpenCode, Pi, Crush, Nono, `ax`, skills, and model configuration |
-| AI mode | `local` manages CLIProxyAPI locally; `remote` uses `http://cliproxyapi:8317` supplied by the environment |
-| GUI tier (macOS) | `none`, `minimum` (Raycast, Ice, Shottr, Hyperkey, Ghostty, font), or `all` |
-| macOS customization | Existing macOS defaults, Dock rewrite, and stock-app cleanup |
-| SSH setup | Generates `gh_personal`, uploads it through GitHub CLI, and enables Git SSH signing |
-| Linux hardening | UFW and fail2ban; never enabled implicitly |
+Example configs live in [`examples/configs`](examples/configs). Copy the closest
+one, then change identity, home paths, OS facts, preset, and overrides:
 
-Homebrew is a prerequisite on both macOS and Linux. The repository prints a
-clear message and skips package installation if it is unavailable.
+- `linux-server-amd64.json`
+- `linux-laptop-arm64.json`
+- `linux-container-amd64.json`
+- `macos-workstation-arm64.json`
+- `macos-server-amd64.json`
 
-To change choices later, use `chezmoi edit-config`, update the `data` values,
-then run `chezmoi apply`. Disabling a category stops future management; it never
-deletes existing files.
+To bootstrap from a local explicit config:
 
-## Secrets and migration
+```bash
+DOTFILES_CONFIG=/absolute/path/to/linux-server-amd64.json \
+  bash .setup.sh
+```
 
-Credentials, OAuth state, SSH keys, and agent sessions are never stored in this
-repository. Complete local AI authentication with `ax auth setup` after applying
-local AI mode.
+The bootstrap installs that file as the persistent Chezmoi JSON config and
+applies it without prompts.
 
-Existing profile-based installations should remove `data.profile` and add the
-new category keys through `chezmoi edit-config`. Start all categories as `false`
-(`guiTier: "none"`, `aiMode: "local"`) and explicitly opt into the desired setup.
-Identity and the existing `setupSshKey` value can be retained.
+To render an example without changing the machine:
 
-## Cleanup CLI (`one`)
+```bash
+chezmoi managed \
+  --config examples/configs/linux-server-amd64.json \
+  --config-format json \
+  --source . \
+  --destination /tmp/dotfiles-preview \
+  --refresh-externals=never
+```
 
-`one` is a unified cleanup CLI for developer caches and project build artifacts.
+## Explicit user-presence commands
+
+Automatic `chezmoi apply` does not authenticate accounts, upload SSH keys, or
+delete applications.
+
+```bash
+dotfiles-ssh-enroll       # generate/add the key, authenticate gh, upload key
+dotfiles-macos-apps       # install the selected Mac App Store applications
+dotfiles-macos-cleanup    # confirmed removal of selected stock macOS apps
+```
+
+After SSH enrollment, run `chezmoi apply` to enable signing when the machine's
+SSH feature is selected and the public key exists.
+
+## Secrets and authentication
+
+Credentials, OAuth state, SSH private keys, and agent sessions are never stored
+in this repository. Age-encrypted source material is only deployed when the
+local Chezmoi identity exists.
+
+For local AI mode, complete provider authentication after applying:
+
+```bash
+ax auth setup
+ax auth status
+```
+
+## Add an application
+
+The managed `add-dotfiles-app` skill lives at
+`~/.config/agents/skills/add-dotfiles-app`. It is shared by the configured agent
+and Claude skill directories.
+
+Example request:
 
 ```text
+Add atuin as a CLI app on macOS and Debian/Ubuntu, including its shell config.
+```
+
+The skill will:
+
+1. classify the app as CLI, GUI, developer tool, service, AI tool, configuration,
+   or enrollment workflow;
+2. update the canonical provider and platform metadata;
+3. add formula-level trust for third-party Homebrew formulae;
+4. scope configuration with resolved machine predicates;
+5. add focused matrix coverage and render the affected profiles.
+
+The core rule is simple: package choices belong in
+`.chezmoidata/packages.yaml`; generic installers should not accumulate
+app-specific branches.
+
+## Cleanup CLI
+
+`one` is the managed cleanup command for developer caches and project build
+artifacts:
+
+```bash
 one system [--dry-run] [--yes] [--only NAME...]
 one project [PATH] [--dry-run] [--yes] [--node|--rust|--all]
 one all [PATH] [--dry-run] [--yes]
 one list
 one doctor
-one help
 ```
 
-- **`one system`**: Cleans system-level package manager and tool caches (`mise`, `python`, `node`, `rust`, `go`, `dotnet`, `docker`, `brew`, `nono`). Deep cleaners (`docker`, `go` module cache, `brew`) are highlighted in preview.
-- **`one project`**: Cleans project build artifacts (`npkill` for Node, `cargo clean-all` for Rust) in the specified path.
-- **`one all`**: Runs both system cache cleanup and project artifact cleanup.
-- **`one list`**: Displays available system and project cleaners.
-- **`one doctor`**: Diagnostics for cleanup tools and cache size estimates.
+Use `--dry-run` before removing data. System cleaners cover package managers
+and runtime caches; project cleaners cover Node and Rust build artifacts.
 
 ## Validation
 
 ```bash
+bash tests/test_machine_matrix.sh
 bash dot_local/bin/tests/test_ax.sh
 bash dot_local/bin/tests/test_one.sh
+bash dot_backup/coolify/tests/test_stack.sh
+chezmoi managed --refresh-externals=never
+chezmoi diff
 chezmoi apply --dry-run
 ```
 
-`.gitignore` excludes local/sensitive source-state only. `.chezmoiignore.tmpl`
-is the deployment matrix for platforms and choices.
+The current machine matrix contains 228 assertions. It covers all four presets
+across macOS/Linux and `amd64`/`arm64`, including:
+
+- provider and package-schema validation;
+- GUI, AI proxy, hardening, service, and explicit-command boundaries;
+- Homebrew prefixes and third-party formula trust ordering;
+- unattended examples and invalid configurations;
+- legacy compatibility, including suppression of new provisioning work.
+
+The Linux path has also been exercised in disposable Ubuntu containers:
+
+- Ubuntu 24.04 ARM64 passed the full matrix;
+- Ubuntu AMD64 passed under emulation with the repository minimum Chezmoi
+  version;
+- the server apt renderer installed Zsh, UFW, and fail2ban successfully;
+- a clean Linuxbrew environment trusted, installed, and launched Crush.
+
+## Migrating an existing config
+
+Existing old-style setup keys remain supported. To adopt the preset schema,
+back up the current config and re-run initialization:
+
+```bash
+cp ~/.config/chezmoi/chezmoi.json ~/.config/chezmoi/chezmoi.json.before-machine-model
+chezmoi init --force --source "$(chezmoi source-path)"
+chezmoi diff
+```
+
+Review the diff before applying. Disabling a feature stops future management; it
+does not uninstall packages or delete existing configuration.

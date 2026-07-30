@@ -1,0 +1,75 @@
+{{- $raw := index . "machine" | default dict -}}
+{{- $isLegacy := eq (len $raw) 0 -}}
+{{- $preset := index $raw "preset" | default "legacy" -}}
+{{- $features := dict -}}
+{{- if $isLegacy -}}
+  {{- $_ := set $features "cli" (index . "setupCli" | default false) -}}
+  {{- $_ := set $features "developer" (index . "setupDeveloper" | default false) -}}
+  {{- $_ := set $features "ai" (index . "setupAi" | default false) -}}
+  {{- $_ := set $features "aiMode" (index . "aiMode" | default "local") -}}
+  {{- $_ := set $features "guiTier" (index . "guiTier" | default "none") -}}
+  {{- $_ := set $features "osCustomization" (index . "setupMacos" | default false) -}}
+  {{- $_ := set $features "hardening" (index . "setupLinuxHardening" | default false) -}}
+  {{- $legacySsh := or (index . "setupSshKey" | default false) (not (empty (stat (joinPath .chezmoi.homeDir ".ssh/gh_personal.pub")))) -}}
+  {{- $_ := set $features "ssh" $legacySsh -}}
+{{- else -}}
+  {{- $presetData := index .machineModel.presets $preset | default dict -}}
+  {{- if eq (len $presetData) 0 }}{{ fail (printf "unknown machine preset %q" $preset) }}{{ end -}}
+  {{- $features = deepCopy $presetData.features -}}
+  {{- if (index $raw "customize" | default false) -}}
+    {{- $overrides := index $raw "overrides" | default dict -}}
+    {{- $features = mergeOverwrite $features (deepCopy $overrides) -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if not (index $features "cli") }}{{ $_ := set $features "developer" false }}{{ end -}}
+{{- if not (index $features "ai") }}{{ $_ := set $features "aiMode" "local" }}{{ end -}}
+
+{{- $os := index $raw "os" | default .chezmoi.os -}}
+{{- $arch := index $raw "arch" | default .chezmoi.arch -}}
+{{- $distro := index $raw "distro" | default (ternary "macos" "unknown" (eq $os "darwin")) -}}
+{{- if and $isLegacy (eq $os "linux") (eq $distro "unknown") (stat "/etc/os-release") -}}
+  {{- $distro = output "sh" "-c" ". /etc/os-release; printf '%s' \"${ID:-unknown}\"" | trim -}}
+{{- end -}}
+{{- if not (has $os .machineModel.supported.os) }}{{ fail (printf "unsupported operating system %q" $os) }}{{ end -}}
+{{- if not (has $arch .machineModel.supported.arch) }}{{ fail (printf "unsupported architecture %q" $arch) }}{{ end -}}
+{{- if and (eq $os "linux") (not (has $distro .machineModel.supported.linuxDistros)) }}{{ fail (printf "unsupported Linux distribution %q" $distro) }}{{ end -}}
+{{- $brewPrefix := index $raw "homebrewPrefix" | default "/home/linuxbrew/.linuxbrew" -}}
+{{- if eq $os "darwin" -}}
+  {{- $brewPrefix = index $raw "homebrewPrefix" | default (ternary "/opt/homebrew" "/usr/local" (eq $arch "arm64")) -}}
+{{- end -}}
+{{- $devRoot := index $raw "devRoot" | default (joinPath .chezmoi.homeDir "dev") -}}
+
+{{- if ne $os "darwin" }}{{ $_ := set $features "guiTier" "none" }}{{ $_ := set $features "osCustomization" false }}{{ end -}}
+{{- if ne $os "linux" }}{{ $_ := set $features "hardening" false }}{{ end -}}
+{{- if eq $preset "container" }}{{ $_ := set $features "hardening" false }}{{ end -}}
+
+{{- $manageHostPackages := ne $preset "container" -}}
+{{- $manageShell := or (index $features "cli") (index $features "ai") -}}
+{{- $manageGui := and (eq $os "darwin") (ne (index $features "guiTier") "none") -}}
+{{- $manageLocalProxy := and (index $features "ai") (eq (index $features "aiMode") "local") -}}
+{{- $manageSystemPackages := and $manageHostPackages (eq $os "linux") -}}
+{{- $packageMode := "none" -}}
+{{- if $manageHostPackages }}{{ $packageMode = ternary "brew" "apt+brew" (eq $os "darwin") }}{{ end -}}
+{{- $environment := ternary "remote-dev" "local-dev" (eq (index $features "aiMode") "remote") -}}
+
+{{- dict
+  "schemaVersion" 1
+  "preset" $preset
+  "legacy" $isLegacy
+  "os" $os
+  "arch" $arch
+  "distro" $distro
+  "homebrewPrefix" $brewPrefix
+  "packageMode" $packageMode
+  "devRoot" $devRoot
+  "environment" $environment
+  "features" $features
+  "predicates" (dict
+    "manageHostPackages" $manageHostPackages
+    "manageSystemPackages" $manageSystemPackages
+    "manageShell" $manageShell
+    "manageGui" $manageGui
+    "manageLocalProxy" $manageLocalProxy
+  )
+  | toJson -}}

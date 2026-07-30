@@ -1,3 +1,4 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -26,7 +27,7 @@ fi
 # Hermes keeps MCP definitions and provider settings in the same mutable YAML document.
 # Merge mcp_servers and sync provider/model config with Hermes' Python/YAML runtime.
 {{- $proxyUrl := "http://127.0.0.1:8317/v1" }}
-{{- if eq .aiMode "remote" }}
+{{- if eq $machine.features.aiMode "remote" }}
 {{- $proxyUrl = "http://cliproxyapi:8317/v1" }}
 {{- end }}
 {{- $managedModels := merge (deepCopy .aiAgentPlatform.roles) (deepCopy .aiAgentPlatform.catalog) }}
@@ -227,7 +228,7 @@ else
   warn "Herdr is missing; agent integrations were skipped"
 fi
 
-{{- if eq .aiMode "local" }}
+{{- if eq $machine.features.aiMode "local" }}
 if ! command -v brew >/dev/null 2>&1; then
   warn "Homebrew is missing; local CLIProxyAPI service setup was skipped"
   exit 0

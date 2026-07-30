@@ -1,0 +1,51 @@
+machineModel:
+  schemaVersion: 1
+  supported:
+    os: [darwin, linux]
+    arch: [amd64, arm64]
+    linuxDistros: [debian, ubuntu]
+  presets:
+    laptop:
+      description: Portable personal machine with a focused GUI.
+      features:
+        cli: true
+        developer: true
+        ai: true
+        aiMode: local
+        guiTier: minimum
+        osCustomization: true
+        hardening: false
+        ssh: true
+    workstation:
+      description: Full development machine with all managed GUI applications.
+      features:
+        cli: true
+        developer: true
+        ai: true
+        aiMode: local
+        guiTier: all
+        osCustomization: true
+        hardening: false
+        ssh: true
+    server:
+      description: Headless host with CLI tools and optional Linux hardening.
+      features:
+        cli: true
+        developer: false
+        ai: false
+        aiMode: local
+        guiTier: none
+        osCustomization: false
+        hardening: true
+        ssh: true
+    container:
+      description: Image-provisioned remote development environment.
+      features:
+        cli: true
+        developer: true
+        ai: true
+        aiMode: remote
+        guiTier: none
+        osCustomization: false
+        hardening: false
+        ssh: false

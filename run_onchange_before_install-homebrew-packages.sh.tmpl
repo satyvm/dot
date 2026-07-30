@@ -1,0 +1,71 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+{{- $enabled := list "base" -}}
+{{- if $machine.features.cli }}{{ $enabled = append $enabled "cli" }}{{ end -}}
+{{- if $machine.features.developer }}{{ $enabled = append $enabled "developer" }}{{ end -}}
+{{- if $machine.features.ai }}{{ $enabled = append $enabled "ai" }}{{ end -}}
+{{- if $machine.predicates.manageLocalProxy }}{{ $enabled = append $enabled "ai-local" }}{{ end -}}
+{{- if or (eq $machine.features.guiTier "minimum") (eq $machine.features.guiTier "all") }}{{ $enabled = append $enabled "gui-minimum" }}{{ end -}}
+{{- if eq $machine.features.guiTier "all" }}{{ $enabled = append $enabled "gui-all" }}{{ end -}}
+{{- if $machine.predicates.manageHostPackages -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+brew_bin="$(command -v brew 2>/dev/null || true)"
+if [[ -z "$brew_bin" ]]; then
+  for candidate in \
+    "{{ $machine.homebrewPrefix }}/bin/brew" \
+    /opt/homebrew/bin/brew \
+    /usr/local/bin/brew \
+    /home/linuxbrew/.linuxbrew/bin/brew \
+    "$HOME/.linuxbrew/bin/brew"; do
+    if [[ -x "$candidate" ]]; then
+      brew_bin="$candidate"
+      break
+    fi
+  done
+fi
+if [[ -z "$brew_bin" ]]; then
+  printf 'Homebrew is required for package mode {{ $machine.packageMode }}. Run .setup.sh, then retry chezmoi apply.\n' >&2
+  exit 1
+fi
+eval "$("$brew_bin" shellenv)"
+
+# Third-party taps must be trusted before Brew evaluates their formulae.
+{{- range $pkg := .packages.inventory -}}
+  {{- $oses := index $pkg "os" | default (list "darwin" "linux") -}}
+  {{- $arches := index $pkg "arch" | default (list "amd64" "arm64") -}}
+  {{- $providers := index $pkg "providers" | default dict -}}
+  {{- $brewByOs := index $providers "brew" | default dict -}}
+  {{- $formula := index $brewByOs $machine.os | default "" -}}
+  {{- $homebrew := index $pkg "homebrew" | default dict -}}
+  {{- $tap := index $homebrew "tap" | default "" -}}
+  {{- if and (has $pkg.feature $enabled) (has $machine.os $oses) (has $machine.arch $arches) $formula $tap }}
+brew tap {{ $tap | quote }}
+    {{- if eq (index $homebrew "trust" | default "") "formula" }}
+brew trust --formula {{ $formula | quote }}
+    {{- else if eq (index $homebrew "trust" | default "") "tap" }}
+brew trust {{ $tap | quote }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+brew bundle --file=/dev/stdin <<'BREWFILE'
+{{- range $pkg := .packages.inventory }}
+  {{- $oses := index $pkg "os" | default (list "darwin" "linux") }}
+  {{- $arches := index $pkg "arch" | default (list "amd64" "arm64") }}
+  {{- $providers := index $pkg "providers" | default dict }}
+  {{- $brewByOs := index $providers "brew" | default dict }}
+  {{- $formula := index $brewByOs $machine.os | default "" }}
+  {{- $caskByOs := index $providers "cask" | default dict }}
+  {{- $cask := index $caskByOs $machine.os | default "" }}
+  {{- if and (has $pkg.feature $enabled) (has $machine.os $oses) (has $machine.arch $arches) }}
+    {{- if $formula }}
+brew {{ $formula | quote }}
+    {{- end }}
+    {{- if $cask }}
+cask {{ $cask | quote }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+BREWFILE
+{{- end }}

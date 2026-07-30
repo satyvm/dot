@@ -1,3 +1,4 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
 # Repo-only files
 README.md
 LICENSE
@@ -5,22 +6,36 @@ AGENTS.md
 .setup.sh
 .local/CONTEXT.md
 .local/adr
-.local/chezmoi-revamp-plan.md
-.local/spec-ai-agent-platform.md
-.local/handoff-ai-agent-platform.md
+.local/handoffs
+.local/reports
 .backup
+examples
+tests
+.config/agents/skills/add-dotfiles-app/evals
+
+# Existing pre-machine-model configs are a compatibility lane. This prevents
+# renamed run_onchange scripts from being treated as new provisioning work on
+# an already-configured host. Explicit machine profiles opt into the new,
+# convergent provisioning pipeline.
+{{- if $machine.legacy }}
+install-homebrew-packages.sh
+install-system-packages.sh
+install-developer-tools.sh
+configure-macos-defaults.sh
+configure-linux-hardening.sh
+setup-shell.sh
+setup-ai-agent-platform.sh
+.local/bin/dotfiles-macos-apps
+.local/bin/dotfiles-macos-cleanup
+.local/bin/dotfiles-ssh-enroll
+{{- end }}
 
 # Secrets never enter the managed destination when the local age key is absent.
 {{- if not (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
 .backup/cursor-default.code-profile
 {{- end }}
 
-# The repository uses Homebrew on both supported platforms; the former APT and
-# GUI-launch scripts are intentionally retired.
-apt-packages.sh
-setup-zend.sh
-
-{{- if not (or .setupCli .setupAi) }}
+{{- if not $machine.predicates.manageShell }}
 .zshrc
 .zshenv
 .dotfiles
@@ -31,14 +46,18 @@ setup-zend.sh
 setup-shell.sh
 {{- end }}
 
-{{- if or (not .setupDeveloper) (eq .aiMode "remote") }}
-install-tools.sh
-{{- end }}
-{{- if eq .aiMode "remote" }}
-brew-packages.sh
+{{- if or (not $machine.features.developer) (not $machine.predicates.manageHostPackages) }}
+install-developer-tools.sh
 {{- end }}
 
-{{- if not .setupAi }}
+{{- if not $machine.predicates.manageHostPackages }}
+install-homebrew-packages.sh
+{{- end }}
+{{- if not $machine.predicates.manageSystemPackages }}
+install-system-packages.sh
+{{- end }}
+
+{{- if not $machine.features.ai }}
 .config/agents
 .config/ai-tools
 .config/ax
@@ -56,35 +75,34 @@ brew-packages.sh
 .local/bin/pi
 setup-ai-agent-platform.sh
 {{- end }}
-{{- if ne .chezmoi.os "darwin" }}
+{{- if ne $machine.os "darwin" }}
 .zed
 {{- end }}
-{{- if ne .chezmoi.os "linux" }}
+{{- if ne $machine.os "linux" }}
 .config/zed
 {{- end }}
-{{- if or (not .setupAi) (eq .aiMode "remote") }}
+{{- if not $machine.predicates.manageLocalProxy }}
 .config/cli-proxy-api
 {{- end }}
 
-{{- if ne .guiTier "minimum" }}
-{{- if ne .guiTier "all" }}
+{{- if not (or (eq $machine.features.guiTier "minimum") (eq $machine.features.guiTier "all")) }}
 .config/ghostty
 {{- end }}
-{{- end }}
-{{- if ne .guiTier "all" }}
+{{- if ne $machine.features.guiTier "all" }}
 .config/alacritty
 {{- end }}
 
-{{- if and (not .setupCli) (not .setupAi) (eq .guiTier "none") }}
-brew-packages.sh
+{{- if or (ne $machine.os "darwin") (not $machine.features.osCustomization) }}
+configure-macos-defaults.sh
+{{- end }}
+{{- if or (ne $machine.os "linux") (not $machine.features.hardening) }}
+configure-linux-hardening.sh
 {{- end }}
 
-{{- if or (ne .chezmoi.os "darwin") (not .setupMacos) }}
-setup-macos.sh
+{{- if ne $machine.os "darwin" }}
+.local/bin/dotfiles-macos-apps
+.local/bin/dotfiles-macos-cleanup
 {{- end }}
-{{- if or (ne .chezmoi.os "linux") (not .setupLinuxHardening) }}
-setup-linux.sh
-{{- end }}
-{{- if not .setupSshKey }}
-setup-ssh-key.sh
+{{- if not $machine.features.ssh }}
+.local/bin/dotfiles-ssh-enroll
 {{- end }}

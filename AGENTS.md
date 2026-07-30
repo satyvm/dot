@@ -1,6 +1,7 @@
 # AGENTS.md — satyvm / dot
 
-Personal dotfiles managed with [chezmoi](https://chezmoi.io). Primary target is **macOS**, with Linux support through Homebrew.
+Personal dotfiles managed with [chezmoi](https://chezmoi.io). Supports macOS
+and Debian/Ubuntu on `amd64` and `arm64`.
 
 ## Quick Reference
 
@@ -11,17 +12,18 @@ Personal dotfiles managed with [chezmoi](https://chezmoi.io). Primary target is 
 | `chezmoi edit ~/.zshrc` | Edit a managed file |
 | `chezmoi cd` | Jump to source directory |
 | `chezmoi apply` | Apply pending changes |
-| `chezmoi state delete-bucket --bucket=scriptState && chezmoi apply` | Re-run `run_once_*` scripts |
+| `bash tests/test_machine_matrix.sh` | Validate every platform/preset combination |
 
 ## Directory Structure
 
 ```
 ~/.local/share/chezmoi/
-├── .chezmoi.json.tmpl           # Config: encryption, age keys, category/git prompts
-├── .chezmoiignore.tmpl          # Platform/category deployment rules (uses Go templates)
-├── .chezmoiexternal.toml        # External archives (agent skills from GitHub)
+├── .chezmoi.json.tmpl           # Config: preset, host facts, overrides, identity
+├── .chezmoidata/                # Machine presets, packages, AI registries
+├── .chezmoitemplates/machine    # Canonical resolved machine object
+├── .chezmoiignore.tmpl          # Deployment rules using machine predicates
 ├── .setup.sh                    # Bootstrap: installs deps, runs chezmoi init
-├── dot_zshrc                    # → ~/.zshrc
+├── dot_zshrc.tmpl               # → ~/.zshrc
 ├── dot_zshenv                   # → ~/.zshenv (disables macOS session restoration)
 ├── dot_dotfiles/                # → ~/.dotfiles/ (sourced by .zshrc in order)
 │   ├── dot_exports.tmpl         #   PATH, XDG, env vars, Rust/Bun/Go
@@ -39,20 +41,22 @@ Personal dotfiles managed with [chezmoi](https://chezmoi.io). Primary target is 
 │   ├── agents/skills/           #   AI agent skills (downloaded via external archives)
 │   └── ...                      #   alacritty, herdr, pet, cli-proxy-api
 ├── dot_local/bin/               # → ~/.local/bin/ (`ax` + managed agent shims)
-├── run_once_after_*.sh.tmpl     # Setup scripts (run once on first apply)
-├── run_onchange_*.sh.tmpl       # Package installers (re-run on change)
+├── run_onchange_*.sh.tmpl       # Providers and convergent setup
+├── examples/configs/            # Explicit unattended machine configs
+├── tests/test_machine_matrix.sh # macOS/Linux × amd64/arm64 × four presets
 └── dot_backup/                  # Backup scripts + encrypted assets
     └── scripts/
         ├── executable_backup-local.sh   # → backup-local.sh
         └── executable_restore-local.sh  # → restore-local.sh
 ```
 
-## Setup Categories
+## Machine Profiles
 
-Set during `chezmoi init` and persisted under `data` in the local Chezmoi
-config. Every category defaults to off: `setupCli`, `setupDeveloper`,
-`setupAi`, `guiTier`, `setupMacos`, `setupSshKey`, and `setupLinuxHardening`.
-Developer tooling requires CLI; AI has `local` and `remote` modes.
+`chezmoi init` first selects `laptop`, `workstation`, `server`, or `container`,
+then offers optional feature overrides. Host facts and choices are persisted
+under `data.machine`. `.chezmoidata/machine.yaml` owns preset defaults and
+`.chezmoitemplates/machine` derives the resolved features and predicates.
+Legacy configs with the former top-level setup booleans still render.
 
 ## Template System
 
@@ -60,14 +64,16 @@ All `.tmpl` files are [chezmoi Go templates](https://chezmoi.io/reference/templa
 
 | Variable | Source | Example |
 |----------|--------|---------|
-| `.chezmoi.os` | chezmoi built-in | `"darwin"` / `"linux"` |
-| `.setupCli` | `.chezmoi.json.tmpl` prompt | boolean |
-| `.setupAi` / `.aiMode` | `.chezmoi.json.tmpl` prompt | boolean / `"local"` or `"remote"` |
+| `$machine.os` | resolved machine template | `"darwin"` / `"linux"` |
+| `$machine.arch` | resolved machine template | `"amd64"` / `"arm64"` |
+| `$machine.features` | preset plus overrides | CLI/developer/AI/GUI/etc. |
+| `$machine.predicates` | derived policy | host packages/GUI/proxy/etc. |
 | `.name` | `.chezmoi.json.tmpl` prompt | Git user name |
 | `.email` | `.chezmoi.json.tmpl` prompt | Git email |
-| `.setupSshKey` | `.chezmoi.json.tmpl` prompt | boolean |
 
-Common patterns: `{{- if eq .chezmoi.os "darwin" }}`, `{{- if .setupCli }}`, `{{- end }}`.
+Start platform-sensitive templates with
+`{{- $machine := includeTemplate "machine" . | fromJson -}}`. Do not add new
+independent setup booleans.
 
 ## Chezmoi Naming Conventions
 
@@ -88,7 +94,7 @@ Path mapping: `dot_config/nvim/init.lua` → `~/.config/nvim/init.lua`. The dire
 Listed in `.chezmoiignore.tmpl`. These files stay in the source directory only:
 
 - `README.md`, `AGENTS.md`, `.setup.sh`
-- `dot_backup/scripts/` (run from source via `"$(chezmoi source-path)/scripts/backup-local.sh"`)
+- `examples/`, `tests/`, and `dot_backup/`
 - `dot_backup/encrypted_cursor-default.code-profile.age`
 
 ## AI Agent Infrastructure
@@ -150,9 +156,11 @@ Starship must be last — it replaces PS1.
 
 ## Package & Toolchain Management
 
-- **macOS**: Homebrew (Brewfile in `run_onchange_brew-packages.sh.tmpl`)
-- **Linux**: Homebrew packages (Linuxbrew)
-- **Local Toolchains**: `mise` is used per project folder (via `mise.toml` / `.mise.toml`) to maintain and isolate runtime tools and SDK versions.
+- **Canonical inventory**: `.chezmoidata/packages.yaml`
+- **macOS**: Homebrew formulae and casks
+- **Linux**: apt for system packages/services; Linuxbrew for portable CLI tools
+- **Third-party taps**: formula-level trust metadata is rendered before Brewfile evaluation
+- **Versioned tools**: pinned mise/npm/uv/cargo entries; no moving `latest` installs
 - **Docker**: Container engine on macOS is started and managed via **Colima** (`colima start`, `docker context use colima`), not Docker Desktop.
 
 ## Git Configuration
@@ -186,15 +194,18 @@ Backups are timestamped (`local_DDMMYY`). Auto-detects first non-system volume i
 ## Important Gotchas
 
 1. **`.tmpl` files are Go templates** — don't edit them as plain config files. Pay attention to template conditionals.
-2. **`run_once_after_*` scripts won't re-run** unless you clear state: `chezmoi state delete-bucket --bucket=scriptState`
+2. **App additions belong in `.chezmoidata/packages.yaml`** — use the
+   `add-dotfiles-app` skill; don't hardcode installs in provider scripts.
 3. **Agent names are managed shims** — `claude`, `pi`, `opencode`, and `crush`
    always enter `ax`, including through `command`. Use `ax <agent> --direct`
    only for an explicit diagnostic sandbox bypass.
-4. **External skills are refreshed weekly** — if editing local skills in `~/.config/agents/skills/`, be aware they may get overwritten by chezmoi external sync.
+4. **External skills are refreshed weekly** — repo-owned skills such as
+   `add-dotfiles-app` are tracked here; upstream archive targets may be replaced
+   on external refresh.
 5. **Sensitive data is not in this repo** — SSH keys, browser profiles, personal docs are backed up separately to external SSD.
 6. **Platform-sensitive files** may not be present (e.g., macOS scripts are ignored entirely on Linux via `.chezmoiignore.tmpl`).
-7. **AI platform tests are shell-based** — run
-   `bash dot_local/bin/tests/test_ax.sh`; also validate repository rendering with
-   `chezmoi diff` or `chezmoi apply --dry-run`.
+7. **Platform tests are shell-based** — run `bash tests/test_machine_matrix.sh`
+   and `bash dot_local/bin/tests/test_ax.sh`; also validate with `chezmoi diff`
+   or `chezmoi apply --dry-run`.
 8. **Docker on macOS** is started and managed with Colima (`colima start`), not Docker Desktop.
 9. **fzf initialization is deferred** via precmd hook for faster shell startup.

@@ -1,6 +1,5 @@
-{{- $environment := "mac-dev" -}}
-{{- if eq .aiMode "remote" }}{{ $environment = "remote-dev" }}{{ end -}}
-{{- $devRoot := index .aiTools.paths.devRoot $environment -}}
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+{{- $devRoot := $machine.devRoot -}}
 {
   "ssh_connections": [
     {

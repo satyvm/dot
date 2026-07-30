@@ -1,3 +1,4 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
 # .aliases
 
 alias rm='rm -i'
@@ -6,7 +7,7 @@ alias mv='mv -iv'
 alias mkdir='mkdir -pv'
 alias ..='cd ../'
 alias ...='cd ../../'
-{{- if eq .chezmoi.os "darwin" }}
+{{- if eq $machine.os "darwin" }}
 alias f='open -a Finder ./'
 {{- end }}
 alias ~="cd ~"
@@ -37,13 +38,13 @@ alias dcdown='dc stop && dc down --remove-orphans'
 alias dce='docker compose exec'
 alias k='kubectl'
 
-{{- if eq .chezmoi.os "darwin" }}
+{{- if eq $machine.os "darwin" }}
 alias flushdns="sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder"
 alias showfiles="defaults write com.apple.finder AppleShowAllFiles -bool true && killall Finder"
 alias hidefiles="defaults write com.apple.finder AppleShowAllFiles -bool false && killall Finder"
 {{- end }}
 
-{{- if eq .chezmoi.os "linux" }}
+{{- if eq $machine.os "linux" }}
 alias update="sudo apt update && sudo apt upgrade -y"
 alias ports="sudo ss -tulnp"
 {{- end }}

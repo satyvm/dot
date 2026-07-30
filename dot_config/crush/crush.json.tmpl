@@ -1,3 +1,4 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
 {
   "$schema": "https://charm.land/crush.json",
   "options": {
@@ -6,9 +7,7 @@
     ]
   },
   "mcp": {
-{{- $environment := "mac-dev" -}}
-{{- if eq .aiMode "remote" }}{{ $environment = "remote-dev" }}{{ end -}}
-{{- $devRoot := index .aiTools.paths.devRoot $environment -}}
+{{- $devRoot := $machine.devRoot -}}
 {{- $mcpServers := .aiTools.mcp.servers -}}
 {{- range $index, $name := keys $mcpServers | sortAlpha }}
 {{- $server := index $mcpServers $name }}
@@ -34,7 +33,7 @@
   "providers": {
     "cliproxy": {
       "type": "openai-compat",
-      "base_url": "{{ if eq .aiMode "remote" }}http://cliproxyapi:8317{{ else }}{{ .aiAgentPlatform.proxy.url }}{{ end }}/v1",
+      "base_url": "{{ if eq $machine.features.aiMode "remote" }}http://cliproxyapi:8317{{ else }}{{ .aiAgentPlatform.proxy.url }}{{ end }}/v1",
       "api_key": "$OPENAI_API_KEY",
       "discover_models": true,
       "models": [

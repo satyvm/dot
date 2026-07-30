@@ -1,0 +1,27 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+ssh_key="$HOME/.ssh/gh_personal"
+mkdir -p "$HOME/.ssh"
+chmod 0700 "$HOME/.ssh"
+
+if [[ ! -s "$ssh_key" || ! -s "$ssh_key.pub" ]]; then
+  printf 'Generating %s\n' "$ssh_key"
+  ssh-keygen -t ed25519 -C {{ .email | quote }} -f "$ssh_key"
+fi
+
+eval "$(ssh-agent -s)"
+{{- if eq $machine.os "darwin" }}
+ssh-add --apple-use-keychain "$ssh_key"
+{{- else }}
+ssh-add "$ssh_key"
+{{- end }}
+
+command -v gh >/dev/null 2>&1 ||
+  { printf 'GitHub CLI is required. Enable the CLI feature and run chezmoi apply.\n' >&2; exit 1; }
+if ! gh auth status >/dev/null 2>&1; then
+  gh auth login
+fi
+gh ssh-key add "$ssh_key.pub" --title "$(hostname) - $(date +%Y-%m-%d)"
+printf 'SSH key enrolled. Run chezmoi apply to enable Git SSH signing.\n'

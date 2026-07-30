@@ -3,6 +3,7 @@ set -euo pipefail
 
 stack_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 compose_file="$stack_dir/hermes_docker_compose.yaml"
+host_chezmoi_cache="${XDG_CACHE_HOME:-$HOME/.cache}/chezmoi"
 pycache_dir="$(mktemp -d "${TMPDIR:-/tmp}/hermes-pycache.XXXXXX")"
 rendered=""
 rendered_json=""
@@ -54,7 +55,7 @@ if command -v chezmoi >/dev/null 2>&1; then
   remote_config="$(mktemp "${TMPDIR:-/tmp}/hermes-remote-config.XXXXXX")"
   remote_destination="$(mktemp -d "${TMPDIR:-/tmp}/hermes-remote-home.XXXXXX")"
   printf '%s\n' \
-    '{"data":{"setupCli":true,"setupDeveloper":true,"setupAi":true,"aiMode":"remote","guiTier":"none","setupMacos":false,"setupLinuxHardening":false,"setupSshKey":false,"name":"Satyam","email":"test@example.com"}}' \
+    '{"data":{"machine":{"schemaVersion":1,"preset":"container","os":"linux","arch":"amd64","distro":"debian","homebrewPrefix":"/home/linuxbrew/.linuxbrew","devRoot":"/home/ubuntu/dev","customize":false,"overrides":{}},"name":"Satyam","email":"test@example.com"}}' \
     >"$remote_config"
   remote_managed="$(
     HOME="$remote_destination" chezmoi managed \
@@ -62,13 +63,14 @@ if command -v chezmoi >/dev/null 2>&1; then
       --config-format json \
       --source "$stack_dir/../.." \
       --destination "$remote_destination" \
+      --cache "$host_chezmoi_cache" \
       --refresh-externals=never
   )"
-  if grep -qx 'brew-packages.sh' <<<"$remote_managed"; then
+  if grep -qx 'install-homebrew-packages.sh' <<<"$remote_managed"; then
     echo "remote profile must not run the host Homebrew package installer" >&2
     exit 1
   fi
-  if grep -qx 'install-tools.sh' <<<"$remote_managed"; then
+  if grep -qx 'install-developer-tools.sh' <<<"$remote_managed"; then
     echo "remote profile must use image-baked developer tools" >&2
     exit 1
   fi
@@ -261,9 +263,8 @@ grep -q '/dev/tcp/127.0.0.1/8317' "$compose_file"
 grep -q 'chezmoi.json' "$stack_dir/entrypoint.sh"
 grep -q 'legacy hand-written chezmoi config' "$stack_dir/entrypoint.sh"
 grep -q 'chezmoi init' "$stack_dir/entrypoint.sh"
-grep -q 'AI deployment mode=remote' "$stack_dir/entrypoint.sh"
-grep -q 'Install developer toolchain=true' "$stack_dir/entrypoint.sh"
-grep -q 'Configure Linux firewall and fail2ban=false' "$stack_dir/entrypoint.sh"
+grep -q 'Machine preset=container' "$stack_dir/entrypoint.sh"
+grep -q 'Customize preset features=false' "$stack_dir/entrypoint.sh"
 grep -q 'bootstrap marker is incomplete' "$stack_dir/entrypoint.sh"
 if grep -A5 'bootstrap_dotfiles()' "$stack_dir/entrypoint.sh" | grep -q 'return'; then
   echo "initialized remote dotfiles must refresh and apply on container restart" >&2
@@ -281,6 +282,7 @@ fi
 grep -q '/home/linuxbrew/.linuxbrew/bin/herdr' "$stack_dir/Dockerfile"
 grep -q '/home/linuxbrew/.linuxbrew/bin/nono' "$stack_dir/Dockerfile"
 grep -q '/home/linuxbrew/.linuxbrew/bin/crush' "$stack_dir/Dockerfile"
+grep -q 'brew trust --formula charmbracelet/tap/crush' "$stack_dir/Dockerfile"
 grep -q 'install -d -o ubuntu -g ubuntu' "$stack_dir/Dockerfile"
 grep -q '/home/linuxbrew/.linuxbrew' "$stack_dir/Dockerfile"
 

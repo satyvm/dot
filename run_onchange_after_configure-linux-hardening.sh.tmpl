@@ -1,0 +1,52 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+{{- if and (eq $machine.os "linux") $machine.features.hardening -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+is_container() {
+  [[ -f /.dockerenv || -f /run/.containerenv ]] && return 0
+  command -v systemd-detect-virt >/dev/null 2>&1 && systemd-detect-virt --container >/dev/null 2>&1
+}
+
+if is_container; then
+  echo "Container detected; skipping firewall and fail2ban configuration."
+  exit 0
+fi
+
+if [[ "$(id -u)" -eq 0 ]]; then
+  sudo_cmd=()
+elif command -v sudo >/dev/null 2>&1; then
+  sudo_cmd=(sudo)
+else
+  printf 'Linux hardening requires root or sudo.\n' >&2
+  exit 1
+fi
+
+command -v ufw >/dev/null 2>&1 ||
+  { printf 'ufw is missing; rerun the system package installer.\n' >&2; exit 1; }
+command -v fail2ban-client >/dev/null 2>&1 ||
+  { printf 'fail2ban is missing; rerun the system package installer.\n' >&2; exit 1; }
+command -v systemctl >/dev/null 2>&1 ||
+  { printf 'systemd is required for the server hardening profile.\n' >&2; exit 1; }
+
+ssh_port="${DOTFILES_SSH_PORT:-}"
+if [[ -z "$ssh_port" && -n "${SSH_CONNECTION:-}" ]]; then
+  ssh_port="${SSH_CONNECTION##* }"
+fi
+if [[ -z "$ssh_port" ]] && command -v sshd >/dev/null 2>&1; then
+  if sshd_settings="$("${sudo_cmd[@]}" sshd -T 2>/dev/null)"; then
+    ssh_port="$(awk '$1 == "port" { print $2; exit }' <<<"$sshd_settings")"
+  fi
+fi
+if [[ ! "$ssh_port" =~ ^[0-9]+$ ]] || ((ssh_port < 1 || ssh_port > 65535)); then
+  ssh_port=22
+fi
+
+"${sudo_cmd[@]}" ufw default deny incoming
+"${sudo_cmd[@]}" ufw default allow outgoing
+"${sudo_cmd[@]}" ufw allow "${ssh_port}/tcp"
+"${sudo_cmd[@]}" ufw allow 80/tcp
+"${sudo_cmd[@]}" ufw allow 443/tcp
+"${sudo_cmd[@]}" ufw --force enable
+"${sudo_cmd[@]}" systemctl enable --now fail2ban
+{{- end }}

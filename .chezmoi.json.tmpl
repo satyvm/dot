@@ -1,19 +1,51 @@
-{{- $setupCli := promptBool "Install core CLI setup" -}}
-{{- $setupDeveloper := false -}}
-{{- if $setupCli }}{{ $setupDeveloper = promptBool "Install developer toolchain" }}{{ end -}}
-{{- $setupAi := promptBool "Install AI setup" -}}
-{{- $aiMode := "local" -}}
-{{- if $setupAi }}{{ $aiMode = promptChoice "AI deployment mode" (list "local" "remote") }}{{ end -}}
-{{- $guiTier := "none" -}}
-{{- $setupMacos := false -}}
-{{- $setupLinuxHardening := false -}}
-{{- if eq .chezmoi.os "darwin" }}
-{{- $guiTier = promptChoice "GUI tools" (list "none" "minimum" "all") -}}
-{{- $setupMacos = promptBool "Apply macOS customization" -}}
-{{- else if eq .chezmoi.os "linux" }}
-{{- $setupLinuxHardening = promptBool "Configure Linux firewall and fail2ban" -}}
+{{- $os := .chezmoi.os -}}
+{{- $arch := .chezmoi.arch -}}
+{{- if not (has $os (list "darwin" "linux")) -}}
+  {{- fail (printf "unsupported operating system %q; this repository supports macOS and Debian/Ubuntu Linux" $os) -}}
 {{- end -}}
-{{- $setupSshKey := promptBool "Set up SSH key and GitHub signing" -}}
+{{- if not (has $arch (list "amd64" "arm64")) -}}
+  {{- fail (printf "unsupported architecture %q; this repository supports amd64 and arm64" $arch) -}}
+{{- end -}}
+
+{{- $distro := "macos" -}}
+{{- if eq $os "linux" -}}
+  {{- $distro = "unknown" -}}
+  {{- if stat "/etc/os-release" -}}
+    {{- $distro = output "sh" "-c" ". /etc/os-release; printf '%s' \"${ID:-unknown}\"" | trim -}}
+  {{- end -}}
+  {{- if not (has $distro (list "debian" "ubuntu")) -}}
+    {{- fail (printf "unsupported Linux distribution %q; only Debian and Ubuntu are supported" $distro) -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $presetDefault := "server" -}}
+{{- if eq $os "darwin" }}{{ $presetDefault = "workstation" }}{{ end -}}
+{{- $preset := promptChoice "Machine preset" (list "laptop" "workstation" "server" "container") $presetDefault -}}
+{{- $customize := promptBool "Customize preset features" false -}}
+
+{{- $setupCli := false -}}
+{{- $setupDeveloper := false -}}
+{{- $setupAi := false -}}
+{{- $aiMode := "local" -}}
+{{- $guiTier := "none" -}}
+{{- $setupOs := false -}}
+{{- $setupHardening := false -}}
+{{- $setupSsh := false -}}
+{{- if $customize -}}
+  {{- $setupCli = promptBool "Install core CLI setup" true -}}
+  {{- if $setupCli }}{{ $setupDeveloper = promptBool "Install developer toolchain" false }}{{ end -}}
+  {{- $setupAi = promptBool "Install AI setup" false -}}
+  {{- if $setupAi }}{{ $aiMode = promptChoice "AI deployment mode" (list "local" "remote") "local" }}{{ end -}}
+  {{- if eq $os "darwin" }}{{ $guiTier = promptChoice "GUI tools" (list "none" "minimum" "all") "none" }}{{ end -}}
+  {{- $setupOs = promptBool "Apply OS customization" false -}}
+  {{- if eq $os "linux" }}{{ $setupHardening = promptBool "Configure Linux firewall and fail2ban" false }}{{ end -}}
+  {{- $setupSsh = promptBool "Manage SSH signing when the key exists" false -}}
+{{- end -}}
+
+{{- $brewPrefix := "/home/linuxbrew/.linuxbrew" -}}
+{{- if eq $os "darwin" -}}
+  {{- if eq $arch "arm64" }}{{ $brewPrefix = "/opt/homebrew" }}{{ else }}{{ $brewPrefix = "/usr/local" }}{{ end -}}
+{{- end -}}
 {
   "encryption": "age",
   "age": {
@@ -21,14 +53,26 @@
     "recipient": "age1naksqkvrfy66sr6ezvw3ykf5ga4tuzp67q78dm94weeduydwssrqx7j67x"
   },
   "data": {
-    "setupCli": {{ $setupCli }},
-    "setupDeveloper": {{ $setupDeveloper }},
-    "setupAi": {{ $setupAi }},
-    "aiMode": {{ $aiMode | quote }},
-    "guiTier": {{ $guiTier | quote }},
-    "setupMacos": {{ $setupMacos }},
-    "setupLinuxHardening": {{ $setupLinuxHardening }},
-    "setupSshKey": {{ $setupSshKey }},
+    "machine": {
+      "schemaVersion": 1,
+      "preset": {{ $preset | quote }},
+      "os": {{ $os | quote }},
+      "arch": {{ $arch | quote }},
+      "distro": {{ $distro | quote }},
+      "homebrewPrefix": {{ $brewPrefix | quote }},
+      "devRoot": {{ joinPath .chezmoi.homeDir "dev" | quote }},
+      "customize": {{ $customize }},
+      "overrides": {
+        "cli": {{ $setupCli }},
+        "developer": {{ $setupDeveloper }},
+        "ai": {{ $setupAi }},
+        "aiMode": {{ $aiMode | quote }},
+        "guiTier": {{ $guiTier | quote }},
+        "osCustomization": {{ $setupOs }},
+        "hardening": {{ $setupHardening }},
+        "ssh": {{ $setupSsh }}
+      }
+    },
     "name": {{ promptString "Git user name" "Satyam" | quote }},
     "email": {{ promptString "Git email address" "75127014+satyvm@users.noreply.github.com" | quote }}
   }

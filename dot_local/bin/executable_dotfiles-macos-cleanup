@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  printf 'This command is only available on macOS.\n' >&2
+  exit 64
+fi
+
+apps=(GarageBand iMovie Keynote Numbers Pages)
+printf 'This will permanently remove the following applications:\n'
+printf '  %s\n' "${apps[@]}"
+read -r -p 'Type REMOVE to continue: ' confirmation
+[[ "$confirmation" == "REMOVE" ]] || {
+  printf 'Aborted.\n'
+  exit 1
+}
+
+for app in "${apps[@]}"; do
+  for app_path in "/Applications/${app}.app" "/System/Applications/${app}.app"; do
+    if [[ -d "$app_path" ]]; then
+      sudo rm -rf -- "$app_path"
+      printf 'Removed %s\n' "$app_path"
+    fi
+  done
+done

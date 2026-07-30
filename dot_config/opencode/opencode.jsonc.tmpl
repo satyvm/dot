@@ -1,3 +1,4 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
 {
   "$schema": "https://opencode.ai/config.json",
   "autoupdate": false,
@@ -8,9 +9,7 @@
   "model": "cliproxy/{{ .aiAgentPlatform.agents.opencode.defaultRole }}",
   "small_model": "cliproxy/light",
   "mcp": {
-{{- $environment := "mac-dev" -}}
-{{- if eq .aiMode "remote" }}{{ $environment = "remote-dev" }}{{ end -}}
-{{- $devRoot := index .aiTools.paths.devRoot $environment -}}
+{{- $devRoot := $machine.devRoot -}}
 {{- $servers := .aiTools.mcp.servers -}}
 {{- range $index, $name := keys $servers | sortAlpha }}
 {{- $server := index $servers $name }}
@@ -36,7 +35,7 @@
       "npm": "@ai-sdk/openai-compatible",
       "name": "CLIProxyAPI",
       "options": {
-        "baseURL": "{{ if eq .aiMode "remote" }}http://cliproxyapi:8317{{ else }}{{ .aiAgentPlatform.proxy.url }}{{ end }}/v1",
+        "baseURL": "{{ if eq $machine.features.aiMode "remote" }}http://cliproxyapi:8317{{ else }}{{ .aiAgentPlatform.proxy.url }}{{ end }}/v1",
         "apiKey": "{env:OPENAI_API_KEY}",
         "timeout": 600000,
         "chunkTimeout": 60000

@@ -1,0 +1,67 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+{{- if and $machine.features.developer $machine.predicates.manageHostPackages -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.local/share/mise/shims:$PATH"
+
+if ! command -v rustup >/dev/null 2>&1; then
+  curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs |
+    sh -s -- -y --default-toolchain {{ .packages.runtimePins.rustToolchain | quote }}
+fi
+# shellcheck disable=SC1091 # rustup creates this user-scoped environment file.
+[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+rustup toolchain install {{ .packages.runtimePins.rustToolchain | quote }}
+rustup default {{ .packages.runtimePins.rustToolchain | quote }}
+
+{{- range $pkg := .packages.inventory }}
+  {{- $provider := index (index $pkg "providers" | default dict) "cargo" | default dict }}
+  {{- if and (eq $pkg.feature "developer") (ne (len $provider) 0) }}
+cargo install {{ $provider.name | quote }} --version {{ $provider.version | quote }} --locked
+  {{- end }}
+{{- end }}
+
+if ! command -v uv >/dev/null 2>&1; then
+  printf 'uv is missing; rerun the Homebrew package installer first.\n' >&2
+  exit 1
+fi
+uv python install {{ .packages.runtimePins.python | quote }}
+{{- range $pkg := .packages.inventory }}
+  {{- $provider := index (index $pkg "providers" | default dict) "uv" | default dict }}
+  {{- if and (eq $pkg.feature "developer") (ne (len $provider) 0) }}
+uv tool install --force {{ printf "%s==%s" $provider.name $provider.version | quote }}
+  {{- end }}
+{{- end }}
+
+if ! command -v mise >/dev/null 2>&1; then
+  printf 'mise is missing; rerun the Homebrew package installer first.\n' >&2
+  exit 1
+fi
+{{- range $pkg := .packages.inventory }}
+  {{- $provider := index (index $pkg "providers" | default dict) "mise" | default dict }}
+  {{- if and (eq $pkg.feature "developer") (ne (len $provider) 0) }}
+mise use -g {{ printf "%s@%s" $provider.name $provider.version | quote }}
+  {{- end }}
+{{- end }}
+mise reshim
+
+if command -v gcloud >/dev/null 2>&1; then
+  gcloud components install --quiet gke-gcloud-auth-plugin
+fi
+
+if command -v npm >/dev/null 2>&1; then
+{{- range $pkg := .packages.inventory }}
+  {{- $provider := index (index $pkg "providers" | default dict) "npm" | default dict }}
+  {{- if and (eq $pkg.feature "developer") (ne (len $provider) 0) }}
+  npm install --global {{ printf "%s@%s" $provider.name $provider.version | quote }}
+  {{- end }}
+{{- end }}
+else
+  printf 'npm is unavailable after the pinned Node installation.\n' >&2
+  exit 1
+fi
+
+if ! command -v bun >/dev/null 2>&1 || [[ "$(bun --version)" != {{ .packages.runtimePins.bun | quote }} ]]; then
+  curl -fsSL https://bun.sh/install | bash -s -- {{ printf "bun-v%s" .packages.runtimePins.bun | quote }}
+fi
+{{- end }}

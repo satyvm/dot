@@ -114,6 +114,13 @@ RUN install -d -o ubuntu -g ubuntu \
       NONINTERACTIVE=1 \
       HOMEBREW_NO_ANALYTICS=1 \
       HOMEBREW_NO_AUTO_UPDATE=1 \
+      /home/linuxbrew/.linuxbrew/bin/brew trust --formula charmbracelet/tap/crush \
+    && runuser -u ubuntu -- env \
+      HOME=/home/ubuntu \
+      PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+      NONINTERACTIVE=1 \
+      HOMEBREW_NO_ANALYTICS=1 \
+      HOMEBREW_NO_AUTO_UPDATE=1 \
       /home/linuxbrew/.linuxbrew/bin/brew install \
         bat eza fd fzf gh git-delta gopls lazygit neovim rust-analyzer \
         starship uv zoxide \

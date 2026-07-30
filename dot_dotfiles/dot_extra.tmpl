@@ -1,11 +1,15 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
 # ── zsh-autosuggestions ──────────────────────────────────────────────
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=248'
-{{- if eq .chezmoi.os "darwin" }}
+{{- if $machine.legacy }}
 if [[ -f /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
   source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 fi
 {{- else }}
 for _zas in \
+  "${HOMEBREW_PREFIX:-}/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+  /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh \
+  /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh \
   /home/linuxbrew/.linuxbrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh \
   /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh; do
   if [[ -f "$_zas" ]]; then source "$_zas"; break; fi
@@ -14,12 +18,15 @@ unset _zas
 {{- end }}
 
 # ── zsh-syntax-highlighting ──────────────────────────────────────────
-{{- if eq .chezmoi.os "darwin" }}
+{{- if $machine.legacy }}
 if [[ -f /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
   source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi
 {{- else }}
 for _zsh in \
+  "${HOMEBREW_PREFIX:-}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" \
+  /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh \
+  /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh \
   /home/linuxbrew/.linuxbrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh \
   /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh; do
   if [[ -f "$_zsh" ]]; then source "$_zsh"; break; fi
@@ -30,12 +37,15 @@ unset _zsh
 # ── zsh-history-substring-search ────────────────────────────────────
 HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_FOUND=''
 HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_NOT_FOUND=''
-{{- if eq .chezmoi.os "darwin" }}
+{{- if $machine.legacy }}
 if [[ -f /opt/homebrew/share/zsh-history-substring-search/zsh-history-substring-search.zsh ]]; then
   source /opt/homebrew/share/zsh-history-substring-search/zsh-history-substring-search.zsh
 fi
 {{- else }}
 for _zhss in \
+  "${HOMEBREW_PREFIX:-}/share/zsh-history-substring-search/zsh-history-substring-search.zsh" \
+  /opt/homebrew/share/zsh-history-substring-search/zsh-history-substring-search.zsh \
+  /usr/local/share/zsh-history-substring-search/zsh-history-substring-search.zsh \
   /home/linuxbrew/.linuxbrew/share/zsh-history-substring-search/zsh-history-substring-search.zsh \
   /usr/share/zsh-history-substring-search/zsh-history-substring-search.zsh; do
   if [[ -f "$_zhss" ]]; then source "$_zhss"; break; fi
@@ -101,3 +111,4 @@ setopt hist_verify
 if [[ -s "$HOME/.bun/_bun" ]]; then
   source "$HOME/.bun/_bun"
 fi
+{{- if $machine.legacy -}}{{- /* Keep legacy hosts byte-for-byte stable. */ -}}{{- end -}}

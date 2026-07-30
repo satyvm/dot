@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  printf 'This command is only available on macOS.\n' >&2
+  exit 64
+fi
+command -v mas >/dev/null 2>&1 ||
+  { printf 'mas is missing; enable a macOS GUI tier and run chezmoi apply.\n' >&2; exit 1; }
+
+export MAS_NO_AUTO_INDEX=1
+apps=(
+  "1444383602:Goodnotes"
+  "1451685025:WireGuard"
+  "1607635845:Velja"
+  "6762003285:Kofe Flow"
+  "6468120888:CleanMyKeyboard"
+)
+for entry in "${apps[@]}"; do
+  id="${entry%%:*}"
+  name="${entry#*:}"
+  if mas list | awk '{print $1}' | grep -qx "$id"; then
+    printf '%s is already installed.\n' "$name"
+  else
+    mas install "$id"
+  fi
+done

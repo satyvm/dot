@@ -1,6 +1,8 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
 DOTFILES="$HOME/.dotfiles"
 
 # Homebrew setup
+{{- if $machine.legacy }}
 if [[ -d "/opt/homebrew" ]]; then
   export HOMEBREW_PREFIX="/opt/homebrew"
   export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
@@ -16,6 +18,26 @@ elif [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
 elif command -v brew >/dev/null 2>&1; then
   eval "$(brew shellenv)"
 fi
+{{- else }}
+_brew_bin="$(command -v brew 2>/dev/null || true)"
+if [[ -z "$_brew_bin" ]]; then
+  for _brew_candidate in \
+    {{ (printf "%s/bin/brew" $machine.homebrewPrefix) | quote }} \
+    /opt/homebrew/bin/brew \
+    /usr/local/bin/brew \
+    /home/linuxbrew/.linuxbrew/bin/brew \
+    "$HOME/.linuxbrew/bin/brew"; do
+    if [[ -x "$_brew_candidate" ]]; then
+      _brew_bin="$_brew_candidate"
+      break
+    fi
+  done
+fi
+if [[ -n "$_brew_bin" ]]; then
+  eval "$("$_brew_bin" shellenv)"
+fi
+unset _brew_bin _brew_candidate
+{{- end }}
 
 for file in "$DOTFILES"/.{exports,aliases,functions,extra}; do
   [ -r "$file" ] && source "$file"
@@ -42,3 +64,4 @@ zstyle ':completion:*' cache-path "$HOME/.cache/zsh/zcompcache"
 if command -v starship >/dev/null 2>&1; then
   eval "$(starship init zsh)"
 fi
+{{- if $machine.legacy -}}{{- /* Keep legacy hosts byte-for-byte stable. */ -}}{{- end -}}

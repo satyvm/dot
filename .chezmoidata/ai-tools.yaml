@@ -1,16 +1,12 @@
 aiTools:
   version: 1
-  paths:
-    devRoot:
-      mac-dev: /Users/s/dev
-      remote-dev: /home/ubuntu/dev
   mcp:
     servers:
       context7:
         command: npx
         args: ["-y", "@upstash/context7-mcp@2.1.1"]
         pinnedVersion: "2.1.1"
-        environments: ["mac-dev", "remote-dev"]
+        environments: ["local-dev", "remote-dev"]
         roots: ["{{ .devRoot }}"]
         clients: ["hermes", "claude", "pi", "opencode", "crush", "zed"]
   lsp:
@@ -19,7 +15,7 @@ aiTools:
         command: vtsls
         args: ["--stdio"]
         pinnedVersion: "0.3.0"
-        environments: ["mac-dev", "remote-dev"]
+        environments: ["local-dev", "remote-dev"]
         filetypes:
           ["typescript", "typescriptreact", "javascript", "javascriptreact"]
         extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"]
@@ -27,20 +23,20 @@ aiTools:
         command: pyright-langserver
         args: ["--stdio"]
         pinnedVersion: "1.1.411"
-        environments: ["mac-dev", "remote-dev"]
+        environments: ["local-dev", "remote-dev"]
         filetypes: ["python"]
         extensions: [".py", ".pyi"]
       gopls:
         command: gopls
         args: []
         pinnedVersion: "0.23.0"
-        environments: ["mac-dev", "remote-dev"]
+        environments: ["local-dev", "remote-dev"]
         filetypes: ["go"]
         extensions: [".go"]
       rust-analyzer:
         command: rust-analyzer
         args: []
         pinnedVersion: "2026-07-20"
-        environments: ["mac-dev", "remote-dev"]
+        environments: ["local-dev", "remote-dev"]
         filetypes: ["rust"]
         extensions: [".rs"]

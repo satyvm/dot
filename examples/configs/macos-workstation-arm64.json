@@ -1,0 +1,17 @@
+{
+  "data": {
+    "machine": {
+      "schemaVersion": 1,
+      "preset": "workstation",
+      "os": "darwin",
+      "arch": "arm64",
+      "distro": "macos",
+      "homebrewPrefix": "/opt/homebrew",
+      "devRoot": "/Users/s/dev",
+      "customize": false,
+      "overrides": {}
+    },
+    "name": "Satyam",
+    "email": "75127014+satyvm@users.noreply.github.com"
+  }
+}

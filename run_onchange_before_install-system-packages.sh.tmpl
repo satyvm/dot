@@ -1,0 +1,47 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+{{- if $machine.predicates.manageSystemPackages -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ ! -r /etc/os-release ]]; then
+  printf 'Cannot identify this Linux distribution: /etc/os-release is missing.\n' >&2
+  exit 1
+fi
+# shellcheck disable=SC1091
+. /etc/os-release
+case "${ID:-unknown}" in
+  debian|ubuntu) ;;
+  *)
+    printf 'Unsupported Linux distribution: %s. Only Debian and Ubuntu are supported.\n' "${ID:-unknown}" >&2
+    exit 1
+    ;;
+esac
+
+if [[ "$(id -u)" -eq 0 ]]; then
+  apt_cmd=(apt-get)
+elif command -v sudo >/dev/null 2>&1; then
+  apt_cmd=(sudo apt-get)
+else
+  printf 'Installing system packages requires root or sudo.\n' >&2
+  exit 1
+fi
+
+packages=(
+{{- $enabled := list "base" -}}
+{{- if $machine.features.cli }}{{ $enabled = append $enabled "cli" }}{{ end -}}
+{{- if $machine.features.developer }}{{ $enabled = append $enabled "developer" }}{{ end -}}
+{{- if $machine.features.hardening }}{{ $enabled = append $enabled "hardening" }}{{ end -}}
+{{- range $pkg := .packages.inventory }}
+  {{- $oses := index $pkg "os" | default (list "darwin" "linux") }}
+  {{- $arches := index $pkg "arch" | default (list "amd64" "arm64") }}
+  {{- $providers := index $pkg "providers" | default dict }}
+  {{- $apt := index $providers "apt" | default "" }}
+  {{- if and (has $pkg.feature $enabled) (has "linux" $oses) (has $machine.arch $arches) $apt }}
+  {{ $apt | quote }}
+  {{- end }}
+{{- end }}
+)
+
+"${apt_cmd[@]}" update
+"${apt_cmd[@]}" install -y --no-install-recommends "${packages[@]}"
+{{- end }}

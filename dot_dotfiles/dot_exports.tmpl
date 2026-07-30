@@ -1,12 +1,13 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
 # .exports
-{{- if .setupCli }}
+{{- if $machine.features.cli }}
 export EDITOR="nvim"
 export VISUAL="nvim"
 {{- else }}
 export EDITOR="${EDITOR:-vi}"
 export VISUAL="${VISUAL:-$EDITOR}"
 {{- end }}
-{{- if eq .chezmoi.os "darwin" }}
+{{- if eq $machine.os "darwin" }}
 export LANG="en_US.UTF-8"
 export LC_ALL="en_US.UTF-8"
 {{- else }}

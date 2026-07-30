@@ -1,0 +1,53 @@
+{
+  "skill_name": "add-dotfiles-app",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add atuin to this dotfiles repo as a CLI app on macOS and Debian/Ubuntu, including its shell config. Keep it working on arm64 and amd64.",
+      "expected_output": "Adds one canonical CLI inventory entry with Brew mappings for both OSes, manages config through the CLI feature, and extends tests only for new behavior.",
+      "files": [],
+      "assertions": [
+        "The package is added to .chezmoidata/packages.yaml rather than hardcoded in an installer.",
+        "Both darwin and linux Brew providers are represented.",
+        "Managed configuration is excluded when the CLI feature is disabled.",
+        "The machine matrix passes."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Install Arc only on full macOS workstations. It should never appear on Linux, servers, containers, or the minimum GUI tier.",
+      "expected_output": "Adds a darwin-only gui-all cask and verifies its exclusions across other profiles and platforms.",
+      "files": [],
+      "assertions": [
+        "The entry uses feature gui-all and provider cask.",
+        "The entry has an explicit darwin constraint.",
+        "No Linux package or special-case installer is added.",
+        "Matrix assertions cover workstation inclusion and other-profile exclusion."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Add Caddy as a Debian/Ubuntu server service and manage its config, but don't start services inside containers.",
+      "expected_output": "Classifies Caddy as a Linux system service, uses apt metadata, scopes config and convergence to Linux servers, and excludes containers.",
+      "files": [],
+      "assertions": [
+        "The package uses an apt provider and a linux constraint.",
+        "Service configuration uses resolved machine predicates.",
+        "Container profiles do not install or start the service.",
+        "A focused service lifecycle matrix test is added."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Add a CLI formula from acme/tools called acme-lint for macOS and Linux. Homebrew says the tap must be trusted.",
+      "expected_output": "Adds a fully qualified third-party Brew formula with formula-level trust metadata and relies on the generic trust renderer.",
+      "files": [],
+      "assertions": [
+        "The formula is owner/tap/formula qualified for both operating systems.",
+        "The entry declares tap acme/tools and trust formula.",
+        "No handwritten brew tap, trust, or install command is introduced.",
+        "Rendered Brew output trusts the formula before Brewfile evaluation."
+      ]
+    }
+  ]
+}

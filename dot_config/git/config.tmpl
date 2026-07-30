@@ -1,7 +1,8 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
 [user]
   name = {{ .name | quote }}
   email = {{ .email | quote }}
-{{- if and .setupCli (or .setupSshKey (stat (joinPath .chezmoi.homeDir ".ssh/gh_personal.pub")) ) }}
+{{- if and $machine.features.cli $machine.features.ssh (stat (joinPath .chezmoi.homeDir ".ssh/gh_personal.pub")) }}
   signingkey = {{ joinPath .chezmoi.homeDir ".ssh/gh_personal.pub" | quote }}
 
 [gpg]
@@ -14,7 +15,7 @@
   gpgsign = true
 {{- end }}
 
-{{- if .setupCli }}
+{{- if $machine.features.cli }}
 [init]
   defaultBranch = main
 
