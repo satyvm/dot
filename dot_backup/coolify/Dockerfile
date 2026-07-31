@@ -26,18 +26,44 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
       build-essential \
       ca-certificates \
+      cmake \
       curl \
       fd-find \
       file \
       git \
+      git-lfs \
+      gnupg \
       gzip \
       jq \
+      libatspi2.0-0 \
+      libatk-bridge2.0-0 \
+      libatk1.0-0 \
+      libasound2 \
+      libcairo2 \
+      libcups2 \
+      libdbus-1-3 \
+      libgbm1 \
+      libglib2.0-0 \
+      libnspr4 \
+      libnss3 \
+      libpango-1.0-0 \
+      libx11-6 \
+      libxcb1 \
+      libxcomposite1 \
+      libxdamage1 \
+      libxext6 \
+      libxfixes3 \
+      libxkbcommon0 \
+      libxrandr2 \
       locales \
       openssh-server \
+      pkg-config \
       procps \
+      python3-dev \
       python3-venv \
       ripgrep \
       shellcheck \
+      sudo \
       supervisor \
       tar \
       tmux \
@@ -65,6 +91,8 @@ RUN if getent group "${REMOTE_GID}" >/dev/null; then \
       --home-dir /home/ubuntu --create-home --shell /bin/zsh ubuntu \
     && passwd --delete ubuntu \
     && passwd --status ubuntu | grep -q '^ubuntu NP ' \
+    && echo "ubuntu ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/ubuntu \
+    && chmod 0440 /etc/sudoers.d/ubuntu \
     && install -d -o ubuntu -g ubuntu \
       /home/ubuntu/dev \
       /home/ubuntu/.config \

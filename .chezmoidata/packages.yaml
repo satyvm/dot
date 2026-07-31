@@ -312,8 +312,7 @@ packages:
     - id: claude-code
       feature: ai
       providers:
-        brew: { linux: claude-code }
-        cask: { darwin: claude-code }
+        cask: { darwin: claude-code, linux: claude-code }
 
     # macOS GUI tiers.
     - id: raycast
