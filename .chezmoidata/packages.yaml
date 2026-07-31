@@ -5,7 +5,7 @@ packages:
     - id: age
       feature: base
       providers:
-        brew: {darwin: age}
+        brew: { darwin: age }
         apt: age
     - id: ca-certificates
       feature: base
@@ -30,16 +30,16 @@ packages:
     - id: chezmoi
       feature: base
       providers:
-        brew: {darwin: chezmoi, linux: chezmoi}
+        brew: { darwin: chezmoi, linux: chezmoi }
     - id: curl
       feature: base
       providers:
-        brew: {darwin: curl}
+        brew: { darwin: curl }
         apt: curl
     - id: git
       feature: base
       providers:
-        brew: {darwin: git}
+        brew: { darwin: git }
         apt: git
 
     # Shell and portable CLI applications.
@@ -51,440 +51,446 @@ packages:
     - id: wget
       feature: cli
       providers:
-        brew: {darwin: wget, linux: wget}
+        brew: { darwin: wget, linux: wget }
     - id: git-delta
       feature: cli
       providers:
-        brew: {darwin: git-delta, linux: git-delta}
+        brew: { darwin: git-delta, linux: git-delta }
     - id: gh
       feature: cli
       providers:
-        brew: {darwin: gh, linux: gh}
+        brew: { darwin: gh, linux: gh }
     - id: jj
       feature: cli
       providers:
-        brew: {darwin: jj, linux: jj}
+        brew: { darwin: jj, linux: jj }
     - id: lazygit
       feature: cli
       providers:
-        brew: {darwin: lazygit, linux: lazygit}
+        brew: { darwin: lazygit, linux: lazygit }
     - id: starship
       feature: cli
       providers:
-        brew: {darwin: starship, linux: starship}
+        brew: { darwin: starship, linux: starship }
     - id: zsh-autosuggestions
       feature: cli
       providers:
-        brew: {darwin: zsh-autosuggestions, linux: zsh-autosuggestions}
+        brew: { darwin: zsh-autosuggestions, linux: zsh-autosuggestions }
     - id: zsh-syntax-highlighting
       feature: cli
       providers:
-        brew: {darwin: zsh-syntax-highlighting, linux: zsh-syntax-highlighting}
+        brew:
+          { darwin: zsh-syntax-highlighting, linux: zsh-syntax-highlighting }
     - id: zsh-history-substring-search
       feature: cli
       providers:
-        brew: {darwin: zsh-history-substring-search, linux: zsh-history-substring-search}
+        brew:
+          {
+            darwin: zsh-history-substring-search,
+            linux: zsh-history-substring-search,
+          }
     - id: thefuck
       feature: cli
       providers:
-        brew: {darwin: thefuck, linux: thefuck}
+        brew: { darwin: thefuck, linux: thefuck }
     - id: bat
       feature: cli
       providers:
-        brew: {darwin: bat, linux: bat}
+        brew: { darwin: bat, linux: bat }
     - id: eza
       feature: cli
       providers:
-        brew: {darwin: eza, linux: eza}
+        brew: { darwin: eza, linux: eza }
     - id: fd
       feature: cli
       providers:
-        brew: {darwin: fd, linux: fd}
+        brew: { darwin: fd, linux: fd }
     - id: fzf
       feature: cli
       providers:
-        brew: {darwin: fzf, linux: fzf}
+        brew: { darwin: fzf, linux: fzf }
     - id: ripgrep
       feature: cli
       providers:
-        brew: {darwin: ripgrep, linux: ripgrep}
+        brew: { darwin: ripgrep, linux: ripgrep }
     - id: jq
       feature: cli
       providers:
-        brew: {darwin: jq, linux: jq}
+        brew: { darwin: jq, linux: jq }
     - id: glow
       feature: cli
       providers:
-        brew: {darwin: glow, linux: glow}
+        brew: { darwin: glow, linux: glow }
     - id: tlrc
       feature: cli
       providers:
-        brew: {darwin: tlrc, linux: tlrc}
+        brew: { darwin: tlrc, linux: tlrc }
     - id: zoxide
       feature: cli
       providers:
-        brew: {darwin: zoxide, linux: zoxide}
+        brew: { darwin: zoxide, linux: zoxide }
     - id: neovim
       feature: cli
       providers:
-        brew: {darwin: neovim, linux: neovim}
+        brew: { darwin: neovim, linux: neovim }
     - id: tmux
       feature: cli
       providers:
-        brew: {darwin: tmux, linux: tmux}
+        brew: { darwin: tmux, linux: tmux }
     - id: tree-sitter-cli
       feature: cli
       providers:
-        brew: {darwin: tree-sitter-cli, linux: tree-sitter-cli}
+        brew: { darwin: tree-sitter-cli, linux: tree-sitter-cli }
     - id: pet
       feature: cli
       providers:
-        brew: {darwin: pet, linux: pet}
+        brew: { darwin: pet, linux: pet }
     - id: btop
       feature: cli
       providers:
-        brew: {darwin: btop, linux: btop}
+        brew: { darwin: btop, linux: btop }
     - id: watch
       feature: cli
       os: [darwin]
       providers:
-        brew: {darwin: watch}
+        brew: { darwin: watch }
 
     # Developer packages. Linux system services use apt; portable tools use Brew.
     - id: fnm
       feature: developer
       providers:
-        brew: {darwin: fnm, linux: fnm}
+        brew: { darwin: fnm, linux: fnm }
     - id: go
       feature: developer
       providers:
-        brew: {darwin: go, linux: go}
+        brew: { darwin: go, linux: go }
     - id: gopls
       feature: developer
       providers:
-        brew: {darwin: gopls, linux: gopls}
+        brew: { darwin: gopls, linux: gopls }
     - id: rust-analyzer
       feature: developer
       providers:
-        brew: {darwin: rust-analyzer, linux: rust-analyzer}
+        brew: { darwin: rust-analyzer, linux: rust-analyzer }
     - id: pyright
       feature: developer
       providers:
-        brew: {darwin: pyright, linux: pyright}
+        brew: { darwin: pyright, linux: pyright }
     - id: vtsls
       feature: developer
       providers:
-        brew: {darwin: vtsls, linux: vtsls}
+        brew: { darwin: vtsls, linux: vtsls }
     - id: postgresql
       feature: developer
       providers:
-        brew: {darwin: postgresql@18, linux: postgresql@18}
+        brew: { darwin: postgresql@18, linux: postgresql@18 }
     - id: mise
       feature: developer
       providers:
-        brew: {darwin: mise, linux: mise}
+        brew: { darwin: mise, linux: mise }
     - id: clang-format
       feature: developer
       providers:
-        brew: {darwin: clang-format, linux: clang-format}
+        brew: { darwin: clang-format, linux: clang-format }
     - id: freetype
       feature: developer
       providers:
-        brew: {darwin: freetype, linux: freetype}
+        brew: { darwin: freetype, linux: freetype }
     - id: gettext
       feature: developer
       providers:
-        brew: {darwin: gettext, linux: gettext}
+        brew: { darwin: gettext, linux: gettext }
     - id: gperf
       feature: developer
       providers:
-        brew: {darwin: gperf, linux: gperf}
+        brew: { darwin: gperf, linux: gperf }
     - id: imlib2
       feature: developer
       providers:
-        brew: {darwin: imlib2, linux: imlib2}
+        brew: { darwin: imlib2, linux: imlib2 }
     - id: lcov
       feature: developer
       providers:
-        brew: {darwin: lcov, linux: lcov}
+        brew: { darwin: lcov, linux: lcov }
     - id: librsvg
       feature: developer
       providers:
-        brew: {darwin: librsvg, linux: librsvg}
+        brew: { darwin: librsvg, linux: librsvg }
     - id: libxfixes
       feature: developer
       providers:
-        brew: {darwin: libxfixes, linux: libxfixes}
+        brew: { darwin: libxfixes, linux: libxfixes }
     - id: libxft
       feature: developer
       providers:
-        brew: {darwin: libxft, linux: libxft}
+        brew: { darwin: libxft, linux: libxft }
     - id: libxi
       feature: developer
       providers:
-        brew: {darwin: libxi, linux: libxi}
+        brew: { darwin: libxi, linux: libxi }
     - id: libxinerama
       feature: developer
       providers:
-        brew: {darwin: libxinerama, linux: libxinerama}
+        brew: { darwin: libxinerama, linux: libxinerama }
     - id: libxml2
       feature: developer
       providers:
-        brew: {darwin: libxml2, linux: libxml2}
+        brew: { darwin: libxml2, linux: libxml2 }
     - id: lua
       feature: developer
       providers:
-        brew: {darwin: lua, linux: lua}
+        brew: { darwin: lua, linux: lua }
     - id: pkg-config
       feature: developer
       providers:
-        brew: {darwin: pkg-config, linux: pkg-config}
+        brew: { darwin: pkg-config, linux: pkg-config }
     - id: tpm
       feature: developer
       providers:
-        brew: {darwin: tpm, linux: tpm}
+        brew: { darwin: tpm, linux: tpm }
     - id: kondo
       feature: developer
       providers:
-        brew: {darwin: kondo, linux: kondo}
+        brew: { darwin: kondo, linux: kondo }
     - id: shellcheck
       feature: developer
       providers:
-        brew: {darwin: shellcheck, linux: shellcheck}
+        brew: { darwin: shellcheck, linux: shellcheck }
     - id: commitizen
       feature: developer
       providers:
-        brew: {darwin: commitizen, linux: commitizen}
+        brew: { darwin: commitizen, linux: commitizen }
     - id: docker-cli
       feature: developer
       providers:
-        brew: {darwin: docker}
+        brew: { darwin: docker }
         apt: docker.io
     - id: docker-compose
       feature: developer
       providers:
-        brew: {darwin: docker-compose}
+        brew: { darwin: docker-compose }
         apt: docker-compose
     - id: colima
       feature: developer
       os: [darwin]
       providers:
-        brew: {darwin: colima}
+        brew: { darwin: colima }
 
     # AI agents.
     - id: herdr
       feature: ai
       providers:
-        brew: {darwin: herdr, linux: herdr}
+        brew: { darwin: herdr, linux: herdr }
     - id: nono
       feature: ai
       providers:
-        brew: {darwin: nono, linux: nono}
+        brew: { darwin: nono, linux: nono }
     - id: uv
       feature: developer
       providers:
-        brew: {darwin: uv, linux: uv}
+        brew: { darwin: uv, linux: uv }
     - id: opencode
       feature: ai
       providers:
-        brew: {darwin: opencode, linux: opencode}
+        brew: { darwin: opencode, linux: opencode }
     - id: pi-coding-agent
       feature: ai
       providers:
-        brew: {darwin: pi-coding-agent, linux: pi-coding-agent}
+        brew: { darwin: pi-coding-agent, linux: pi-coding-agent }
     - id: crush
       feature: ai
       providers:
-        brew: {darwin: charmbracelet/tap/crush, linux: charmbracelet/tap/crush}
+        brew:
+          { darwin: charmbracelet/tap/crush, linux: charmbracelet/tap/crush }
       homebrew:
         tap: charmbracelet/tap
         trust: formula
     - id: cliproxyapi
       feature: ai-local
       providers:
-        brew: {darwin: cliproxyapi, linux: cliproxyapi}
+        brew: { darwin: cliproxyapi, linux: cliproxyapi }
     - id: claude-code
       feature: ai
       providers:
-        brew: {linux: claude-code}
-        cask: {darwin: claude-code}
+        brew: { linux: claude-code }
+        cask: { darwin: claude-code }
 
     # macOS GUI tiers.
     - id: raycast
       feature: gui-minimum
       os: [darwin]
-      providers: {cask: {darwin: raycast}}
+      providers: { cask: { darwin: raycast } }
     - id: jordanbaird-ice
       feature: gui-minimum
       os: [darwin]
-      providers: {cask: {darwin: jordanbaird-ice}}
+      providers: { cask: { darwin: jordanbaird-ice } }
     - id: shottr
       feature: gui-minimum
       os: [darwin]
-      providers: {cask: {darwin: shottr}}
+      providers: { cask: { darwin: shottr } }
     - id: hyperkey
       feature: gui-minimum
       os: [darwin]
-      providers: {cask: {darwin: hyperkey}}
+      providers: { cask: { darwin: hyperkey } }
     - id: ghostty
       feature: gui-minimum
       os: [darwin]
-      providers: {cask: {darwin: ghostty}}
+      providers: { cask: { darwin: ghostty } }
     - id: font-jetbrains-mono-nerd-font
       feature: gui-minimum
       os: [darwin]
-      providers: {cask: {darwin: font-jetbrains-mono-nerd-font}}
+      providers: { cask: { darwin: font-jetbrains-mono-nerd-font } }
     - id: mas
       feature: gui-minimum
       os: [darwin]
-      providers: {brew: {darwin: mas}}
+      providers: { brew: { darwin: mas } }
     - id: helium-browser
       feature: gui-minimum
       os: [darwin]
-      providers: {cask: {darwin: helium-browser}}
+      providers: { cask: { darwin: helium-browser } }
     - id: notion
       feature: gui-minimum
       os: [darwin]
-      providers: {cask: {darwin: notion}}
+      providers: { cask: { darwin: notion } }
     - id: boring-notch
       feature: gui-minimum
       os: [darwin]
-      providers: {cask: {darwin: TheBoredTeam/boring-notch/boring-notch}}
+      providers: { cask: { darwin: TheBoredTeam/boring-notch/boring-notch } }
     - id: iina
       feature: gui-minimum
       os: [darwin]
-      providers: {cask: {darwin: iina}}
+      providers: { cask: { darwin: iina } }
     - id: appcleaner
       feature: gui-minimum
       os: [darwin]
-      providers: {cask: {darwin: appcleaner}}
+      providers: { cask: { darwin: appcleaner } }
     - id: whatsapp
       feature: gui-minimum
       os: [darwin]
-      providers: {cask: {darwin: whatsapp}}
+      providers: { cask: { darwin: whatsapp } }
     - id: discord
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: discord}}
+      providers: { cask: { darwin: discord } }
     - id: telegram
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: telegram}}
+      providers: { cask: { darwin: telegram } }
     - id: notion-calendar
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: notion-calendar}}
+      providers: { cask: { darwin: notion-calendar } }
     - id: zotero
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: zotero}}
+      providers: { cask: { darwin: zotero } }
     - id: dockdoor
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: dockdoor}}
+      providers: { cask: { darwin: dockdoor } }
     - id: veracrypt
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: veracrypt-fuse-t}}
+      providers: { cask: { darwin: veracrypt-fuse-t } }
     - id: google-drive
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: google-drive}}
+      providers: { cask: { darwin: google-drive } }
     - id: protonvpn
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: protonvpn}}
+      providers: { cask: { darwin: protonvpn } }
     - id: handy
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: handy}}
+      providers: { cask: { darwin: handy } }
     - id: zen
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: zen}}
+      providers: { cask: { darwin: zen } }
     - id: google-gemini
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: google-gemini}}
+      providers: { cask: { darwin: google-gemini } }
     - id: zed
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: zed}}
-    - id: antigravity-ide
+      providers: { cask: { darwin: zed } }
+    - id: antigravity
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: antigravity-ide}}
+      providers: { cask: { darwin: antigravity } }
     - id: alacritty
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: alacritty}}
+      providers: { cask: { darwin: alacritty } }
     - id: yaak
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: yaak}}
+      providers: { cask: { darwin: yaak } }
     - id: utm
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: utm}}
+      providers: { cask: { darwin: utm } }
     - id: onyx
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: onyx}}
+      providers: { cask: { darwin: onyx } }
     - id: basictex
       feature: gui-all
       os: [darwin]
-      providers: {cask: {darwin: basictex}}
+      providers: { cask: { darwin: basictex } }
 
     # Linux hardening services.
     - id: ufw
       feature: hardening
       os: [linux]
-      providers: {apt: ufw}
+      providers: { apt: ufw }
     - id: fail2ban
       feature: hardening
       os: [linux]
-      providers: {apt: fail2ban}
+      providers: { apt: fail2ban }
 
     # Versioned secondary providers, installed by install-developer-tools.sh.
     - id: node
       feature: developer
-      providers: {mise: {name: node, version: "22.19.0"}}
+      providers: { mise: { name: node, version: "22.19.0" } }
     - id: gcloud
       feature: developer
-      providers: {mise: {name: gcloud, version: "578.0.0"}}
+      providers: { mise: { name: gcloud, version: "578.0.0" } }
     - id: aws-cli
       feature: developer
-      providers: {mise: {name: aws-cli, version: "2.27.49"}}
+      providers: { mise: { name: aws-cli, version: "2.27.49" } }
     - id: kubectl
       feature: developer
-      providers: {mise: {name: kubectl, version: "1.33.1"}}
+      providers: { mise: { name: kubectl, version: "1.33.1" } }
     - id: kubectx
       feature: developer
-      providers: {mise: {name: kubectx, version: "0.9.5"}}
+      providers: { mise: { name: kubectx, version: "0.9.5" } }
     - id: kubens
       feature: developer
-      providers: {mise: {name: kubens, version: "0.9.5"}}
+      providers: { mise: { name: kubens, version: "0.9.5" } }
     - id: k9s
       feature: developer
-      providers: {mise: {name: k9s, version: "0.50.6"}}
+      providers: { mise: { name: k9s, version: "0.50.6" } }
     - id: npkill
       feature: developer
-      providers: {npm: {name: npkill, version: "0.12.2"}}
+      providers: { npm: { name: npkill, version: "0.12.2" } }
     - id: pylint
       feature: developer
-      providers: {uv: {name: pylint, version: "3.3.7"}}
+      providers: { uv: { name: pylint, version: "3.3.7" } }
     - id: black
       feature: developer
-      providers: {uv: {name: black, version: "25.1.0"}}
+      providers: { uv: { name: black, version: "25.1.0" } }
     - id: isort
       feature: developer
-      providers: {uv: {name: isort, version: "6.0.1"}}
+      providers: { uv: { name: isort, version: "6.0.1" } }
     - id: cargo-clean-all
       feature: developer
-      providers: {cargo: {name: cargo-clean-all, version: "0.6.4"}}
+      providers: { cargo: { name: cargo-clean-all, version: "0.6.4" } }
     - id: cargo-cache
       feature: developer
-      providers: {cargo: {name: cargo-cache, version: "0.8.3"}}
+      providers: { cargo: { name: cargo-cache, version: "0.8.3" } }
 
   runtimePins:
     rustToolchain: "1.88.0"
