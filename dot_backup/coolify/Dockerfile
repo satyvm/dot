@@ -55,6 +55,7 @@ RUN apt-get update \
       libxfixes3 \
       libxkbcommon0 \
       libxrandr2 \
+      libssl-dev \
       locales \
       openssh-server \
       pkg-config \
@@ -70,6 +71,7 @@ RUN apt-get update \
       unzip \
       util-linux \
       zsh \
+      zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node

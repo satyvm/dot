@@ -17,6 +17,16 @@ packages:
       os: [linux]
       providers:
         apt: build-essential
+    - id: zlib1g-dev
+      feature: base
+      os: [linux]
+      providers:
+        apt: zlib1g-dev
+    - id: libssl-dev
+      feature: base
+      os: [linux]
+      providers:
+        apt: libssl-dev
     - id: file
       feature: base
       os: [linux]
@@ -244,6 +254,7 @@ packages:
       feature: developer
       providers:
         brew: { darwin: pkg-config, linux: pkg-config }
+        apt: pkg-config
     - id: tpm
       feature: developer
       providers:
