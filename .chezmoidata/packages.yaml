@@ -27,6 +27,16 @@ packages:
       os: [linux]
       providers:
         apt: libssl-dev
+    - id: unzip
+      feature: base
+      providers:
+        brew: { darwin: unzip, linux: unzip }
+        apt: unzip
+    - id: locales
+      feature: base
+      os: [linux]
+      providers:
+        apt: locales
     - id: file
       feature: base
       os: [linux]
