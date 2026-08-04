@@ -331,7 +331,7 @@ For the dotfiles/platform repository, run:
 
 ```bash
 bash dot_local/bin/tests/test_ax.sh
-bash dot_backup/coolify/tests/test_stack.sh
+bash hermes/tests/test_stack.sh
 git diff --check
 ```
 

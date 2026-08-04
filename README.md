@@ -403,8 +403,7 @@ preferred way to add, remove, or reclassify applications.
 - Account enrollment, SSH upload, App Store installation, and destructive macOS
   cleanup are never automatic.
 - Sensitive authentication material is not committed to this repository.
-- An absent local Age identity prevents encrypted backup material from being
-  deployed.
+- Repository-only backup and Hermes platform files are never deployed.
 - Unsupported operating systems, Linux distributions, architectures, and
   provisioning failures stop the run.
 - macOS uses Colima, not Docker Desktop.
@@ -415,7 +414,7 @@ preferred way to add, remove, or reclassify applications.
 bash tests/test_machine_matrix.sh
 bash dot_local/bin/tests/test_ax.sh
 bash dot_local/bin/tests/test_one.sh
-bash dot_backup/coolify/tests/test_stack.sh
+bash hermes/tests/test_stack.sh
 chezmoi managed --refresh-externals=never
 chezmoi diff
 chezmoi apply --dry-run

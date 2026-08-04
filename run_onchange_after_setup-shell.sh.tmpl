@@ -1,9 +1,33 @@
 {{- $machine := includeTemplate "machine" . | fromJson -}}
+{{- if $machine.predicates.manageLoginShell -}}
 #!/usr/bin/env bash
 set -euo pipefail
 
-{{- if eq $machine.os "linux" }}
-if command -v zsh >/dev/null 2>&1 && [[ "${SHELL##*/}" != "zsh" ]]; then
-  chsh -s "$(command -v zsh)" || echo "Set zsh manually with: chsh -s $(command -v zsh)"
+zsh_path="$(command -v zsh 2>/dev/null || true)"
+if [[ -z "$zsh_path" ]]; then
+  exit 0
+fi
+
+user="$(id -un 2>/dev/null || true)"
+if [[ -z "$user" ]]; then
+  exit 0
+fi
+
+current_shell=""
+if command -v getent >/dev/null 2>&1; then
+  current_shell="$(getent passwd "$user" | cut -d: -f7 || true)"
+fi
+
+if [[ "$current_shell" == "$zsh_path" ]]; then
+  exit 0
+fi
+
+printf 'setting login shell to %s for %s...\n' "$zsh_path" "$user"
+if [[ "$(id -u)" -eq 0 ]]; then
+  usermod -s "$zsh_path" "$user" || printf 'unable to set shell for %s with usermod; set manually with: sudo usermod -s %s %s\n' "$user" "$zsh_path" "$user"
+elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+  sudo -n usermod -s "$zsh_path" "$user" || printf 'unable to set shell for %s via sudo usermod; set manually with: sudo usermod -s %s %s\n' "$user" "$zsh_path" "$user"
+else
+  printf 'passwordless elevation unavailable; set login shell manually with: sudo usermod -s %s %s\n' "$zsh_path" "$user"
 fi
 {{- end }}

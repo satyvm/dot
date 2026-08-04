@@ -55,7 +55,7 @@ install_authorized_key() {
 
 validate_development_mount() {
   mountpoint -q "$dev_root" ||
-    die "$dev_root is not a bind mount; set SERVER_DEV_PATH=/home/ubuntu/dev"
+    die "$dev_root is not a bind mount; bind the server host's /home/ubuntu/dev to $dev_root"
 
   local expected_uid expected_gid actual_uid actual_gid
   expected_uid="$(id -u "$remote_user")"

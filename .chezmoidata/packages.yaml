@@ -389,7 +389,7 @@ packages:
       os: [darwin]
       providers: { cask: { darwin: whatsapp } }
     - id: discord
-      feature: gui-all
+      feature: gui-minimum
       os: [darwin]
       providers: { cask: { darwin: discord } }
     - id: telegram

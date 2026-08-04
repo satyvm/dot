@@ -9,13 +9,13 @@ machineModel:
       description: Portable personal machine with a focused GUI.
       features:
         cli: true
-        developer: true
-        ai: true
+        developer: false
+        ai: false
         aiMode: local
         guiTier: minimum
         osCustomization: true
         hardening: false
-        ssh: true
+        ssh: false
     workstation:
       description: Full development machine with all managed GUI applications.
       features:
@@ -31,8 +31,8 @@ machineModel:
       description: Headless host with CLI tools and optional Linux hardening.
       features:
         cli: true
-        developer: false
-        ai: false
+        developer: true
+        ai: true
         aiMode: local
         guiTier: none
         osCustomization: false

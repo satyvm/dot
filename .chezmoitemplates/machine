@@ -49,6 +49,7 @@
 {{- $manageGui := and (eq $os "darwin") (ne (index $features "guiTier") "none") -}}
 {{- $manageLocalProxy := and (index $features "ai") (eq (index $features "aiMode") "local") -}}
 {{- $manageSystemPackages := and $manageHostPackages (eq $os "linux") -}}
+{{- $manageLoginShell := and $manageSystemPackages $manageShell -}}
 {{- $packageMode := "none" -}}
 {{- if $manageHostPackages }}{{ $packageMode = ternary "brew" "apt+brew" (eq $os "darwin") }}{{ end -}}
 {{- $environment := ternary "remote-dev" "local-dev" (eq (index $features "aiMode") "remote") -}}
@@ -69,6 +70,7 @@
     "manageHostPackages" $manageHostPackages
     "manageSystemPackages" $manageSystemPackages
     "manageShell" $manageShell
+    "manageLoginShell" $manageLoginShell
     "manageGui" $manageGui
     "manageLocalProxy" $manageLocalProxy
   )

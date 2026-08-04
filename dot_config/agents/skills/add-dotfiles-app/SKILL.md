@@ -138,7 +138,7 @@ Also render any changed template with the closest unattended example config in
 `examples/configs/` and syntax-check the output. If Docker/Coolify changed, run:
 
 ```bash
-bash dot_backup/coolify/tests/test_stack.sh
+bash hermes/tests/test_stack.sh
 ```
 
 Do not run a live apply, package install, enrollment command, or destructive

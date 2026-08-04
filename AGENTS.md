@@ -44,10 +44,11 @@ and Debian/Ubuntu on `amd64` and `arm64`.
 ├── run_onchange_*.sh.tmpl       # Providers and convergent setup
 ├── examples/configs/            # Explicit unattended machine configs
 ├── tests/test_machine_matrix.sh # macOS/Linux × amd64/arm64 × four presets
-└── dot_backup/                  # Backup scripts + encrypted assets
-    └── scripts/
-        ├── executable_backup-local.sh   # → backup-local.sh
-        └── executable_restore-local.sh  # → restore-local.sh
+├── backup/                      # Repository-only backup assets and scripts
+│   └── scripts/
+│       ├── executable_backup-local.sh
+│       └── executable_restore-local.sh
+└── hermes/                      # Repository-only Coolify remote-development platform
 ```
 
 ## Machine Profiles
@@ -94,8 +95,7 @@ Path mapping: `dot_config/nvim/init.lua` → `~/.config/nvim/init.lua`. The dire
 Listed in `.chezmoiignore.tmpl`. These files stay in the source directory only:
 
 - `README.md`, `AGENTS.md`, `.setup.sh`
-- `examples/`, `tests/`, and `dot_backup/`
-- `dot_backup/encrypted_cursor-default.code-profile.age`
+- `examples/`, `tests/`, `backup/`, and `hermes/`
 
 ## AI Agent Infrastructure
 
@@ -182,11 +182,12 @@ Starship must be last — it replaces PS1.
 
 ## Backup & Restore
 
-External SSD sync scripts at `dot_backup/scripts/`:
+External SSD sync scripts under the repository-only `backup/scripts/` directory:
 
 ```bash
-"$(chezmoi source-path)/scripts/backup-local.sh"
-"$(chezmoi source-path)/scripts/restore-local.sh" /Volumes/MyDrive/mac_backup/local_310526
+bash "$(chezmoi source-path)/backup/scripts/executable_backup-local.sh"
+bash "$(chezmoi source-path)/backup/scripts/executable_restore-local.sh" \
+  /Volumes/MyDrive/mac_backup/local_310526
 ```
 
 Backups are timestamped (`local_DDMMYY`). Auto-detects first non-system volume if no path given. Restore backs up existing data before overwriting.

@@ -8,7 +8,8 @@ AGENTS.md
 .local/adr
 .local/handoffs
 .local/reports
-.backup
+backup
+hermes
 examples
 tests
 .config/agents/skills/add-dotfiles-app/evals
@@ -30,10 +31,6 @@ setup-ai-agent-platform.sh
 .local/bin/dotfiles-ssh-enroll
 {{- end }}
 
-# Secrets never enter the managed destination when the local age key is absent.
-{{- if not (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
-.backup/cursor-default.code-profile
-{{- end }}
 
 {{- if not $machine.predicates.manageShell }}
 .zshrc
@@ -43,6 +40,8 @@ setup-ai-agent-platform.sh
 .config/tmux
 .config/starship
 .config/private_pet
+{{- end }}
+{{- if not $machine.predicates.manageLoginShell }}
 setup-shell.sh
 {{- end }}
 

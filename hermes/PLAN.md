@@ -85,7 +85,7 @@ projects run their terminals, tasks, and language servers inside the
 
 Use a Git-based Docker Compose application whose base directory is `/`
 (repository root) and whose Compose file is
-`/dot_backup/coolify/hermes_docker_compose.yaml`.
+`/hermes/hermes_docker_compose.yaml`.
 
 Before the first deployment, run on the host:
 
@@ -217,7 +217,7 @@ Before committing:
 
 ```bash
 bash dot_local/bin/tests/test_ax.sh
-bash dot_backup/coolify/tests/test_stack.sh
+bash hermes/tests/test_stack.sh
 chezmoi diff
 ```
 

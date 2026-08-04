@@ -36,7 +36,7 @@ Deployable Docker Compose application featuring Hermes WebUI, SSH container deve
 1. **Create Docker Compose Application**:
    - In Coolify, create a new **Docker Compose** service connected to your Git repository (`satyvm/dot`).
    - Base Directory: `/` (repository root)
-   - Docker Compose File: `/dot_backup/coolify/hermes_docker_compose.yaml`
+   - Docker Compose File: `/hermes/hermes_docker_compose.yaml`
    - Keep the repository root as Coolify's project directory. Both image build contexts are intentionally repository-root-relative.
    - `/home/ubuntu/dev` is the only host bind. `/home/ubuntu` and all service state use Docker-managed named volumes; the Coolify host user's dotfiles are never mounted into the container.
 
@@ -149,20 +149,20 @@ Deployable Docker Compose application featuring Hermes WebUI, SSH container deve
 
    docker compose \
      --project-directory . \
-     -f dot_backup/coolify/hermes_docker_compose.yaml \
+     -f hermes/hermes_docker_compose.yaml \
      config
 
    docker compose \
      --project-directory . \
-     -f dot_backup/coolify/hermes_docker_compose.yaml \
+     -f hermes/hermes_docker_compose.yaml \
      build --pull --progress=plain tea-sidecar hermes-dev
    ```
 
-   Run these commands from the repository root, not from `dot_backup/coolify`.
+   Run these commands from the repository root, not from `hermes`.
    The explicit `--project-directory .` reproduces Coolify's path resolution.
 
 6. **Static Validation**:
    ```bash
-   bash dot_backup/coolify/tests/test_stack.sh
+   bash hermes/tests/test_stack.sh
    bash dot_local/bin/tests/test_ax.sh
    ```

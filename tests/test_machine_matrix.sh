@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fixture_root="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-matrix.XXXXXX")"
-host_cache="${XDG_CACHE_HOME:-$HOME/.cache}/chezmoi"
+host_cache="$fixture_root/chezmoi-cache"
 trap 'rm -rf "$fixture_root"' EXIT
 export MISE_CACHE_DIR="$fixture_root/mise-cache"
 mkdir -p "$MISE_CACHE_DIR"
@@ -113,6 +113,9 @@ for os in darwin linux; do
       make_config "$config" "$preset" "$os" "$arch"
       managed="$(render_managed "$config" "$destination")"
 
+      assert_lacks "$managed" "backup/scripts/backup-local.sh" "$case_name excludes repository-only backup scripts"
+      assert_lacks "$managed" "hermes/hermes_docker_compose.yaml" "$case_name excludes the repository-only Hermes platform"
+
       if [[ "$preset" == "container" ]]; then
         assert_lacks "$managed" "install-homebrew-packages.sh" "$case_name skips host Brew packages"
         assert_lacks "$managed" "install-system-packages.sh" "$case_name skips system packages"
@@ -177,6 +180,12 @@ for os in darwin linux; do
         assert_has "$managed" ".local/bin/dotfiles-ssh-enroll" "$case_name exposes explicit SSH enrollment"
       fi
 
+      if [[ "$os" == "linux" && "$preset" != "container" ]]; then
+        assert_has "$managed" "setup-shell.sh" "$case_name manages login shell"
+      else
+        assert_lacks "$managed" "setup-shell.sh" "$case_name excludes login shell setup"
+      fi
+
       if [[ "$preset" != "server" ]]; then
         if [[ "$os" == "darwin" ]]; then
           assert_has "$managed" ".zed/settings.json" "$case_name uses local Zed settings"
@@ -226,6 +235,24 @@ if grep -qF 'ssh_port="${SSH_CONNECTION##* }"' <<<"$linux_hardening" &&
   pass "Linux hardening preserves the active SSH server port"
 else
   fail "Linux hardening preserves the active SSH server port"
+fi
+
+linux_shell="$(render_template "$linux_config" run_onchange_after_setup-shell.sh.tmpl)"
+if grep -qF 'getent passwd' <<<"$linux_shell" &&
+   grep -qF 'sudo -n usermod' <<<"$linux_shell"; then
+  pass "Linux shell setup uses noninteractive usermod with getent passwd"
+else
+  fail "Linux shell setup uses noninteractive usermod with getent passwd"
+fi
+if grep -qF 'chsh' <<<"$linux_shell"; then
+  fail "Linux shell setup contains no chsh calls"
+else
+  pass "Linux shell setup contains no chsh calls"
+fi
+if bash -n <<<"$linux_shell"; then
+  pass "Linux shell setup script syntax is valid"
+else
+  fail "Linux shell setup script syntax is valid"
 fi
 
 mac_config="$fixture_root/mac-workstation.json"
@@ -340,7 +367,7 @@ if jq -e '
     .packages.inventory[];
     all((.os? // ["darwin", "linux"])[]; IN("darwin", "linux")) and
     all((.arch? // ["amd64", "arm64"])[]; IN("amd64", "arm64")) and
-    ((.providers.cask? // {}) | keys | all(.[]; . == "darwin"))
+    ((.providers.cask? // {}) | keys | all(.[]; IN("darwin", "linux")))
   )
 ' <<<"$inventory" >/dev/null; then
   pass "package platform and architecture constraints are supported"

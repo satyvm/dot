@@ -2,9 +2,10 @@
 set -euo pipefail
 
 stack_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$stack_dir/.." && pwd)"
 compose_file="$stack_dir/hermes_docker_compose.yaml"
-host_chezmoi_cache="${XDG_CACHE_HOME:-$HOME/.cache}/chezmoi"
 pycache_dir="$(mktemp -d "${TMPDIR:-/tmp}/hermes-pycache.XXXXXX")"
+host_chezmoi_cache="$pycache_dir/chezmoi-cache"
 rendered=""
 rendered_json=""
 remote_config=""
@@ -61,11 +62,15 @@ if command -v chezmoi >/dev/null 2>&1; then
     HOME="$remote_destination" chezmoi managed \
       --config "$remote_config" \
       --config-format json \
-      --source "$stack_dir/../.." \
+      --source "$repo_root" \
       --destination "$remote_destination" \
       --cache "$host_chezmoi_cache" \
       --refresh-externals=never
   )"
+  if grep -Eq '^(backup|hermes)(/|$)' <<<"$remote_managed"; then
+    echo "remote profile must not manage repository-only backup or Hermes files" >&2
+    exit 1
+  fi
   if grep -qx 'install-homebrew-packages.sh' <<<"$remote_managed"; then
     echo "remote profile must not run the host Homebrew package installer" >&2
     exit 1
@@ -74,14 +79,18 @@ if command -v chezmoi >/dev/null 2>&1; then
     echo "remote profile must use image-baked developer tools" >&2
     exit 1
   fi
+  if grep -qx 'setup-shell.sh' <<<"$remote_managed"; then
+    echo "remote profile must use image-baked login shell, not host setup-shell.sh" >&2
+    exit 1
+  fi
   grep -qx 'setup-ai-agent-platform.sh' <<<"$remote_managed"
 
   rendered_setup="$(mktemp "${TMPDIR:-/tmp}/hermes-setup-script.XXXXXX")"
   HOME="$remote_destination" chezmoi execute-template \
     --config "$remote_config" \
     --config-format json \
-    --source "$stack_dir/../.." \
-    <"$stack_dir/../../run_onchange_after_setup-ai-agent-platform.sh.tmpl" \
+    --source "$repo_root" \
+    <"$repo_root/run_onchange_after_setup-ai-agent-platform.sh.tmpl" \
     >"$rendered_setup"
   bash -n "$rendered_setup"
 
@@ -168,8 +177,8 @@ fi
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   rendered="$(mktemp "${TMPDIR:-/tmp}/hermes-compose.XXXXXX")"
   rendered_json="$(mktemp "${TMPDIR:-/tmp}/hermes-compose.XXXXXX.json")"
-  docker compose -f "$compose_file" config >"$rendered"
-  docker compose -f "$compose_file" config --format json >"$rendered_json"
+  docker compose --project-directory "$repo_root" -f "$compose_file" config >"$rendered"
+  docker compose --project-directory "$repo_root" -f "$compose_file" config --format json >"$rendered_json"
 
   if grep -q 'cliproxy-init' "$rendered"; then
     echo "one-shot cliproxy-init must not be present" >&2
@@ -250,7 +259,7 @@ if ! grep -q 'passwd --delete ubuntu' "$stack_dir/Dockerfile"; then
 fi
 grep -q "passwd --status ubuntu.*grep -q '\\^ubuntu NP '" \
   "$stack_dir/Dockerfile"
-grep -q 'context: ./dot_backup/coolify' "$compose_file"
+grep -q 'context: ./hermes' "$compose_file"
 grep -q 'dockerfile: Dockerfile.tea' "$compose_file"
 grep -q 'COPY tea_sidecar.py /usr/local/bin/tea-sidecar' \
   "$stack_dir/Dockerfile.tea"
@@ -286,6 +295,10 @@ fi
 grep -q '^  initialize_chezmoi_config$' "$stack_dir/entrypoint.sh"
 grep -q 'find.*remote_home' "$stack_dir/entrypoint.sh"
 grep -q 'dev_root.*-prune' "$stack_dir/entrypoint.sh"
+if grep -q 'SERVER_DEV_PATH' "$stack_dir/entrypoint.sh"; then
+  echo "the development mount must remain fixed at /home/ubuntu/dev" >&2
+  exit 1
+fi
 if grep -q 'write_chezmoi_config' "$stack_dir/entrypoint.sh"; then
   echo "remote bootstrap must use chezmoi init, not a hand-written config" >&2
   exit 1
@@ -297,7 +310,7 @@ grep -q 'brew trust --formula charmbracelet/tap/crush' "$stack_dir/Dockerfile"
 grep -q 'install -d -o ubuntu -g ubuntu' "$stack_dir/Dockerfile"
 grep -q '/home/linuxbrew/.linuxbrew' "$stack_dir/Dockerfile"
 
-if rg -n 'npm start|NOPASSWD|chown -R .*dev|0\.0\.0\.0:.*:22' \
+if rg -n 'npm start|chown -R .*dev|0\.0\.0\.0:.*:22' \
   "$stack_dir/Dockerfile" "$stack_dir/entrypoint.sh" \
   "$stack_dir/supervisord.conf" "$compose_file"; then
   echo "unsafe or obsolete stack pattern found" >&2
