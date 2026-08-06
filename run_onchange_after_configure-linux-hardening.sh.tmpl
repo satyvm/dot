@@ -3,6 +3,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Administrative binaries are commonly outside a non-root user's PATH.
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
 is_container() {
   [[ -f /.dockerenv || -f /run/.containerenv ]] && return 0
   command -v systemd-detect-virt >/dev/null 2>&1 && systemd-detect-virt --container >/dev/null 2>&1

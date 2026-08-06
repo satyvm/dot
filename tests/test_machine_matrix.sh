@@ -229,6 +229,14 @@ fi
 linux_server_config="$fixture_root/linux-server.json"
 make_config "$linux_server_config" server linux amd64
 linux_hardening="$(render_template "$linux_server_config" run_onchange_after_configure-linux-hardening.sh.tmpl)"
+hardening_path_setup="$(grep -m1 '^export PATH=' <<<"$linux_hardening" || true)"
+hardening_path="$({ PATH=/usr/bin:/bin bash -c "${hardening_path_setup:-:}; printf '%s' \"\$PATH\""; })"
+if [[ ":$hardening_path:" == *:/usr/sbin:* && ":$hardening_path:" == *:/sbin:* ]]; then
+  pass "Linux hardening resolves administrative commands outside a user PATH"
+else
+  fail "Linux hardening resolves administrative commands outside a user PATH" \
+    "rendered PATH: $hardening_path"
+fi
 # shellcheck disable=SC2016 # These are literal rendered-code assertions.
 if grep -qF 'ssh_port="${SSH_CONNECTION##* }"' <<<"$linux_hardening" &&
    grep -qF 'ufw allow "${ssh_port}/tcp"' <<<"$linux_hardening"; then
