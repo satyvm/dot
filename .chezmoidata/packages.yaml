@@ -272,7 +272,7 @@ packages:
     - id: mole
       feature: developer
       providers:
-        brew: { darwin: mole, linux: mole }
+        brew: { darwin: mole}
     - id: shellcheck
       feature: developer
       providers:
