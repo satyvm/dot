@@ -1,96 +1,43 @@
 {
   "meta": {
     "name": "default-opencode",
-    "version": "1.0.0",
-    "description": "ax-managed OpenCode profile"
+    "version": "2.1.0",
+    "description": "Thin ax overlay for the official OpenCode nono pack"
   },
-  "extends": "default-agent",
+  "extends": "always-further/opencode",
+  "security": {
+    "signal_mode": "isolated",
+    "capability_elevation": false
+  },
+  "groups": {
+    "include": [
+      "mise_manager",
+      "bun_runtime",
+      "go_runtime",
+      {
+        "name": "go_runtime_macos",
+        "when": "macos"
+      }
+    ]
+  },
   "filesystem": {
     "allow": [
-      {
-        "path": "$HOME/.local/share/opencode",
-        "when": "macos"
-      },
-      {
-        "path": "$HOME/.local/share/opencode/log",
-        "when": "linux"
-      },
-      {
-        "path": "$HOME/.local/share/opencode/repos",
-        "when": "linux"
-      },
-      {
-        "path": "$HOME/.local/share/opencode/storage",
-        "when": "linux"
-      },
-      {
-        "path": "$HOME/.local/share/opencode/worktree",
-        "when": "linux"
-      },
-      "$HOME/.local/state/opencode",
-      "$HOME/.cache/opencode",
-      "$HOME/.local/share/opentui"
+      "$HOME/.npm/_cacache",
+      "$HOME/.npm/_npx",
+      "$HOME/.npm/_logs"
     ],
     "read": [
-      {
-        "path": "$HOME/.config/opencode",
-        "when": "macos"
-      },
-      {
-        "path": "$HOME/.config/opencode/agents",
-        "when": "linux"
-      },
-      {
-        "path": "$HOME/.config/opencode/commands",
-        "when": "linux"
-      },
-      {
-        "path": "$HOME/.config/opencode/plugins",
-        "when": "linux"
-      },
-      {
-        "path": "$HOME/.config/opencode/skills",
-        "when": "linux"
-      }
+      "$HOME/.config/agents/skills",
+      "$HOME/.local/state/fnm_multishells",
+      "$HOME/.go"
     ],
     "read_file": [
-      "$HOME/.config/opencode/opencode.json",
-      "$HOME/.config/opencode/opencode.jsonc"
-    ],
-    "allow_file": [
-      "$HOME/.local/share/opencode/opencode.db",
-      "$HOME/.local/share/opencode/opencode.db-shm",
-      "$HOME/.local/share/opencode/opencode.db-wal"
-    ],
-    "deny": [
-      "$HOME/.local/share/opencode/auth.json",
-      "$HOME/.config/opencode/auth.json"
-    ],
-    "suppress_save_prompt": [
-      {
-        "path": "/",
-        "when": "linux"
-      },
-      {
-        "path": "/home",
-        "when": "linux"
-      },
-      {
-        "path": "$HOME",
-        "when": "linux"
-      }
+      "$HOME/.config/agents/universal_context.md"
     ]
-  },
-  "platform_overrides": {
-    "linux": {
-      "security": {
-        "capability_elevation": true
-      }
-    }
   },
   "network": {
-    "allow_domain": [
-      "*"
-    ]
+    "block": false,
+    "open_port": [8317],
+    "no_proxy": ["127.0.0.1", "localhost", "cliproxyapi"]
   }
 }

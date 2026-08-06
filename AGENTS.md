@@ -123,10 +123,14 @@ search path so the shims cannot recurse.
 
 ### Nono Sandbox Profiles
 Located in `dot_config/nono/profiles/`. Each agent has a profile:
-- `default-agent.json` holds the shared developer network, worktree, runtime-read,
-  and credential-deny boundary; `ax` grants the resolved Herdr socket dynamically
-- `default-claude.json`, `default-pi.json`, `default-opencode.json`, and
-  `default-crush.json` add only the state paths required by each client
+- `default-claude.json`, `default-pi.json`, and `default-opencode.json` extend the
+  signed `always-further` registry packs with only shared-context, home-toolchain,
+  npm-cache, and CLIProxy grants
+- `default-agent.json` is the shared base for `default-crush.json`; Crush has no
+  upstream `nono-packs` profile
+- `run_after_sync-nono-packs.sh.tmpl` installs and updates the three official
+  packs on AI-enabled machines; Codex is intentionally not managed by Nono
+- `ax` grants resolved Herdr and Tea sockets dynamically at launch
 - Nono controls filesystem access, network, workdir permissions for sandboxed AI agents
 
 ## Shell Initialization Order

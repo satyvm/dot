@@ -1,14 +1,39 @@
 {
   "meta": {
     "name": "default-agent",
-    "version": "1.0.0",
-    "description": "Shared macOS developer boundary for ax-managed coding agents"
+    "version": "2.0.0",
+    "description": "Shared developer boundary for ax-managed agents without an official nono pack"
   },
-  "extends": "node-dev",
+  "extends": "default",
+  "security": {
+    "signal_mode": "isolated",
+    "capability_elevation": false
+  },
   "groups": {
     "include": [
+      "node_runtime",
       "rust_runtime",
       "python_runtime",
+      "mise_manager",
+      "bun_runtime",
+      "go_runtime",
+      {
+        "name": "go_runtime_macos",
+        "when": "macos"
+      },
+      {
+        "name": "user_caches_macos",
+        "when": "macos"
+      },
+      {
+        "name": "user_caches_linux",
+        "when": "linux"
+      },
+      {
+        "name": "linux_sysfs_read",
+        "when": "linux"
+      },
+      "nix_runtime",
       "git_config",
       "unlink_protection"
     ]
@@ -22,74 +47,11 @@
     "read": [
       "$HOME/.agents/skills",
       "$HOME/.config/agents/skills",
-      "$HOME/.codex/skills",
-      "$HOME/.local/share/fnm",
       "$HOME/.local/state/fnm_multishells",
-      "$HOME/.local/share/mise",
-      "$HOME/.local/state/mise",
-      "$HOME/.fnm",
-      "$HOME/.bun",
-      {
-        "path": "$HOME/.cargo",
-        "when": "macos"
-      },
-      {
-        "path": "$HOME/.cargo/bin",
-        "when": "linux"
-      },
-      {
-        "path": "$HOME/.cargo/git",
-        "when": "linux"
-      },
-      {
-        "path": "$HOME/.cargo/registry",
-        "when": "linux"
-      },
-      "$HOME/.rustup",
-      "$HOME/.go",
-      {
-        "path": "/sys/fs/cgroup",
-        "when": "linux"
-      },
-      {
-        "path": "/sys/devices/system/cpu",
-        "when": "linux"
-      }
+      "$HOME/.go"
     ],
     "read_file": [
-      "$HOME/.config/agents/universal_context.md",
-      {
-        "path": "/usr/share/locale/locale.alias",
-        "when": "linux"
-      },
-      {
-        "path": "/etc/locale.alias",
-        "when": "linux"
-      },
-      {
-        "path": "/sys/kernel/mm/transparent_hugepage/enabled",
-        "when": "linux"
-      },
-      {
-        "path": "/proc/sys/vm/mmap_min_addr",
-        "when": "linux"
-      },
-      {
-        "path": "/proc/sys/vm/overcommit_memory",
-        "when": "linux"
-      },
-      {
-        "path": "/proc/version_signature",
-        "when": "linux"
-      },
-      {
-        "path": "/etc/passwd",
-        "when": "linux"
-      },
-      {
-        "path": "/sys/kernel/mm/transparent_hugepage/hpage_pmd_size",
-        "when": "linux"
-      }
+      "$HOME/.config/agents/universal_context.md"
     ],
     "deny": [
       "$HOME/.ssh",

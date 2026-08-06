@@ -1,48 +1,43 @@
 {
   "meta": {
     "name": "default-pi",
-    "version": "1.0.0",
-    "description": "ax-managed Pi coding agent profile"
+    "version": "2.1.0",
+    "description": "Thin ax overlay for the official Pi nono pack"
   },
-  "extends": "default-agent",
-  "filesystem": {
-    "allow": [
-      "$HOME/.pi/agent/sessions"
-    ],
-    "read": [
+  "extends": "always-further/pi",
+  "security": {
+    "signal_mode": "isolated",
+    "capability_elevation": false
+  },
+  "groups": {
+    "include": [
+      "mise_manager",
+      "bun_runtime",
+      "go_runtime",
       {
-        "path": "$HOME/.pi/agent",
+        "name": "go_runtime_macos",
         "when": "macos"
-      },
-      {
-        "path": "$HOME/.pi/agent/extensions",
-        "when": "linux"
-      },
-      {
-        "path": "$HOME/.pi/agent/skills",
-        "when": "linux"
       }
-    ],
-    "read_file": [
-      "$HOME/.pi/agent/models.json"
-    ],
-    "allow_file": [
-      "$HOME/.pi/agent/auth.json.lock",
-      "$HOME/.pi/agent/models-store.json",
-      "$HOME/.pi/agent/models-store.json.lock",
-      "$HOME/.pi/agent/settings.json",
-      "$HOME/.pi/agent/settings.json.lock"
-    ],
-    "deny": [
-      "$HOME/.pi/agent/auth.json",
-      "$HOME/.pi/agent/credentials.json"
     ]
   },
-  "platform_overrides": {
-    "linux": {
-      "security": {
-        "capability_elevation": true
-      }
-    }
+  "filesystem": {
+    "allow": [
+      "$HOME/.npm/_cacache",
+      "$HOME/.npm/_npx",
+      "$HOME/.npm/_logs"
+    ],
+    "read": [
+      "$HOME/.config/agents/skills",
+      "$HOME/.local/state/fnm_multishells",
+      "$HOME/.go"
+    ],
+    "read_file": [
+      "$HOME/.config/agents/universal_context.md"
+    ]
+  },
+  "network": {
+    "block": false,
+    "open_port": [8317],
+    "no_proxy": ["127.0.0.1", "localhost", "cliproxyapi"]
   }
 }

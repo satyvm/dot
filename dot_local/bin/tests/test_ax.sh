@@ -607,6 +607,7 @@ if command -v chezmoi >/dev/null 2>&1; then
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_zed/settings.json.tmpl" >"$RENDER_ROOT/zed.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/cli-proxy-api/private_config.yaml.tmpl" >"$RENDER_ROOT/proxy.yaml"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/run_onchange_after_setup-ai-agent-platform.sh.tmpl" >"$RENDER_ROOT/setup-ai-agent-platform.sh"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/run_after_sync-nono-packs.sh.tmpl" >"$RENDER_ROOT/sync-nono-packs.sh"
   SKILL_SCRIPT_ROOT="$RENDER_ROOT/skill-creator/scripts"
   mkdir -p "$SKILL_SCRIPT_ROOT"
   for script_name in generate_report improve_description quick_validate run_eval run_loop utils; do
@@ -662,6 +663,21 @@ if command -v chezmoi >/dev/null 2>&1; then
   fi
   assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" "PI_CODING_AGENT_DIR=\"\$HOME/.pi/agent\" herdr integration install \"\$agent\"" "Herdr installs Pi integration in Pi's documented agent directory"
   assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" 'config["mcp_servers"] = servers' "Hermes MCP sync preserves the rest of config.yaml"
+  if bash -n "$RENDER_ROOT/sync-nono-packs.sh"; then
+    pass "rendered Nono pack synchronization script parses"
+  else
+    fail "rendered Nono pack synchronization script parses" "invalid shell syntax"
+  fi
+  NONO_PACK_SCRIPT="$(cat "$RENDER_ROOT/sync-nono-packs.sh")"
+  assert_contains "$NONO_PACK_SCRIPT" "always-further/claude" "Nono sync installs the official Claude pack"
+  assert_contains "$NONO_PACK_SCRIPT" "always-further/pi" "Nono sync installs the official Pi pack"
+  assert_contains "$NONO_PACK_SCRIPT" "always-further/opencode" "Nono sync installs the official OpenCode pack"
+  assert_contains "$NONO_PACK_SCRIPT" "nono remove nolabs-ai/claude" "Nono sync removes the duplicate legacy Claude pack"
+  if [[ "$NONO_PACK_SCRIPT" != *"always-further/codex"* ]]; then
+    pass "Nono sync leaves Codex unmanaged"
+  else
+    fail "Nono sync leaves Codex unmanaged" "$NONO_PACK_SCRIPT"
+  fi
   assert_contains "$(chezmoi target-path --config "$MAC_CONFIG" --source "$REPO_ROOT" "$REPO_ROOT/dot_config/agents/skills/skill-creator/scripts/literal_run_eval.py")" "/run_eval.py" "chezmoi preserves the run_eval.py payload basename"
   assert_contains "$(chezmoi target-path --config "$MAC_CONFIG" --source "$REPO_ROOT" "$REPO_ROOT/dot_config/agents/skills/skill-creator/scripts/literal_run_loop.py")" "/run_loop.py" "chezmoi preserves the run_loop.py payload basename"
   if (cd "$FIXTURE_ROOT" && PYTHONDONTWRITEBYTECODE=1 python3 "$SKILL_SCRIPT_ROOT/run_eval.py" --help >/dev/null); then
@@ -699,37 +715,42 @@ if command -v nono >/dev/null 2>&1; then
       fail "$(basename "$profile_path") passes nono profile validate" "invalid Nono profile"
     fi
   done
+  if jq -e '
+    .extends == "always-further/claude" and
+    .security.capability_elevation == false and
+    ([.groups.include[] | if type == "object" then .name else . end] |
+      contains(["mise_manager", "bun_runtime", "go_runtime", "go_runtime_macos"])) and
+    (.filesystem.allow | length == 3) and
+    (.filesystem.read == ["$HOME/.config/agents/skills", "$HOME/.local/state/fnm_multishells", "$HOME/.go"]) and
+    (.filesystem.read_file == ["$HOME/.config/agents/universal_context.md"]) and
+    (.filesystem.suppress_save_prompt? == null)
+  ' "$REPO_ROOT/dot_config/nono/profiles/default-claude.json" >/dev/null; then
+    pass "Claude is a thin ax overlay on the official pack"
+  else
+    fail "Claude is a thin ax overlay on the official pack" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-claude.json")"
+  fi
+  if jq -e '
+    .extends == "always-further/pi" and .security.capability_elevation == false
+  ' "$REPO_ROOT/dot_config/nono/profiles/default-pi.json" >/dev/null &&
+    jq -e '
+      .extends == "always-further/opencode" and .security.capability_elevation == false
+    ' "$REPO_ROOT/dot_config/nono/profiles/default-opencode.json" >/dev/null; then
+    pass "Pi and OpenCode inherit their official packs without interactive elevation"
+  else
+    fail "Pi and OpenCode inherit their official packs without interactive elevation" "official pack inheritance is missing"
+  fi
   for profile in default-claude default-crush default-opencode default-pi; do
     profile_path="$REPO_ROOT/dot_config/nono/profiles/$profile.json"
-    if jq -e '.platform_overrides.linux.security.capability_elevation == true' "$profile_path" >/dev/null; then
-      pass "$profile enables supervised deny enforcement only on Linux"
+    if jq -e '
+      .security.signal_mode == "isolated" and
+      .security.capability_elevation == false and
+      ((.platform_overrides.linux.security.capability_elevation? // false) == false)
+    ' "$profile_path" >/dev/null; then
+      pass "$profile disables interactive capability elevation on every platform"
     else
-      fail "$profile enables supervised deny enforcement only on Linux" "$(cat "$profile_path")"
-    fi
-    resolved_profile="$(nono profile show "$profile_path" --json)"
-    if jq -e '.security.capability_elevation != true and (.filesystem.deny | length > 0)' <<<"$resolved_profile" >/dev/null; then
-      pass "$profile preserves native macOS Seatbelt deny enforcement"
-    else
-      fail "$profile preserves native macOS Seatbelt deny enforcement" "$resolved_profile"
+      fail "$profile disables interactive capability elevation on every platform" "$(cat "$profile_path")"
     fi
   done
-  if jq -e '
-    any(.filesystem.read[]; type == "object" and .path == "$HOME/.claude" and .when == "macos") and
-    any(.filesystem.read[]; type == "object" and .path == "$HOME/.claude/skills" and .when == "linux")
-  ' "$REPO_ROOT/dot_config/nono/profiles/default-claude.json" >/dev/null; then
-    pass "Claude splits state grants by platform"
-  else
-    fail "Claude splits state grants by platform" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-claude.json")"
-  fi
-  if jq -e '
-    any(.filesystem.allow[]; type == "object" and .path == "$HOME/.local/share/opencode" and .when == "macos") and
-    any(.filesystem.allow[]; type == "object" and .path == "$HOME/.local/share/opencode/storage" and .when == "linux") and
-    any(.filesystem.read[]; type == "object" and .path == "$HOME/.config/opencode" and .when == "macos")
-  ' "$REPO_ROOT/dot_config/nono/profiles/default-opencode.json" >/dev/null; then
-    pass "OpenCode splits state grants by platform"
-  else
-    fail "OpenCode splits state grants by platform" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-opencode.json")"
-  fi
   if jq -e '
     any(.filesystem.allow[]; type == "object" and .path == "$HOME/.local/share/crush" and .when == "macos") and
     any(.filesystem.allow[]; type == "object" and .path == "$HOME/.local/share/crush/sessions" and .when == "linux") and
@@ -740,40 +761,23 @@ if command -v nono >/dev/null 2>&1; then
     fail "Crush splits state grants by platform" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-crush.json")"
   fi
   if jq -e '
-    any(.filesystem.read[]; type == "object" and .path == "$HOME/.cargo" and .when == "macos") and
-    any(.filesystem.read[]; type == "object" and .path == "$HOME/.cargo/registry" and .when == "linux")
-  ' "$REPO_ROOT/dot_config/nono/profiles/default-agent.json" >/dev/null; then
-    pass "shared Cargo grants avoid Linux credential overlap"
-  else
-    fail "shared Cargo grants avoid Linux credential overlap" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-agent.json")"
-  fi
-  if jq -e '
-    any(.filesystem.read_file[]; type == "object" and .path == "/usr/share/locale/locale.alias" and .when == "linux") and
-    any(.filesystem.read[]; type == "object" and .path == "/sys/fs/cgroup" and .when == "linux") and
-    any(.filesystem.read[]; type == "object" and .path == "/sys/devices/system/cpu" and .when == "linux") and
-    any(.filesystem.read_file[]; type == "object" and .path == "/sys/kernel/mm/transparent_hugepage/enabled" and .when == "linux") and
-    any(.filesystem.read_file[]; type == "object" and .path == "/sys/kernel/mm/transparent_hugepage/hpage_pmd_size" and .when == "linux") and
-    any(.filesystem.read_file[]; type == "object" and .path == "/proc/sys/vm/mmap_min_addr" and .when == "linux") and
-    any(.filesystem.read_file[]; type == "object" and .path == "/proc/sys/vm/overcommit_memory" and .when == "linux") and
-    any(.filesystem.read_file[]; type == "object" and .path == "/proc/version_signature" and .when == "linux") and
-    any(.filesystem.read_file[]; type == "object" and .path == "/etc/passwd" and .when == "linux") and
+    .extends == "default" and
+    ([.groups.include[] | if type == "object" then .name else . end] |
+      contains(["node_runtime", "rust_runtime", "python_runtime", "mise_manager",
+        "bun_runtime", "go_runtime", "go_runtime_macos", "user_caches_macos",
+        "user_caches_linux", "linux_sysfs_read", "nix_runtime", "git_config"])) and
     (all(.filesystem.read[]; if type == "object" then .path != "/proc" else . != "/proc" end))
   ' "$REPO_ROOT/dot_config/nono/profiles/default-agent.json" >/dev/null; then
-    pass "Linux agents receive narrow runtime metadata grants without broad procfs access"
+    pass "unpacked agents use Nono-maintained cross-platform runtime groups"
   else
-    fail "Linux agents receive narrow runtime metadata grants without broad procfs access" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-agent.json")"
+    fail "unpacked agents use Nono-maintained cross-platform runtime groups" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-agent.json")"
   fi
   if jq -e '
-    any(.filesystem.suppress_save_prompt[]; type == "object" and .path == "/" and .when == "linux") and
-    any(.filesystem.suppress_save_prompt[]; type == "object" and .path == "/home" and .when == "linux") and
-    any(.filesystem.suppress_save_prompt[]; type == "object" and .path == "$HOME" and .when == "linux")
-  ' "$REPO_ROOT/dot_config/nono/profiles/default-opencode.json" >/dev/null &&
-    jq -e '
-      any(.filesystem.suppress_save_prompt[]; type == "object" and .path == "/proc" and .when == "linux")
-    ' "$REPO_ROOT/dot_config/nono/profiles/default-crush.json" >/dev/null; then
-    pass "known client metadata probes cannot trigger unsafe grant-save prompts"
+    any(.filesystem.suppress_save_prompt[]; type == "object" and .path == "/proc" and .when == "linux")
+  ' "$REPO_ROOT/dot_config/nono/profiles/default-crush.json" >/dev/null; then
+    pass "the unpacked Crush client suppresses unsafe procfs grant suggestions"
   else
-    fail "known client metadata probes cannot trigger unsafe grant-save prompts" "missing suppress_save_prompt entries"
+    fail "the unpacked Crush client suppresses unsafe procfs grant suggestions" "missing suppress_save_prompt entry"
   fi
   if REPO_ROOT="$REPO_ROOT" python3 - <<'PY'
 import json
@@ -824,48 +828,29 @@ PY
     fail "Linux profiles contain no Landlock deny-overlap" "platform-specific profile conflict"
   fi
   EFFECTIVE_PROFILE="$(nono profile show "$REPO_ROOT/dot_config/nono/profiles/default-opencode.json" --json)"
-  assert_contains "$EFFECTIVE_PROFILE" '"network_profile": "developer"' "effective policy permits general developer networking"
-  assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.ssh\"" "effective policy denies SSH material"
-  assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/Library/Keychains\"" "effective policy denies macOS Keychain data"
-  assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.cargo/credentials.toml\"" "effective policy denies Cargo registry credentials"
+  assert_contains "$EFFECTIVE_PROFILE" '"block": false' "effective policy permits general developer networking"
   assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.config/agents/universal_context.md\"" "effective policy grants read-only universal context access"
   assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.npm/_cacache\"" "effective policy permits npm package cache writes"
-  assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.npm/_npx\"" "effective policy permits npx ephemeral package writes"
-  if [[ "$EFFECTIVE_PROFILE" != *"\"\$HOME/.local/share\""* ]]; then
-    pass "effective policy avoids a broad ~/.local/share grant"
-  else
-    fail "effective policy avoids a broad ~/.local/share grant" "$EFFECTIVE_PROFILE"
-  fi
+  assert_contains "$EFFECTIVE_PROFILE" '8317' "effective policy permits the local CLIProxy port"
   PI_EFFECTIVE="$(nono profile show "$REPO_ROOT/dot_config/nono/profiles/default-pi.json" --json)"
   if jq -e '
-    (.filesystem.read | index("$HOME/.pi/agent")) != null and
-    (.filesystem.allow | index("$HOME/.pi/agent")) == null and
-    (.filesystem.read_file | index("$HOME/.pi/agent/models.json")) != null and
-    (.filesystem.allow_file | index("$HOME/.pi/agent/settings.json")) != null
+    (.filesystem.allow | index("$HOME/.pi")) != null and
+    .security.capability_elevation == false
   ' <<<"$PI_EFFECTIVE" >/dev/null; then
-    pass "Pi preserves native macOS state access"
+    pass "Pi inherits complete client state access from the official pack"
   else
-    fail "Pi preserves native macOS state access" "$PI_EFFECTIVE"
-  fi
-  if jq -e '
-    any(.filesystem.read[]; type == "object" and .path == "$HOME/.pi/agent" and .when == "macos") and
-    any(.filesystem.read[]; type == "object" and .path == "$HOME/.pi/agent/extensions" and .when == "linux") and
-    any(.filesystem.read[]; type == "object" and .path == "$HOME/.pi/agent/skills" and .when == "linux")
-  ' "$REPO_ROOT/dot_config/nono/profiles/default-pi.json" >/dev/null; then
-    pass "Pi splits state grants by platform"
-  else
-    fail "Pi splits state grants by platform" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-pi.json")"
+    fail "Pi inherits complete client state access from the official pack" "$PI_EFFECTIVE"
   fi
   CLAUDE_EFFECTIVE="$(nono profile show "$REPO_ROOT/dot_config/nono/profiles/default-claude.json" --json)"
   if jq -e '
-    (.filesystem.read | index("$HOME/.claude")) != null and
-    (.filesystem.allow | index("$HOME/.claude")) == null and
+    (.filesystem.allow | index("$HOME/.claude")) != null and
     (.filesystem.allow_file | index("$HOME/.claude.json")) != null and
-    (.filesystem.allow_file | index("$HOME/.claude.json.lock")) != null
+    (.filesystem.allow_file | index("$HOME/.claude.json.lock")) != null and
+    .security.capability_elevation == false
   ' <<<"$CLAUDE_EFFECTIVE" >/dev/null; then
-    pass "Claude settings and Herdr hooks are read-only"
+    pass "Claude inherits complete client state access from the official pack"
   else
-    fail "Claude settings and Herdr hooks are read-only" "$CLAUDE_EFFECTIVE"
+    fail "Claude inherits complete client state access from the official pack" "$CLAUDE_EFFECTIVE"
   fi
 else
   fail "Nono profile tests" "nono is not installed"

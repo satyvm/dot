@@ -5,6 +5,10 @@
     "description": "ax-managed Crush profile"
   },
   "extends": "default-agent",
+  "security": {
+    "signal_mode": "isolated",
+    "capability_elevation": false
+  },
   "filesystem": {
     "allow": [
       {
@@ -47,13 +51,6 @@
         "when": "linux"
       }
     ]
-  },
-  "platform_overrides": {
-    "linux": {
-      "security": {
-        "capability_elevation": true
-      }
-    }
   },
   "network": {
     "allow_domain": [

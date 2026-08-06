@@ -269,10 +269,10 @@ packages:
       feature: developer
       providers:
         brew: { darwin: tpm, linux: tpm }
-    - id: kondo
+    - id: mole
       feature: developer
       providers:
-        brew: { darwin: kondo, linux: kondo }
+        brew: { darwin: mole, linux: mole }
     - id: shellcheck
       feature: developer
       providers:
