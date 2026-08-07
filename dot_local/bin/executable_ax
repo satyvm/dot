@@ -303,6 +303,7 @@ models_edit() {
 models_sync() {
   need chezmoi
   models_validate_command
+  rm -f "$HOME/.pi/agent/models.json"
   chezmoi apply \
     "$config_home/ax/models.json" \
     "$config_home/cli-proxy-api/config.yaml" \
@@ -628,14 +629,15 @@ sync_pi_models() {
   temporary="$(mktemp "$dir/.models.json.ax.XXXXXX")"
   if jq -n --slurpfile registry "$models_file" \
     --argjson live "$live_json" --argjson current "$current_json" --arg base_url "$base_url" '
-    (($registry[0].roles + $registry[0].catalog) as $rawModels |
-     reduce ($rawModels | keys[]) as $key ({};
-       .[$key] = $rawModels[$key] |
-       (if $rawModels[$key].target then .[$rawModels[$key].target] = $rawModels[$key] else . end) |
-       (if (($rawModels[$key].reasoningSuffix // "") | length) > 0 then
-         ("(" + $rawModels[$key].reasoningSuffix + ")") as $suffix |
-         .[$key + $suffix] = $rawModels[$key] |
-         (if $rawModels[$key].target then .[$rawModels[$key].target + $suffix] = $rawModels[$key] else . end)
+    ($registry[0].roles) as $rawRoles |
+    ($registry[0].roles + $registry[0].catalog) as $rawModels |
+    (reduce ($rawRoles | keys[]) as $key ({};
+       .[$key] = $rawRoles[$key] |
+       (if $rawRoles[$key].target then .[$rawRoles[$key].target] = $rawRoles[$key] else . end) |
+       (if (($rawRoles[$key].reasoningSuffix // "") | length) > 0 then
+         ("(" + $rawRoles[$key].reasoningSuffix + ")") as $suffix |
+         .[$key + $suffix] = $rawRoles[$key] |
+         (if $rawRoles[$key].target then .[$rawRoles[$key].target + $suffix] = $rawRoles[$key] else . end)
        else . end)
      )
     ) as $baseDict |
@@ -648,9 +650,9 @@ sync_pi_models() {
     )) as $m ($baseDict;
       . as $curr |
       ($m.id) as $id |
-      ($curr[$id] // {"displayName": $id, "reasoning": true}) as $item |
-      (if ($id | test("\\((minimal|low|medium|high|xhigh|max)\\)$") | not) and ($item.reasoning // true) then
-        (if ($m.owned_by == "antigravity" or ($id | startswith("gemini-")) or ($id | startswith("claude-")) or ($id | startswith("gpt-oss-"))) then "(max)" else "(xhigh)" end) as $suffix |
+      ($rawModels[$id] // $curr[$id] // {"displayName": $id, "reasoning": false}) as $item |
+      (if (($item.reasoningSuffix // "") | length) > 0 then
+        ("(" + $item.reasoningSuffix + ")") as $suffix |
         .[$id] = $item | .[$id + $suffix] = ($item + {"displayName": (($item.displayName // $id) + " " + $suffix)})
       else
         .[$id] = $item
@@ -718,14 +720,15 @@ sync_opencode_models() {
     die "$AX_EXIT_CONFIG" "OPENCODE_CONFIG_CONTENT must contain a JSON object"
   fi
   managed_config="$(jq -cn --slurpfile registry "$models_file" --argjson live "$live_json" '
-    (($registry[0].roles + $registry[0].catalog) as $rawModels |
-     reduce ($rawModels | keys[]) as $key ({};
-       .[$key] = $rawModels[$key] |
-       (if $rawModels[$key].target then .[$rawModels[$key].target] = $rawModels[$key] else . end) |
-       (if (($rawModels[$key].reasoningSuffix // "") | length) > 0 then
-         ("(" + $rawModels[$key].reasoningSuffix + ")") as $suffix |
-         .[$key + $suffix] = $rawModels[$key] |
-         (if $rawModels[$key].target then .[$rawModels[$key].target + $suffix] = $rawModels[$key] else . end)
+    ($registry[0].roles) as $rawRoles |
+    ($registry[0].roles + $registry[0].catalog) as $rawModels |
+    (reduce ($rawRoles | keys[]) as $key ({};
+       .[$key] = $rawRoles[$key] |
+       (if $rawRoles[$key].target then .[$rawRoles[$key].target] = $rawRoles[$key] else . end) |
+       (if (($rawRoles[$key].reasoningSuffix // "") | length) > 0 then
+         ("(" + $rawRoles[$key].reasoningSuffix + ")") as $suffix |
+         .[$key + $suffix] = $rawRoles[$key] |
+         (if $rawRoles[$key].target then .[$rawRoles[$key].target + $suffix] = $rawRoles[$key] else . end)
        else . end)
      )
     ) as $baseDict |
@@ -738,9 +741,9 @@ sync_opencode_models() {
     )) as $m ($baseDict;
       . as $curr |
       ($m.id) as $id |
-      ($curr[$id] // {"displayName": $id, "reasoning": true}) as $item |
-      (if ($id | test("\\((minimal|low|medium|high|xhigh|max)\\)$") | not) and ($item.reasoning // true) then
-        (if ($m.owned_by == "antigravity" or ($id | startswith("gemini-")) or ($id | startswith("claude-")) or ($id | startswith("gpt-oss-"))) then "(max)" else "(xhigh)" end) as $suffix |
+      ($rawModels[$id] // $curr[$id] // {"displayName": $id, "reasoning": false}) as $item |
+      (if (($item.reasoningSuffix // "") | length) > 0 then
+        ("(" + $item.reasoningSuffix + ")") as $suffix |
         .[$id] = $item | .[$id + $suffix] = $item
       else
         .[$id] = $item
@@ -846,15 +849,7 @@ resolve_target_model() {
     return 0
   fi
 
-  local owner=""
-  if [[ "$role" == "live" ]]; then
-    owner="$(proxy_model_owner "$(proxy_url)" "$model_id" || true)"
-  fi
-  if [[ "$owner" == "antigravity" || "$model_id" == gemini-* || "$model_id" == claude-* || "$model_id" == gpt-oss-* ]]; then
-    printf '%s(max)\n' "$model_id"
-  else
-    printf '%s(xhigh)\n' "$model_id"
-  fi
+  printf '%s\n' "$model_id"
 }
 
 launch_agent() {

@@ -21,13 +21,13 @@ cat >"$CONFIG_HOME/ax/models.json" <<'JSON'
   "version": 1,
   "proxy": {"url": "http://127.0.0.1:8317", "channel": "antigravity"},
   "roles": {
-    "frontier": {"alias": "frontier", "target": "upstream-frontier", "provider": "codex", "displayName": "Frontier", "contextWindow": 200000, "maxTokens": 32768, "reasoning": true, "reasoningSuffix": "xhigh", "input": ["text", "image"]},
-    "balanced": {"alias": "balanced", "target": "upstream-balanced", "provider": "codex", "displayName": "Balanced", "contextWindow": 1000000, "maxTokens": 65536, "reasoning": true, "reasoningSuffix": "xhigh", "input": ["text", "image"]},
-    "fast": {"alias": "fast", "target": "upstream-fast", "provider": "antigravity", "displayName": "Fast", "contextWindow": 1000000, "maxTokens": 65536, "reasoning": true, "reasoningSuffix": "max", "input": ["text", "image"]},
-    "light": {"alias": "light", "target": "upstream-light", "provider": "codex", "displayName": "Light", "contextWindow": 1000000, "maxTokens": 32768, "reasoning": true, "reasoningSuffix": "xhigh", "input": ["text"]}
+    "frontier": {"alias": "frontier", "target": "upstream-frontier", "provider": "codex", "displayName": "Frontier", "contextWindow": 200000, "maxTokens": 32768, "reasoning": false, "reasoningSuffix": "", "input": ["text", "image"]},
+    "balanced": {"alias": "balanced", "target": "upstream-balanced", "provider": "codex", "displayName": "Balanced", "contextWindow": 1000000, "maxTokens": 65536, "reasoning": false, "reasoningSuffix": "", "input": ["text", "image"]},
+    "fast": {"alias": "fast", "target": "upstream-fast", "provider": "antigravity", "displayName": "Fast", "contextWindow": 1000000, "maxTokens": 65536, "reasoning": false, "reasoningSuffix": "", "input": ["text", "image"]},
+    "light": {"alias": "light", "target": "upstream-light", "provider": "codex", "displayName": "Light", "contextWindow": 1000000, "maxTokens": 32768, "reasoning": false, "reasoningSuffix": "", "input": ["text"]}
   },
   "catalog": {
-    "gpt-5.6-luna": {"alias": "gpt-5.6-luna", "target": "upstream-luna", "provider": "codex", "displayName": "GPT Luna", "contextWindow": 200000, "maxTokens": 32768, "reasoning": true, "reasoningSuffix": "xhigh", "input": ["text", "image"]}
+    "gpt-5.6-luna": {"alias": "gpt-5.6-luna", "target": "upstream-luna", "provider": "codex", "displayName": "GPT Luna", "contextWindow": 200000, "maxTokens": 32768, "reasoning": false, "reasoningSuffix": "", "input": ["text", "image"]}
   },
   "agents": {
     "claude": {"defaultRole": "balanced", "profile": "default-claude"},
@@ -109,8 +109,8 @@ if [[ "${1:-}" == "rollback" ]]; then
   exit
 fi
 if [[ -n "${OPENCODE_CONFIG_CONTENT:-}" ]]; then
-  printf ' opencode_live_model=%s' "$(/usr/bin/jq -r '.provider.cliproxy.models | has("experimental/model(max)")' <<<"$OPENCODE_CONFIG_CONTENT")"
-  printf ' opencode_parenthetical_model=%s' "$(/usr/bin/jq -r '.provider.cliproxy.models | has("future-model(preview)(xhigh)")' <<<"$OPENCODE_CONFIG_CONTENT")"
+  printf ' opencode_live_model=%s' "$(/usr/bin/jq -r '.provider.cliproxy.models | has("experimental/model")' <<<"$OPENCODE_CONFIG_CONTENT")"
+  printf ' opencode_parenthetical_model=%s' "$(/usr/bin/jq -r '.provider.cliproxy.models | has("future-model(preview)")' <<<"$OPENCODE_CONFIG_CONTENT")"
 fi
 printf 'nono cwd=<%s>' "$PWD"
 for arg in "$@"; do printf ' <%s>' "$arg"; done
@@ -144,8 +144,8 @@ if [[ -n "${CRUSH_GLOBAL_CONFIG:-}" ]]; then
   printf 'crush_discovery=%s\n' "$(/usr/bin/jq -r '.providers.cliproxy.discover_models' "$CRUSH_GLOBAL_CONFIG")"
 fi
 if [[ "$(basename "$0")" == "opencode" && -n "${OPENCODE_CONFIG_CONTENT:-}" ]]; then
-  printf 'opencode_live_model=%s\n' "$(/usr/bin/jq -r '.provider.cliproxy.models | has("experimental/model(max)")' <<<"$OPENCODE_CONFIG_CONTENT")"
-  printf 'opencode_parenthetical_model=%s\n' "$(/usr/bin/jq -r '.provider.cliproxy.models | has("future-model(preview)(xhigh)")' <<<"$OPENCODE_CONFIG_CONTENT")"
+  printf 'opencode_live_model=%s\n' "$(/usr/bin/jq -r '.provider.cliproxy.models | has("experimental/model")' <<<"$OPENCODE_CONFIG_CONTENT")"
+  printf 'opencode_parenthetical_model=%s\n' "$(/usr/bin/jq -r '.provider.cliproxy.models | has("future-model(preview)")' <<<"$OPENCODE_CONFIG_CONTENT")"
 fi
 index=0
 for arg in "$@"; do
@@ -275,8 +275,8 @@ assert_contains "$OUTPUT" "<--allow-unix-socket> <$FIXTURE_ROOT/tea.sock>" "Tea 
 OUTPUT="$(run_ax pi --direct --session 'path with spaces')"
 assert_contains "$OUTPUT" "agent=pi" "direct launch resolves the real Pi binary without shim recursion"
 assert_contains "$OUTPUT" "pi_agent_dir=$HOME_DIR/.pi/agent" "Pi uses its documented global agent directory"
-assert_contains "$OUTPUT" "arg[0]=<--model>" "Pi receives an explicit maximum-reasoning default"
-assert_contains "$OUTPUT" "arg[1]=<cliproxy/balanced(xhigh)>" "Pi's canonical default uses the registry reasoning policy"
+assert_contains "$OUTPUT" "arg[0]=<--model>" "Pi receives an explicit model default"
+assert_contains "$OUTPUT" "arg[1]=<cliproxy/balanced>" "Pi's canonical default uses clean base model"
 assert_contains "$OUTPUT" "arg[2]=<--append-system-prompt>" "Pi receives universal context through its system-prompt flag"
 assert_contains "$OUTPUT" "arg[3]=<$CONFIG_HOME/agents/universal_context.md>" "Pi receives the universal context file path"
 if [[ -d "$HOME_DIR/.pi/agent/sessions" ]]; then
@@ -284,20 +284,20 @@ if [[ -d "$HOME_DIR/.pi/agent/sessions" ]]; then
 else
   fail "Pi session root exists before the sandbox starts" "missing: $HOME_DIR/.pi/agent/sessions"
 fi
-if [[ -f "$HOME_DIR/.pi/agent/models.json" ]] && jq -e '.providers.cliproxy.models[] | select(.id == "gpt-5.6-sol(xhigh)")' "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
-  pass "Pi live catalog includes real Codex model names with maximum reasoning"
+if [[ -f "$HOME_DIR/.pi/agent/models.json" ]] && jq -e '.providers.cliproxy.models[] | select(.id == "gpt-5.6-sol")' "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
+  pass "Pi live catalog includes real Codex model names"
 else
-  fail "Pi live catalog includes real Codex model names with maximum reasoning" "missing generated Codex model"
+  fail "Pi live catalog includes real Codex model names" "missing generated Codex model"
 fi
-if jq -e '.providers.cliproxy.models[] | select(.id == "future-model(preview)(xhigh)")' \
+if jq -e '.providers.cliproxy.models[] | select(.id == "future-model(preview)")' \
   "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
-  pass "Pi preserves parenthetical live IDs when adding a recognized reasoning suffix"
+  pass "Pi preserves parenthetical live IDs"
 else
-  fail "Pi preserves parenthetical live IDs when adding a recognized reasoning suffix" "missing parenthetical model"
+  fail "Pi preserves parenthetical live IDs" "missing parenthetical model"
 fi
 if jq -e '
   .providers.cliproxy.models[] |
-  select(.id == "experimental/model(max)") |
+  select(.id == "experimental/model") |
   (has("contextWindow") or has("maxTokens") or has("input")) | not
 ' "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
   pass "Pi live discovery leaves unknown capability metadata to client defaults"
@@ -322,21 +322,21 @@ assert_contains "$OUTPUT" "<direct>" "sandbox bypass requires the explicit --dir
 
 OUTPUT="$(AX_MODEL=frontier run_ax opencode)"
 assert_contains "$OUTPUT" "<run> <--profile> <default-opencode>" "OpenCode selects its agent-specific profile"
-assert_contains "$OUTPUT" "<--model> <cliproxy/frontier(xhigh)>" "OpenCode applies the canonical role's maximum reasoning policy"
+assert_contains "$OUTPUT" "<--model> <cliproxy/frontier>" "OpenCode selects the clean canonical role"
 assert_contains "$OUTPUT" "opencode_live_model=true" "OpenCode receives live proxy models through an ephemeral config merge"
 
 OUTPUT="$(AX_MODEL=gpt-5.6-sol run_ax opencode)"
-assert_contains "$OUTPUT" "<--model> <cliproxy/gpt-5.6-sol(xhigh)>" "OpenCode accepts a live Codex model by its real name at maximum reasoning"
+assert_contains "$OUTPUT" "<--model> <cliproxy/gpt-5.6-sol>" "OpenCode accepts a live Codex model by its real name"
 
 OUTPUT="$(AX_MODEL='future-model(preview)' run_ax opencode)"
-assert_contains "$OUTPUT" "<--model> <cliproxy/future-model(preview)(xhigh)>" "OpenCode preserves parenthetical live IDs when adding reasoning"
-assert_contains "$OUTPUT" "opencode_parenthetical_model=true" "OpenCode synchronizes the suffixed parenthetical live ID"
+assert_contains "$OUTPUT" "<--model> <cliproxy/future-model(preview)>" "OpenCode preserves parenthetical live IDs"
+assert_contains "$OUTPUT" "opencode_parenthetical_model=true" "OpenCode synchronizes the parenthetical live ID"
 
 OUTPUT="$(AX_MODEL=gemini-3.6-flash-high run_ax pi)"
-assert_contains "$OUTPUT" "<--model> <cliproxy/gemini-3.6-flash-high(max)>" "Pi accepts a live Antigravity model by its real name at maximum thinking"
+assert_contains "$OUTPUT" "<--model> <cliproxy/gemini-3.6-flash-high>" "Pi accepts a live Antigravity model by its real name"
 
 OUTPUT="$(run_ax pi --direct)"
-assert_contains "$OUTPUT" "arg[1]=<cliproxy/balanced(xhigh)>" "Pi defaults also receive maximum reasoning"
+assert_contains "$OUTPUT" "arg[1]=<cliproxy/balanced>" "Pi defaults to clean base model"
 
 OUTPUT="$(AX_MODEL=fast run_ax claude --direct)"
 assert_contains "$OUTPUT" "arg[0]=<--model>" "Claude accepts the canonical fast role override"
@@ -365,7 +365,7 @@ assert_contains "$OUTPUT" "crush_discovery=true" "Crush enables native live mode
 assert_contains "$OUTPUT" "arg[0]=<--continue>" "raw-model selection preserves Crush continue arguments"
 
 OUTPUT="$(AX_MODEL='experimental/model' run_ax crush --direct)"
-assert_contains "$OUTPUT" "crush_model=experimental/model(max)" "Crush applies Antigravity maximum reasoning to live models"
+assert_contains "$OUTPUT" "crush_model=experimental/model" "Crush accepts live models by clean base name"
 
 set +e
 OUTPUT="$(AX_MODEL='gpt-5.6-sol(garbage)' run_ax pi --direct 2>&1)"

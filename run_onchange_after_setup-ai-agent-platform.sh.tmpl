@@ -72,7 +72,7 @@ model_config = config.get("model", {})
 if not isinstance(model_config, dict):
     model_config = {}
 model_config.update({
-    "default": "balanced",
+    "default": "fast",
     "provider": provider_id,
     "base_url": proxy_url,
     "api_mode": "chat_completions",

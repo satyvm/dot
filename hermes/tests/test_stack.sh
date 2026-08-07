@@ -125,7 +125,7 @@ import yaml
 
 config = yaml.safe_load(Path(os.environ["HERMES_TEST_CONFIG"]).read_text())
 assert config["model"] == {
-    "default": "balanced",
+    "default": "fast",
     "provider": "custom:cliproxyapi",
     "base_url": "http://cliproxyapi:8317/v1",
     "api_mode": "chat_completions",
@@ -158,11 +158,11 @@ for alias, entry in config["model_aliases"].items():
     assert isinstance(entry, dict), alias
     assert entry["provider"] == "custom:cliproxyapi", alias
     assert entry["base_url"] == "http://cliproxyapi:8317/v1", alias
-    assert entry["model"] != alias, alias
-assert config["model_aliases"]["frontier"]["model"] == "frontier(xhigh)"
-assert config["model_aliases"]["balanced"]["model"] == "balanced(xhigh)"
-assert config["model_aliases"]["gpt-5.6-luna"]["model"] == "gpt-5.6-luna(xhigh)"
-assert config["model_aliases"]["gpt-5.6-sol"]["model"] == "gpt-5.6-sol(xhigh)"
+    assert entry["model"] is not None, alias
+assert config["model_aliases"]["frontier"]["model"] == "frontier"
+assert config["model_aliases"]["balanced"]["model"] == "balanced"
+assert config["model_aliases"]["gpt-5.6-luna"]["model"] == "gpt-5.6-luna"
+assert config["model_aliases"]["gpt-5.6-sol"]["model"] == "gpt-5.6-sol"
 assert config["mcp_servers"]["filesystem"]["command"] == "mcp-server"
 PY
   else
@@ -170,7 +170,7 @@ PY
     grep -q 'custom_providers = config.get("custom_providers", \[\])' "$rendered_setup"
     grep -q '"key_env": "OPENAI_API_KEY"' "$rendered_setup"
     grep -q '"discover_models": True' "$rendered_setup"
-    grep -q 'canonical_aliases\["gpt-5.6-sol"\] = "gpt-5.6-sol(xhigh)"' "$rendered_setup"
+    grep -q 'canonical_aliases\["gpt-5.6-sol"\] = "gpt-5.6-sol"' "$rendered_setup"
   fi
 fi
 

@@ -109,7 +109,7 @@ The managed provider is CLIProxyAPI:
 
 ```yaml
 model:
-  default: balanced
+  default: fast
   provider: custom:cliproxyapi
   base_url: http://cliproxyapi:8317/v1
   api_mode: chat_completions

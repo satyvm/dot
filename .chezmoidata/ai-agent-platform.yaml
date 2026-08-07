@@ -10,9 +10,9 @@ aiAgentPlatform:
       provider: codex
       displayName: Frontier
       contextWindow: 372000
-      maxTokens: 128000
-      reasoning: true
-      reasoningSuffix: xhigh
+      maxTokens: 32768
+      reasoning: false
+      reasoningSuffix: ""
       input: [text, image]
     balanced:
       alias: balanced
@@ -20,9 +20,9 @@ aiAgentPlatform:
       provider: codex
       displayName: Balanced
       contextWindow: 372000
-      maxTokens: 128000
-      reasoning: true
-      reasoningSuffix: xhigh
+      maxTokens: 32768
+      reasoning: false
+      reasoningSuffix: ""
       input: [text, image]
     fast:
       alias: fast
@@ -30,9 +30,9 @@ aiAgentPlatform:
       provider: antigravity
       displayName: Fast
       contextWindow: 1048576
-      maxTokens: 65536
-      reasoning: true
-      reasoningSuffix: max
+      maxTokens: 32768
+      reasoning: false
+      reasoningSuffix: ""
       input: [text, image]
     light:
       alias: light
@@ -40,9 +40,9 @@ aiAgentPlatform:
       provider: codex
       displayName: Light
       contextWindow: 400000
-      maxTokens: 128000
-      reasoning: true
-      reasoningSuffix: xhigh
+      maxTokens: 16384
+      reasoning: false
+      reasoningSuffix: ""
       input: [text, image]
   catalog:
     gpt-5.6-luna:
@@ -51,9 +51,9 @@ aiAgentPlatform:
       provider: codex
       displayName: GPT 5.6 Luna
       contextWindow: 372000
-      maxTokens: 128000
-      reasoning: true
-      reasoningSuffix: xhigh
+      maxTokens: 32768
+      reasoning: false
+      reasoningSuffix: ""
       input: [text, image]
     gpt-5.4:
       alias: gpt-5.4
@@ -61,9 +61,9 @@ aiAgentPlatform:
       provider: codex
       displayName: GPT 5.4
       contextWindow: 1050000
-      maxTokens: 128000
-      reasoning: true
-      reasoningSuffix: xhigh
+      maxTokens: 32768
+      reasoning: false
+      reasoningSuffix: ""
       input: [text, image]
     gemini-3.1-pro-low:
       alias: gemini-3.1-pro-low
@@ -71,9 +71,9 @@ aiAgentPlatform:
       provider: antigravity
       displayName: Gemini 3.1 Pro Low
       contextWindow: 1048576
-      maxTokens: 65535
-      reasoning: true
-      reasoningSuffix: max
+      maxTokens: 32768
+      reasoning: false
+      reasoningSuffix: ""
       input: [text, image]
     gemini-3-flash-agent:
       alias: gemini-3-flash-agent
@@ -81,9 +81,9 @@ aiAgentPlatform:
       provider: antigravity
       displayName: Gemini 3 Flash Agent
       contextWindow: 1048576
-      maxTokens: 65536
-      reasoning: true
-      reasoningSuffix: max
+      maxTokens: 32768
+      reasoning: false
+      reasoningSuffix: ""
       input: [text, image]
     gemini-3.5-flash-lite:
       alias: gemini-3.5-flash-lite
@@ -91,9 +91,9 @@ aiAgentPlatform:
       provider: antigravity
       displayName: Gemini 3.5 Flash Lite
       contextWindow: 1048576
-      maxTokens: 32768
-      reasoning: true
-      reasoningSuffix: max
+      maxTokens: 16384
+      reasoning: false
+      reasoningSuffix: ""
       input: [text, image]
     claude-sonnet-4-6:
       alias: claude-sonnet-4-6
@@ -101,9 +101,9 @@ aiAgentPlatform:
       provider: antigravity
       displayName: Claude Sonnet 4.6
       contextWindow: 200000
-      maxTokens: 64000
-      reasoning: true
-      reasoningSuffix: max
+      maxTokens: 16384
+      reasoning: false
+      reasoningSuffix: ""
       input: [text, image]
     gpt-oss-120b-medium:
       alias: gpt-oss-120b-medium
@@ -111,9 +111,9 @@ aiAgentPlatform:
       provider: antigravity
       displayName: GPT OSS 120B Medium
       contextWindow: 114000
-      maxTokens: 32768
-      reasoning: true
-      reasoningSuffix: max
+      maxTokens: 16384
+      reasoning: false
+      reasoningSuffix: ""
       input: [text]
   alternatives:
     frontier:
