@@ -817,7 +817,11 @@ configure_environment() {
   export ANTHROPIC_DEFAULT_OPUS_MODEL
   ANTHROPIC_DEFAULT_OPUS_MODEL="$(jq -r '.classes.claude.large' "$models_file")"
   export ANTHROPIC_DEFAULT_SONNET_MODEL
-  ANTHROPIC_DEFAULT_SONNET_MODEL="$(jq -r '.classes.claude.normal' "$models_file")"
+  if [[ "$model_override" == true && -n "$model_id" ]]; then
+    ANTHROPIC_DEFAULT_SONNET_MODEL="$model_id"
+  else
+    ANTHROPIC_DEFAULT_SONNET_MODEL="$(jq -r '.classes.claude.normal' "$models_file")"
+  fi
   export ANTHROPIC_DEFAULT_HAIKU_MODEL
   ANTHROPIC_DEFAULT_HAIKU_MODEL="$(jq -r '.classes.claude.fast' "$models_file")"
   export ANTHROPIC_SMALL_FAST_MODEL
