@@ -56,7 +56,7 @@ if command -v chezmoi >/dev/null 2>&1; then
   remote_config="$(mktemp "${TMPDIR:-/tmp}/hermes-remote-config.XXXXXX")"
   remote_destination="$(mktemp -d "${TMPDIR:-/tmp}/hermes-remote-home.XXXXXX")"
   printf '%s\n' \
-    '{"data":{"machine":{"schemaVersion":1,"preset":"container","os":"linux","arch":"amd64","distro":"debian","homebrewPrefix":"/home/linuxbrew/.linuxbrew","devRoot":"/home/ubuntu/dev","customize":false,"overrides":{}},"name":"Satyam","email":"test@example.com"}}' \
+    '{"data":{"machine":{"schemaVersion":1,"preset":"hermes","os":"linux","arch":"amd64","distro":"debian","homebrewPrefix":"/home/linuxbrew/.linuxbrew","devRoot":"/home/ubuntu/dev","customize":false,"overrides":{}},"name":"Satyam","email":"test@example.com"}}' \
     >"$remote_config"
   remote_managed="$(
     HOME="$remote_destination" chezmoi managed \
@@ -272,7 +272,7 @@ grep -q '/dev/tcp/127.0.0.1/8317' "$compose_file"
 grep -q 'chezmoi.json' "$stack_dir/entrypoint.sh"
 grep -q 'legacy hand-written chezmoi config' "$stack_dir/entrypoint.sh"
 grep -q 'chezmoi init' "$stack_dir/entrypoint.sh"
-grep -q 'Machine preset=container' "$stack_dir/entrypoint.sh"
+grep -q 'Machine preset=hermes' "$stack_dir/entrypoint.sh"
 grep -q 'Customize preset features=false' "$stack_dir/entrypoint.sh"
 grep -q 'bootstrap marker is incomplete' "$stack_dir/entrypoint.sh"
 if grep -A5 'bootstrap_dotfiles()' "$stack_dir/entrypoint.sh" | grep -q 'return'; then

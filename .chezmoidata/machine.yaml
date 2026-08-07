@@ -28,7 +28,18 @@ machineModel:
         hardening: false
         ssh: true
     server:
-      description: Headless host with CLI tools and optional Linux hardening.
+      description: Headless host with CLI terminal tools and optional Linux hardening.
+      features:
+        cli: true
+        developer: true
+        ai: false
+        aiMode: local
+        guiTier: none
+        osCustomization: false
+        hardening: true
+        ssh: true
+    container:
+      description: Generic image-provisioned environment.
       features:
         cli: true
         developer: true
@@ -36,10 +47,10 @@ machineModel:
         aiMode: local
         guiTier: none
         osCustomization: false
-        hardening: true
-        ssh: true
-    container:
-      description: Image-provisioned remote development environment.
+        hardening: false
+        ssh: false
+    hermes:
+      description: Image-provisioned remote AI development environment for Hermes.
       features:
         cli: true
         developer: true

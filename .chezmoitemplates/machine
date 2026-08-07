@@ -42,9 +42,9 @@
 
 {{- if ne $os "darwin" }}{{ $_ := set $features "guiTier" "none" }}{{ $_ := set $features "osCustomization" false }}{{ end -}}
 {{- if ne $os "linux" }}{{ $_ := set $features "hardening" false }}{{ end -}}
-{{- if eq $preset "container" }}{{ $_ := set $features "hardening" false }}{{ end -}}
+{{- if or (eq $preset "container") (eq $preset "hermes") }}{{ $_ := set $features "hardening" false }}{{ end -}}
 
-{{- $manageHostPackages := ne $preset "container" -}}
+{{- $manageHostPackages := not (or (eq $preset "container") (eq $preset "hermes")) -}}
 {{- $manageShell := or (index $features "cli") (index $features "ai") -}}
 {{- $manageGui := and (eq $os "darwin") (ne (index $features "guiTier") "none") -}}
 {{- $manageLocalProxy := and (index $features "ai") (eq (index $features "aiMode") "local") -}}

@@ -6,7 +6,9 @@ fixture_root="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-matrix.XXXXXX")"
 host_cache="$fixture_root/chezmoi-cache"
 trap 'rm -rf "$fixture_root"' EXIT
 export MISE_CACHE_DIR="$fixture_root/mise-cache"
-mkdir -p "$MISE_CACHE_DIR"
+export MISE_STATE_DIR="$fixture_root/mise-state"
+export MISE_DATA_DIR="$fixture_root/mise-data"
+mkdir -p "$MISE_CACHE_DIR" "$MISE_STATE_DIR" "$MISE_DATA_DIR"
 
 pass_count=0
 fail_count=0
@@ -106,7 +108,7 @@ printf 'TAP version 13\n'
 
 for os in darwin linux; do
   for arch in amd64 arm64; do
-    for preset in laptop workstation server container; do
+    for preset in laptop workstation server container hermes; do
       case_name="${os}-${arch}-${preset}"
       config="$fixture_root/${case_name}.json"
       destination="$fixture_root/${case_name}-home"
@@ -116,7 +118,7 @@ for os in darwin linux; do
       assert_lacks "$managed" "backup/scripts/backup-local.sh" "$case_name excludes repository-only backup scripts"
       assert_lacks "$managed" "hermes/hermes_docker_compose.yaml" "$case_name excludes the repository-only Hermes platform"
 
-      if [[ "$preset" == "container" ]]; then
+      if [[ "$preset" == "container" || "$preset" == "hermes" ]]; then
         assert_lacks "$managed" "install-homebrew-packages.sh" "$case_name skips host Brew packages"
         assert_lacks "$managed" "install-system-packages.sh" "$case_name skips system packages"
         assert_lacks "$managed" "install-developer-tools.sh" "$case_name uses image-baked developer tools"
@@ -127,20 +129,20 @@ for os in darwin linux; do
         else
           assert_lacks "$managed" "install-system-packages.sh" "$case_name has no apt installer"
         fi
-        if [[ "$preset" == "laptop" || "$preset" == "workstation" ]]; then
+        if [[ "$preset" == "workstation" || "$preset" == "server" ]]; then
           assert_has "$managed" "install-developer-tools.sh" "$case_name manages pinned developer tools"
         else
           assert_lacks "$managed" "install-developer-tools.sh" "$case_name omits developer tools"
         fi
       fi
 
-      if [[ "$preset" == "server" ]]; then
+      if [[ "$preset" == "server" || "$preset" == "laptop" ]]; then
         assert_lacks "$managed" "setup-ai-agent-platform.sh" "$case_name disables AI by default"
       else
         assert_has "$managed" "setup-ai-agent-platform.sh" "$case_name enables its AI profile"
       fi
 
-      if [[ "$preset" == "laptop" || "$preset" == "workstation" ]]; then
+      if [[ "$preset" == "workstation" || "$preset" == "container" ]]; then
         assert_has "$managed" ".config/cli-proxy-api/config.yaml" "$case_name manages a local AI proxy"
       else
         assert_lacks "$managed" ".config/cli-proxy-api/config.yaml" "$case_name omits a local AI proxy"
@@ -174,19 +176,19 @@ for os in darwin linux; do
       else
         assert_lacks "$managed" ".local/bin/dotfiles-macos-cleanup" "$case_name excludes macOS-only commands"
       fi
-      if [[ "$preset" == "container" ]]; then
-        assert_lacks "$managed" ".local/bin/dotfiles-ssh-enroll" "$case_name excludes SSH enrollment"
-      else
+      if [[ "$preset" == "workstation" || "$preset" == "server" ]]; then
         assert_has "$managed" ".local/bin/dotfiles-ssh-enroll" "$case_name exposes explicit SSH enrollment"
+      else
+        assert_lacks "$managed" ".local/bin/dotfiles-ssh-enroll" "$case_name excludes SSH enrollment"
       fi
 
-      if [[ "$os" == "linux" && "$preset" != "container" ]]; then
+      if [[ "$os" == "linux" && "$preset" != "container" && "$preset" != "hermes" ]]; then
         assert_has "$managed" "setup-shell.sh" "$case_name manages login shell"
       else
         assert_lacks "$managed" "setup-shell.sh" "$case_name excludes login shell setup"
       fi
 
-      if [[ "$preset" != "server" ]]; then
+      if [[ "$preset" == "workstation" || "$preset" == "container" || "$preset" == "hermes" ]]; then
         if [[ "$os" == "darwin" ]]; then
           assert_has "$managed" ".zed/settings.json" "$case_name uses local Zed settings"
           assert_lacks "$managed" ".config/zed/settings.json" "$case_name excludes Linux Zed settings"
@@ -194,6 +196,9 @@ for os in darwin linux; do
           assert_has "$managed" ".config/zed/settings.json" "$case_name uses Linux Zed settings"
           assert_lacks "$managed" ".zed/settings.json" "$case_name excludes macOS Zed settings"
         fi
+      else
+        assert_lacks "$managed" ".zed/settings.json" "$case_name excludes macOS Zed settings"
+        assert_lacks "$managed" ".config/zed/settings.json" "$case_name excludes Linux Zed settings"
       fi
     done
   done
@@ -320,13 +325,13 @@ else
   fail "Pi-owned runtime state does not drift after Chezmoi seeds it" "$pi_drift"
 fi
 
-container_config="$fixture_root/container.json"
-make_config "$container_config" container linux amd64
-container_ax="$(render_template "$container_config" dot_config/ax/models.json.tmpl)"
-if jq -e '.proxy.url == "http://cliproxyapi:8317"' <<<"$container_ax" >/dev/null; then
-  pass "container AI proxy mode renders the remote service URL"
+hermes_config="$fixture_root/hermes.json"
+make_config "$hermes_config" hermes linux amd64
+hermes_ax="$(render_template "$hermes_config" dot_config/ax/models.json.tmpl)"
+if jq -e '.proxy.url == "http://cliproxyapi:8317"' <<<"$hermes_ax" >/dev/null; then
+  pass "hermes AI proxy mode renders the remote service URL"
 else
-  fail "container AI proxy mode renders the remote service URL"
+  fail "hermes AI proxy mode renders the remote service URL"
 fi
 
 tmux_linux="$(render_template "$linux_config" dot_config/tmux/tmux.conf.tmpl)"

@@ -99,7 +99,7 @@ initialize_chezmoi_config() {
     --cache "$remote_home/.cache/chezmoi" \
     --no-tty \
     --force \
-    --promptChoice "Machine preset=container" \
+    --promptChoice "Machine preset=hermes" \
     --promptBool "Customize preset features=false" \
     --promptString "Git user name=$git_name" \
     --promptString "Git email address=$git_email"

@@ -20,7 +20,7 @@
 
 {{- $presetDefault := "server" -}}
 {{- if eq $os "darwin" }}{{ $presetDefault = "workstation" }}{{ end -}}
-{{- $preset := promptChoice "Machine preset" (list "laptop" "workstation" "server" "container") $presetDefault -}}
+{{- $preset := promptChoice "Machine preset" (list "laptop" "workstation" "server" "container" "hermes") $presetDefault -}}
 {{- $customize := promptBool "Customize preset features" false -}}
 
 {{- $setupCli := false -}}
