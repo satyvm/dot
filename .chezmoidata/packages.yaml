@@ -318,6 +318,7 @@ packages:
       feature: ai
       providers:
         brew: { darwin: pi-coding-agent, linux: pi-coding-agent }
+        npm: { name: "@earendil-works/pi-coding-agent", version: "latest" }
     - id: crush
       feature: ai
       providers:
@@ -333,7 +334,8 @@ packages:
     - id: claude-code
       feature: ai
       providers:
-        cask: { darwin: claude-code, linux: claude-code }
+        cask: { darwin: claude-code }
+        npm: { name: "@anthropic-ai/claude-code", version: "latest" }
 
     # macOS GUI tiers.
     - id: raycast

@@ -52,7 +52,7 @@ fi
 if command -v npm >/dev/null 2>&1; then
 {{- range $pkg := .packages.inventory }}
   {{- $provider := index (index $pkg "providers" | default dict) "npm" | default dict }}
-  {{- if and (eq $pkg.feature "developer") (ne (len $provider) 0) }}
+  {{- if and (or (eq $pkg.feature "developer") (eq $pkg.feature "ai")) (ne (len $provider) 0) }}
   npm install --global {{ printf "%s@%s" $provider.name $provider.version | quote }}
   {{- end }}
 {{- end }}

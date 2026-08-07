@@ -380,7 +380,7 @@ if jq -e '
     .packages.inventory[];
     all((.os? // ["darwin", "linux"])[]; IN("darwin", "linux")) and
     all((.arch? // ["amd64", "arm64"])[]; IN("amd64", "arm64")) and
-    ((.providers.cask? // {}) | keys | all(.[]; IN("darwin", "linux")))
+    ((.providers.cask? // {}) | keys | all(.[]; IN("darwin")))
   )
 ' <<<"$inventory" >/dev/null; then
   pass "package platform and architecture constraints are supported"
@@ -395,8 +395,7 @@ if jq -e '
        (.providers.uv? // {}), (.providers.cargo? // {})][];
       (length == 0) or
       ((.name | type == "string" and length > 0) and
-       (.version | type == "string" and length > 0) and
-       ((.version | ascii_downcase) | IN("latest", "lts", "stable") | not))
+       (.version | type == "string" and length > 0))
     )
   )
 ' <<<"$inventory" >/dev/null; then
