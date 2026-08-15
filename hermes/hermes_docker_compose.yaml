@@ -1,6 +1,6 @@
 services:
   cliproxyapi:
-    image: eceasy/cli-proxy-api:v7.2.95
+    image: eceasy/cli-proxy-api:latest
     restart: unless-stopped
     command:
       - /bin/bash

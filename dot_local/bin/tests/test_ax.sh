@@ -254,6 +254,13 @@ run_ax() {
 
 printf 'TAP version 13\n'
 
+if rg -F 'path=("$HOME/.local/bin" ${path:#$HOME/.local/bin})' \
+  "$REPO_ROOT/dot_dotfiles/dot_extra.tmpl" >/dev/null; then
+  pass "shell startup keeps managed agent shims ahead of Mise"
+else
+  fail "shell startup keeps managed agent shims ahead of Mise" "missing final PATH precedence repair"
+fi
+
 OUTPUT="$(cd "$HOME_DIR" && AX_PLATFORM=Linux run_ax claude --resume 'session id' --flag='two words')"
 assert_contains "$OUTPUT" "/home/dev> <run> <--profile> <default-claude> <--allow-cwd> <--> <$FAKE_BIN/claude>" "Linux home launches use the safe development workspace"
 assert_contains "$OUTPUT" "<--settings> <{\"availableModels\":[\"frontier\",\"balanced\",\"fast\",\"light\"]}>" "Claude receives the canonical four-role allowlist"

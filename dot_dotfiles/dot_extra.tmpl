@@ -67,6 +67,9 @@ elif command -v mise &> /dev/null; then
   eval "$(mise activate zsh)"
 fi
 
+# Managed agent shims must remain ahead of tool-manager shims.
+path=("$HOME/.local/bin" ${path:#$HOME/.local/bin})
+
 # ── Zoxide (smart cd) ───────────────────────────────────────────────
 if command -v zoxide &> /dev/null; then
   eval "$(zoxide init zsh)"
