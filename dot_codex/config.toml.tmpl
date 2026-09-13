@@ -1,0 +1,22 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+{{- $devRoot := $machine.devRoot -}}
+# Managed by chezmoi. Codex runs unmodified when invoked directly; the
+# cliproxy provider below is only selected when ax passes -c model_provider.
+
+[history]
+persistence = "save-all"
+
+{{ if $machine.predicates.useGateway -}}
+[model_providers.cliproxy]
+name = "CLIProxyAPI"
+base_url = "{{ $machine.gatewayUrl }}/v1"
+env_key = "OPENAI_API_KEY"
+wire_api = "chat"
+{{ end }}
+{{- $servers := .aiTools.mcp.servers -}}
+{{- range $name := keys $servers | sortAlpha }}
+{{- $server := index $servers $name }}
+[mcp_servers.{{ $name }}]
+command = {{ $server.command | quote }}
+args = [{{ range $i, $arg := $server.args }}{{ if $i }}, {{ end }}{{ if eq $arg "$DEV_ROOT" }}{{ $devRoot | quote }}{{ else }}{{ $arg | quote }}{{ end }}{{ end }}]
+{{ end -}}

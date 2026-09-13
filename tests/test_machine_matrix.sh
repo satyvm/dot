@@ -108,7 +108,7 @@ printf 'TAP version 13\n'
 
 for os in darwin linux; do
   for arch in amd64 arm64; do
-    for preset in laptop workstation server container hermes; do
+    for preset in minimal workstation server container t3; do
       case_name="${os}-${arch}-${preset}"
       config="$fixture_root/${case_name}.json"
       destination="$fixture_root/${case_name}-home"
@@ -116,9 +116,9 @@ for os in darwin linux; do
       managed="$(render_managed "$config" "$destination")"
 
       assert_lacks "$managed" "backup/scripts/backup-local.sh" "$case_name excludes repository-only backup scripts"
-      assert_lacks "$managed" "hermes/hermes_docker_compose.yaml" "$case_name excludes the repository-only Hermes platform"
+      assert_lacks "$managed" "t3code/t3code_docker_compose.yaml" "$case_name excludes the repository-only T3 Code platform"
 
-      if [[ "$preset" == "container" || "$preset" == "hermes" ]]; then
+      if [[ "$preset" == "container" || "$preset" == "t3" ]]; then
         assert_lacks "$managed" "install-homebrew-packages.sh" "$case_name skips host Brew packages"
         assert_lacks "$managed" "install-system-packages.sh" "$case_name skips system packages"
         assert_lacks "$managed" "install-developer-tools.sh" "$case_name uses image-baked developer tools"
@@ -136,19 +136,32 @@ for os in darwin linux; do
         fi
       fi
 
-      if [[ "$preset" == "server" || "$preset" == "laptop" ]]; then
-        assert_lacks "$managed" "setup-ai-agent-platform.sh" "$case_name disables AI by default"
-      else
+      if [[ "$preset" == "workstation" || "$preset" == "t3" ]]; then
         assert_has "$managed" "setup-ai-agent-platform.sh" "$case_name enables its AI profile"
-      fi
-
-      if [[ "$preset" == "workstation" || "$preset" == "container" ]]; then
-        assert_has "$managed" ".config/cli-proxy-api/config.yaml" "$case_name manages a local AI proxy"
+        assert_has "$managed" ".config/agents/context/base.md" "$case_name deploys the base context layer"
+        assert_has "$managed" ".config/agents/context/environment.md" "$case_name deploys the environment context layer"
+        assert_has "$managed" ".config/agents/context/ax-context.md" "$case_name deploys the ax session context layer"
+        assert_has "$managed" ".claude/CLAUDE.md" "$case_name gives Claude its native global context"
+        assert_has "$managed" ".codex/AGENTS.md" "$case_name gives Codex its native global context"
+        assert_has "$managed" ".config/nono/profiles/default-codex.json" "$case_name ships the Codex sandbox profile"
       else
-        assert_lacks "$managed" ".config/cli-proxy-api/config.yaml" "$case_name omits a local AI proxy"
+        assert_lacks "$managed" "setup-ai-agent-platform.sh" "$case_name disables AI"
+        assert_lacks "$managed" ".config/agents/context/base.md" "$case_name omits agent context layers"
+        assert_lacks "$managed" ".codex/AGENTS.md" "$case_name omits Codex context"
       fi
 
-      if [[ "$os" == "darwin" && "$preset" == "laptop" ]]; then
+      # The shims are gone: nothing may shadow a real agent binary on PATH.
+      for shimmed in claude codex pi opencode crush; do
+        assert_lacks "$managed" ".local/bin/$shimmed" "$case_name does not shadow the real $shimmed binary"
+      done
+
+      if [[ "$preset" == "workstation" ]]; then
+        assert_has "$managed" ".config/cli-proxy-api/config.yaml" "$case_name manages a local AI gateway"
+      else
+        assert_lacks "$managed" ".config/cli-proxy-api/config.yaml" "$case_name omits a local AI gateway"
+      fi
+
+      if [[ "$os" == "darwin" && "$preset" == "minimal" ]]; then
         assert_has "$managed" ".config/ghostty/config.ghostty" "$case_name includes minimum GUI config"
         assert_lacks "$managed" ".config/alacritty/alacritty.toml" "$case_name excludes all-tier GUI config"
       elif [[ "$os" == "darwin" && "$preset" == "workstation" ]]; then
@@ -165,7 +178,7 @@ for os in darwin linux; do
         assert_lacks "$managed" "configure-linux-hardening.sh" "$case_name does not enable Linux hardening"
       fi
 
-      if [[ "$os" == "darwin" && ( "$preset" == "laptop" || "$preset" == "workstation" ) ]]; then
+      if [[ "$os" == "darwin" && ( "$preset" == "minimal" || "$preset" == "workstation" ) ]]; then
         assert_has "$managed" "configure-macos-defaults.sh" "$case_name enables macOS defaults"
       else
         assert_lacks "$managed" "configure-macos-defaults.sh" "$case_name omits macOS defaults"
@@ -182,13 +195,13 @@ for os in darwin linux; do
         assert_lacks "$managed" ".local/bin/dotfiles-ssh-enroll" "$case_name excludes SSH enrollment"
       fi
 
-      if [[ "$os" == "linux" && "$preset" != "container" && "$preset" != "hermes" ]]; then
+      if [[ "$os" == "linux" && "$preset" != "container" && "$preset" != "t3" ]]; then
         assert_has "$managed" "setup-shell.sh" "$case_name manages login shell"
       else
         assert_lacks "$managed" "setup-shell.sh" "$case_name excludes login shell setup"
       fi
 
-      if [[ "$preset" == "workstation" || "$preset" == "container" || "$preset" == "hermes" ]]; then
+      if [[ "$preset" == "workstation" || "$preset" == "t3" ]]; then
         if [[ "$os" == "darwin" ]]; then
           assert_has "$managed" ".zed/settings.json" "$case_name uses local Zed settings"
           assert_lacks "$managed" ".config/zed/settings.json" "$case_name excludes Linux Zed settings"
@@ -325,13 +338,42 @@ else
   fail "Pi-owned runtime state does not drift after Chezmoi seeds it" "$pi_drift"
 fi
 
-hermes_config="$fixture_root/hermes.json"
-make_config "$hermes_config" hermes linux amd64
-hermes_ax="$(render_template "$hermes_config" dot_config/ax/models.json.tmpl)"
-if jq -e '.proxy.url == "http://cliproxyapi:8317"' <<<"$hermes_ax" >/dev/null; then
-  pass "hermes AI proxy mode renders the remote service URL"
+t3_config="$fixture_root/t3.json"
+make_config "$t3_config" t3 linux arm64
+t3_ax="$(render_template "$t3_config" dot_config/ax/models.json.tmpl)"
+if jq -e '.proxy.url == "http://cliproxyapi:8317" and .proxy.mode == "sidecar"' <<<"$t3_ax" >/dev/null; then
+  pass "t3 renders the sidecar gateway URL"
 else
-  fail "hermes AI proxy mode renders the remote service URL"
+  fail "t3 renders the sidecar gateway URL"
+fi
+
+workstation_config="$fixture_root/workstation-gw.json"
+make_config "$workstation_config" workstation darwin arm64
+workstation_ax="$(render_template "$workstation_config" dot_config/ax/models.json.tmpl)"
+if jq -e '.proxy.url == "http://127.0.0.1:8317" and .proxy.mode == "local"' <<<"$workstation_ax" >/dev/null; then
+  pass "workstation renders the loopback gateway URL"
+else
+  fail "workstation renders the loopback gateway URL"
+fi
+if jq -e '.agents | has("codex")' <<<"$workstation_ax" >/dev/null; then
+  pass "the model registry knows about codex"
+else
+  fail "the model registry knows about codex"
+fi
+
+# AI-feature npm packages must not reach a machine with ai disabled.
+server_devtools="$(render_template "$fixture_root/linux-amd64-server.json" run_onchange_after_install-developer-tools.sh.tmpl)"
+if grep -q 'npm install --global "@openai/codex' <<<"$server_devtools" ||
+   grep -q 'npm install --global "@anthropic-ai/claude-code' <<<"$server_devtools"; then
+  fail "AI npm packages are withheld from AI-disabled machines" "$server_devtools"
+else
+  pass "AI npm packages are withheld from AI-disabled machines"
+fi
+workstation_devtools="$(render_template "$fixture_root/darwin-arm64-workstation.json" run_onchange_after_install-developer-tools.sh.tmpl)"
+if grep -q 'npm install --global "@openai/codex' <<<"$workstation_devtools"; then
+  pass "AI npm packages reach AI-enabled machines"
+else
+  fail "AI npm packages reach AI-enabled machines" "$workstation_devtools"
 fi
 
 tmux_linux="$(render_template "$linux_config" dot_config/tmux/tmux.conf.tmpl)"

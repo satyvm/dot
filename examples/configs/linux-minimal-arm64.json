@@ -2,7 +2,7 @@
   "data": {
     "machine": {
       "schemaVersion": 1,
-      "preset": "laptop",
+      "preset": "minimal",
       "os": "linux",
       "arch": "arm64",
       "distro": "debian",

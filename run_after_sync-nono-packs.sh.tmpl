@@ -10,22 +10,36 @@ if ! command -v nono >/dev/null 2>&1; then
   exit 1
 fi
 
-installed_packs="$(nono list --installed)"
+# Pack namespace policy: prefer nolabs-ai, fall back to always-further.
+# Verified against registry.nono.sh — only codex has migrated to nolabs-ai so
+# far. Re-probe with `nono pull <namespace>/<agent>` before changing a line
+# here; a missing pack makes the dependent profile fail to resolve.
+# Crush has no published pack in either namespace and uses default-agent.
 required_packs=(
+  nolabs-ai/codex
   always-further/claude
   always-further/pi
   always-further/opencode
 )
 
+# Packs retired upstream. Leaving a stale copy installed shadows the live one.
+retired_packs=(
+  nolabs-ai/claude
+)
+
+installed_packs="$(nono list --installed)"
+
 for pack in "${required_packs[@]}"; do
   if grep -qF "${pack}"$'\t' <<<"$installed_packs"; then
     nono update "$pack" --silent || warn "Could not update $pack; keeping the installed version"
   else
-    nono pull "$pack" --silent
+    nono pull "$pack" --silent || warn "Could not pull $pack; ax launches for that agent will fail"
   fi
 done
 
-if grep -qF 'nolabs-ai/claude'$'\t' <<<"$installed_packs"; then
-  nono remove nolabs-ai/claude --silent
-fi
+for pack in "${retired_packs[@]}"; do
+  if grep -qF "${pack}"$'\t' <<<"$installed_packs"; then
+    nono remove "$pack" --silent || warn "Could not remove retired pack $pack"
+  fi
+done
 {{- end }}

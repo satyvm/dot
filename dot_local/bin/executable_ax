@@ -6,7 +6,7 @@ readonly AX_EXIT_UNAVAILABLE=69
 readonly AX_EXIT_CONFIG=78
 readonly AX_REQUIRED_ROLES='["frontier","balanced","fast","light"]'
 readonly AX_CLAUDE_MODELS='["frontier","balanced","fast","light"]'
-readonly AX_REQUIRED_AGENTS='["claude","pi","opencode","crush"]'
+readonly AX_REQUIRED_AGENTS='["claude","codex","pi","opencode","crush"]'
 
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 models_file="${AX_REGISTRY_PATH:-$config_home/ax/models.json}"
@@ -25,18 +25,21 @@ need() {
 
 show_help() {
   cat <<'EOF'
-ax — policy gateway for local coding agents
+ax — sandboxed, gateway-routed launcher for coding agents
 
 Usage:
-  ax <claude|pi|opencode|crush> [--direct] [agent arguments...]
+  ax <claude|codex|pi|opencode|crush> [agent arguments...]
   ax models [show|edit|validate|sync|live]
   ax auth setup [antigravity|claude|codex|kimi|xai]
   ax clear [--dry-run]
   ax doctor
 
-All normal agent launches use Nono. --direct is the only sandbox escape and
-must immediately follow the agent name. Agent arguments are otherwise passed
-through unchanged.
+ax is opt-in. It runs the agent under Nono and, when a gateway is configured,
+routes the agent through it. To run an agent exactly as its vendor ships it —
+no sandbox, no model rewriting, its own authentication — invoke the plain
+command name instead: `claude`, `codex`, `pi`, `opencode`, `crush`.
+
+Agent arguments are passed through unchanged.
 
 Set AX_MODEL to frontier, balanced, fast, or light to override an agent's
 default role. Set AX_MODEL=raw:<provider-model-id> for an explicit experiment.
@@ -91,7 +94,8 @@ validate_models() {
           mapping: ([$entry.value.provider, $entry.value.target] | join(":"))
         };
       (.version | type == "number") and
-      (.proxy.url | nonempty_string) and
+      (.proxy.mode | IN("local", "sidecar", "none")) and
+      (if .proxy.mode == "none" then true else (.proxy.url | nonempty_string) end) and
       (.proxy.channel | valid_provider) and
       ((.roles | keys | sort) == ($required_roles | sort)) and
       (all(.roles | to_entries[]; .key == .value.alias)) and
@@ -193,6 +197,14 @@ proxy_url() {
   jq -r '.proxy.url' "$models_file"
 }
 
+gateway_mode() {
+  jq -r '.proxy.mode // "local"' "$models_file"
+}
+
+gateway_enabled() {
+  [[ "$(gateway_mode)" != "none" ]]
+}
+
 proxy_is_local() {
   case "$(proxy_url)" in
     http://127.0.0.1:*|https://127.0.0.1:*|http://localhost:*|https://localhost:*)
@@ -239,6 +251,7 @@ proxy_model_owner() {
 
 ensure_proxy() {
   local requested_model="${1:-}" base_url
+  gateway_enabled || return 0
   base_url="$(proxy_url)"
   if proxy_ready "$base_url"; then
     :
@@ -304,13 +317,18 @@ models_sync() {
   need chezmoi
   models_validate_command
   rm -f "$HOME/.pi/agent/models.json"
-  chezmoi apply \
-    "$config_home/ax/models.json" \
-    "$config_home/cli-proxy-api/config.yaml" \
-    "$config_home/opencode/opencode.jsonc" \
-    "$HOME/.pi/agent/settings.json" \
-    "$HOME/.pi/agent/models.json" \
+  local -a targets=(
+    "$config_home/ax/models.json"
+    "$config_home/opencode/opencode.jsonc"
     "$config_home/crush/crush.json"
+    "$HOME/.codex/config.toml"
+    "$HOME/.pi/agent/settings.json"
+    "$HOME/.pi/agent/models.json"
+  )
+  if [[ "$(gateway_mode)" == "local" ]]; then
+    targets+=("$config_home/cli-proxy-api/config.yaml")
+  fi
+  chezmoi apply "${targets[@]}"
 }
 
 models_command() {
@@ -352,9 +370,13 @@ ensure_management_key_hash() {
 
 auth_setup() {
   local channel="${1:-}"
+  load_models
+  if ! gateway_enabled; then
+    die "$AX_EXIT_CONFIG" "no gateway is configured on this machine; authenticate each agent with its own login (claude, codex, ...)"
+  fi
   if [[ "${AX_PLATFORM:-$(uname -s)}" != "Darwin" ]]; then
     read_proxy_key ||
-      die "$AX_EXIT_CONFIG" "remote proxy client key is missing; redeploy hermes-dev with CLIPROXY_CLIENT_KEY configured"
+      die "$AX_EXIT_CONFIG" "gateway client key is missing; redeploy the cliproxyapi service with CLIPROXY_CLIENT_KEY configured"
     channel="${channel:-antigravity}"
     local login_flag
     case "$channel" in
@@ -419,14 +441,7 @@ command_version() {
 doctor_check_binary() {
   local command_name="$1" minimum="$2"
   local command_path=""
-  case "$command_name" in
-    claude|pi|opencode|crush)
-      command_path="$(PATH="$(real_path)" command -v "$command_name" 2>/dev/null || true)"
-      ;;
-    *)
-      command_path="$(command -v "$command_name" 2>/dev/null || true)"
-      ;;
-  esac
+  command_path="$(command -v "$command_name" 2>/dev/null || true)"
   if [[ -z "$command_path" ]]; then
     printf '%s: missing (need >= %s)\n' "$command_name" "$minimum"
     return 1
@@ -505,38 +520,46 @@ doctor() {
     printf 'models: invalid\n'
     failures=$((failures + 1))
   fi
-  if [[ -r "$config_home/agents/universal_context.md" ]]; then
-    printf 'universal context: ready\n'
+  local layer missing_context=0
+  for layer in base environment ax-context; do
+    [[ -r "$config_home/agents/context/$layer.md" ]] || missing_context=1
+  done
+  if ((missing_context == 0)); then
+    printf 'agent context layers: ready\n'
   else
-    printf 'universal context: missing or unreadable (run: chezmoi apply)\n'
+    printf 'agent context layers: missing or unreadable (run: chezmoi apply)\n'
     failures=$((failures + 1))
   fi
 
-  if read_proxy_key; then
-    printf 'proxy authentication: configured\n'
+  if ! gateway_enabled; then
+    printf 'gateway: disabled (agents use their own upstream authentication)\n'
+  elif read_proxy_key; then
+    printf 'gateway authentication: configured\n'
   else
-    printf 'proxy authentication: missing (run: ax auth setup)\n'
+    printf 'gateway authentication: missing (run: ax auth setup)\n'
     failures=$((failures + 1))
   fi
-  while IFS= read -r provider; do
-    if ! proxy_is_local; then
-      printf 'provider authentication (%s): managed by remote CLIProxyAPI\n' "$provider"
-    elif provider_auth_present "$provider"; then
-      printf 'provider authentication (%s): configured\n' "$provider"
+  if gateway_enabled; then
+    while IFS= read -r provider; do
+      if ! proxy_is_local; then
+        printf 'provider authentication (%s): managed by the cliproxyapi sidecar\n' "$provider"
+      elif provider_auth_present "$provider"; then
+        printf 'provider authentication (%s): configured\n' "$provider"
+      else
+        printf 'provider authentication (%s): missing (run: ax auth setup %s)\n' "$provider" "$provider"
+        failures=$((failures + 1))
+      fi
+    done < <(jq -r '[.roles[].provider] | unique[]' "$models_file")
+    if proxy_ready "$(proxy_url)"; then
+      printf 'gateway: ready\n'
     else
-      printf 'provider authentication (%s): missing (run: ax auth setup %s)\n' "$provider" "$provider"
+      if [[ "${AX_PLATFORM:-$(uname -s)}" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
+        printf 'gateway: unavailable (run: brew services restart cliproxyapi)\n'
+      else
+        printf 'gateway: unavailable (ensure the cliproxyapi service is running)\n'
+      fi
       failures=$((failures + 1))
     fi
-  done < <(jq -r '[.roles[].provider] | unique[]' "$models_file")
-  if proxy_ready "$(proxy_url)"; then
-    printf 'proxy: ready\n'
-  else
-    if [[ "${AX_PLATFORM:-$(uname -s)}" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
-      printf 'proxy: unavailable (run: brew services restart cliproxyapi)\n'
-    else
-      printf 'proxy: unavailable (ensure cliproxyapi container is running in Docker Compose)\n'
-    fi
-    failures=$((failures + 1))
   fi
 
   while IFS=$'\t' read -r name minimum; do
@@ -544,24 +567,13 @@ doctor() {
   done < <(jq -r '.minimumVersions | to_entries[] | [.key, .value] | @tsv' "$models_file")
 
   local profile
-  for profile in default-claude default-pi default-opencode default-crush; do
+  for profile in default-claude default-codex default-pi default-opencode default-crush; do
     if [[ -r "$config_home/nono/profiles/$profile.json" ]] &&
       command -v nono >/dev/null 2>&1 &&
       nono profile validate "$config_home/nono/profiles/$profile.json" >/dev/null 2>&1; then
       printf 'profile %s: valid\n' "$profile"
     else
       printf 'profile %s: missing or invalid\n' "$profile"
-      failures=$((failures + 1))
-    fi
-  done
-
-  local shim
-  for name in claude pi opencode crush; do
-    shim="$HOME/.local/bin/$name"
-    if [[ -x "$shim" ]] && grep -q "ax $name" "$shim"; then
-      printf 'shim %s: ready\n' "$name"
-    else
-      printf 'shim %s: missing or stale\n' "$name"
       failures=$((failures + 1))
     fi
   done
@@ -582,27 +594,12 @@ doctor() {
   ((failures == 0))
 }
 
-real_path() {
-  if [[ -n "${AX_REAL_PATH:-}" ]]; then
-    printf '%s\n' "$AX_REAL_PATH"
-    return
-  fi
-  local shim_dir="$HOME/.local/bin"
-  local entry result=()
-  IFS=':' read -r -a path_entries <<<"$PATH"
-  for entry in "${path_entries[@]}"; do
-    [[ -n "$entry" && "$entry" != "$shim_dir" ]] && result+=("$entry")
-  done
-  local joined
-  printf -v joined '%s:' "${result[@]}"
-  printf '%s\n' "${joined%:}"
-}
-
+# The managed shims were removed: `claude` and friends on PATH are the real
+# upstream binaries, so no PATH surgery is needed to find them.
 resolve_agent_binary() {
-  local agent="$1" search_path
-  search_path="$(real_path)"
-  PATH="$search_path" command -v "$agent" 2>/dev/null ||
-    die "$AX_EXIT_UNAVAILABLE" "real agent binary not found outside managed shims: $agent"
+  local agent="$1"
+  command -v "$agent" 2>/dev/null ||
+    die "$AX_EXIT_UNAVAILABLE" "agent binary not found on PATH: $agent"
 }
 
 sync_pi_models() {
@@ -787,9 +784,29 @@ sync_opencode_models() {
 
 configure_environment() {
   local agent="$1" role="$2" model_id="$3" base_url="$4"
+  export HERDR_AGENT="$agent"
+
+  # Runtime state directories are needed whether or not a gateway is in play.
+  if [[ "$agent" == "opencode" ]]; then
+    export OPENCODE_EXPERIMENTAL_LSP_TOOL=true
+    mkdir -p \
+      "$HOME/.cache/opencode" \
+      "$HOME/.local/share/opencode/log" \
+      "$HOME/.local/share/opencode/repos" \
+      "$HOME/.local/share/opencode/storage" \
+      "$HOME/.local/share/opencode/worktree" \
+      "$HOME/.local/share/opentui" \
+      "$HOME/.local/state/opencode"
+  fi
+  if [[ "$agent" == "pi" ]]; then
+    export PI_CODING_AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+    mkdir -p "$PI_CODING_AGENT_DIR/sessions"
+  fi
+
+  gateway_enabled || return 0
+
   export AX_MODEL_ROLE="$role"
   export AX_MODEL_ID="$model_id"
-  export HERDR_AGENT="$agent"
   export ANTHROPIC_BASE_URL="$base_url"
   if [[ "$agent" == "claude" ]]; then
     export ANTHROPIC_AUTH_TOKEN="$proxy_key"
@@ -801,18 +818,6 @@ configure_environment() {
   export OPENAI_BASE_URL="$base_url/v1"
   export OPENAI_API_KEY="$proxy_key"
   export OPENAI_MODEL="$model_id"
-  if [[ "$agent" == "opencode" ]]; then
-    export OPENCODE_EXPERIMENTAL_LSP_TOOL=true
-    mkdir -p \
-      "$HOME/.cache/opencode" \
-      "$HOME/.local/share/opencode/log" \
-      "$HOME/.local/share/opencode/repos" \
-      "$HOME/.local/share/opencode/storage" \
-      "$HOME/.local/share/opencode/worktree" \
-      "$HOME/.local/share/opentui" \
-      "$HOME/.local/state/opencode"
-    sync_opencode_models "$base_url"
-  fi
   export ANTHROPIC_MODEL="$model_id"
   export ANTHROPIC_DEFAULT_OPUS_MODEL
   ANTHROPIC_DEFAULT_OPUS_MODEL="$(jq -r '.classes.claude.large' "$models_file")"
@@ -826,9 +831,11 @@ configure_environment() {
   ANTHROPIC_DEFAULT_HAIKU_MODEL="$(jq -r '.classes.claude.fast' "$models_file")"
   export ANTHROPIC_SMALL_FAST_MODEL
   ANTHROPIC_SMALL_FAST_MODEL="$(jq -r '.classes.claude.small' "$models_file")"
+
+  if [[ "$agent" == "opencode" ]]; then
+    sync_opencode_models "$base_url"
+  fi
   if [[ "$agent" == "pi" ]]; then
-    export PI_CODING_AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
-    mkdir -p "$PI_CODING_AGENT_DIR/sessions"
     sync_pi_models "$base_url" "$PI_CODING_AGENT_DIR"
   fi
 }
@@ -859,73 +866,80 @@ resolve_target_model() {
 launch_agent() {
   local agent="$1"
   shift
-  local direct=false
-  if [[ "${1:-}" == "--direct" ]]; then
-    direct=true
-    shift
-  fi
 
   load_models
   validate_models "$models_file" || die "$AX_EXIT_CONFIG" "rendered model registry is invalid: $models_file"
-  local universal_context="$config_home/agents/universal_context.md"
-  [[ -r "$universal_context" ]] ||
-    die "$AX_EXIT_CONFIG" "essential universal context is missing or unreadable: $universal_context; run: chezmoi apply"
-  export AX_UNIVERSAL_CONTEXT="$universal_context"
+
+  # Layer 3 of the context stack. It describes the sandbox and gateway, so it is
+  # true only for ax launches and is deliberately not written into any agent's
+  # own global config file.
+  local ax_context="$config_home/agents/context/ax-context.md"
+  [[ -r "$ax_context" ]] ||
+    die "$AX_EXIT_CONFIG" "ax session context is missing or unreadable: $ax_context; run: chezmoi apply"
+  export AX_SESSION_CONTEXT="$ax_context"
+
   local model_override=false
   [[ -n "${AX_MODEL+x}" ]] && model_override=true
-  local requested="${AX_MODEL:-$(jq -r --arg agent "$agent" '.agents[$agent].defaultRole' "$models_file")}"
-  local role model_id
-  read_proxy_key || die "$AX_EXIT_CONFIG" "proxy client key is missing; run: ax auth setup"
-  local base_url
-  base_url="$(proxy_url)"
+  local role="" model_id="" base_url=""
 
-  if [[ "$agent" == "claude" ]] &&
-    ! jq -e --arg role "$requested" '.roles[$role]' "$models_file" >/dev/null 2>&1; then
-    die "$AX_EXIT_USAGE" "Claude model must be one of: frontier, balanced, fast, light"
+  if gateway_enabled; then
+    local requested="${AX_MODEL:-$(jq -r --arg agent "$agent" '.agents[$agent].defaultRole' "$models_file")}"
+    read_proxy_key || die "$AX_EXIT_CONFIG" "gateway client key is missing; run: ax auth setup"
+    base_url="$(proxy_url)"
+
+    if [[ "$agent" == "claude" ]] &&
+      ! jq -e --arg role "$requested" '.roles[$role]' "$models_file" >/dev/null 2>&1; then
+      die "$AX_EXIT_USAGE" "Claude model must be one of: frontier, balanced, fast, light"
+    fi
+
+    if [[ "$requested" == raw:* ]]; then
+      role="raw"
+      model_id="${requested#raw:}"
+      [[ -n "$model_id" ]] || die "$AX_EXIT_USAGE" "raw model override is empty"
+    elif jq -e --arg role "$requested" '.roles[$role]' "$models_file" >/dev/null 2>&1; then
+      role="$requested"
+      model_id="$requested"
+    elif jq -e --arg model "$requested" '.catalog[$model]' "$models_file" >/dev/null 2>&1; then
+      role="catalog"
+      model_id="$requested"
+    elif proxy_has_model "$base_url" "$requested" 2>/dev/null; then
+      role="live"
+      model_id="$requested"
+    else
+      die "$AX_EXIT_USAGE" "unknown model role: $requested"
+    fi
+
+    ensure_proxy "$model_id"
+  elif [[ -n "${AX_MODEL:-}" ]]; then
+    die "$AX_EXIT_CONFIG" "AX_MODEL was set but no gateway is configured on this machine; the agent uses its own model selection"
   fi
 
-  if [[ "$requested" == raw:* ]]; then
-    role="raw"
-    model_id="${requested#raw:}"
-    [[ -n "$model_id" ]] || die "$AX_EXIT_USAGE" "raw model override is empty"
-  elif jq -e --arg role "$requested" '.roles[$role]' "$models_file" >/dev/null 2>&1; then
-    role="$requested"
-    model_id="$requested"
-  elif jq -e --arg model "$requested" '.catalog[$model]' "$models_file" >/dev/null 2>&1; then
-    role="catalog"
-    model_id="$requested"
-  elif proxy_has_model "$base_url" "$requested" 2>/dev/null; then
-    role="live"
-    model_id="$requested"
-  else
-    die "$AX_EXIT_USAGE" "unknown model role: $requested"
-  fi
-
-  ensure_proxy "$model_id"
   local binary
   binary="$(resolve_agent_binary "$agent")"
   configure_environment "$agent" "$role" "$model_id" "$base_url"
 
   local crush_override_file=""
-  if [[ -n "${AX_UNIVERSAL_CONTEXT:-}" ]]; then
-    case "$agent" in
-      claude)
-        set -- --append-system-prompt-file "$AX_UNIVERSAL_CONTEXT" "$@"
-        ;;
-      pi)
-        set -- --append-system-prompt "$AX_UNIVERSAL_CONTEXT" "$@"
-        ;;
-    esac
-  fi
-  if [[ "$agent" == "claude" ]]; then
+  case "$agent" in
+    claude)
+      set -- --append-system-prompt-file "$ax_context" "$@"
+      ;;
+    pi)
+      set -- --append-system-prompt "$ax_context" "$@"
+      ;;
+  esac
+  if [[ "$agent" == "claude" ]] && gateway_enabled; then
     set -- --settings "{\"availableModels\":$AX_CLAUDE_MODELS}" "$@"
   fi
-  if [[ "$agent" != "claude" || "$model_override" == true ]]; then
+
+  if gateway_enabled && { [[ "$agent" != "claude" ]] || [[ "$model_override" == true ]]; }; then
     local target_model
     target_model="$(resolve_target_model "$model_id" "$agent" "$role")"
     case "$agent" in
       claude)
         set -- --model "$model_id" "$@"
+        ;;
+      codex)
+        set -- -c "model_provider=cliproxy" --model "$target_model" "$@"
         ;;
       pi)
         set -- --model "cliproxy/$target_model" "$@"
@@ -947,24 +961,19 @@ launch_agent() {
     esac
   fi
 
-  local -a run_command
-  if [[ "$direct" == true ]]; then
-    run_command=("$binary" "$@")
-  else
-    local profile
-    profile="$(jq -r --arg agent "$agent" '.agents[$agent].profile' "$models_file")"
-    local -a socket_args=()
-    if [[ -n "${HERDR_SOCKET_PATH:-}" ]]; then
-      socket_args+=(--allow-unix-socket "$HERDR_SOCKET_PATH")
-    fi
-    if [[ -n "${TEA_SOCKET_PATH:-}" ]]; then
-      socket_args+=(--allow-unix-socket "$TEA_SOCKET_PATH")
-    fi
-    if [[ "${AX_PLATFORM:-$(uname -s)}" != "Darwin" && "$PWD" -ef "$HOME" && -d "$HOME/dev" ]]; then
-      cd "$HOME/dev"
-    fi
-    run_command=(nono run --profile "$profile" --allow-cwd ${socket_args[@]+"${socket_args[@]}"} -- "$binary" "$@")
+  local profile
+  profile="$(jq -r --arg agent "$agent" '.agents[$agent].profile' "$models_file")"
+  local -a socket_args=()
+  if [[ -n "${HERDR_SOCKET_PATH:-}" ]]; then
+    socket_args+=(--allow-unix-socket "$HERDR_SOCKET_PATH")
   fi
+  if [[ -n "${TEA_SOCKET_PATH:-}" ]]; then
+    socket_args+=(--allow-unix-socket "$TEA_SOCKET_PATH")
+  fi
+  if [[ "${AX_PLATFORM:-$(uname -s)}" != "Darwin" && "$PWD" -ef "$HOME" && -d "$HOME/dev" ]]; then
+    cd "$HOME/dev"
+  fi
+  local -a run_command=(nono run --profile "$profile" --allow-cwd ${socket_args[@]+"${socket_args[@]}"} -- "$binary" "$@")
 
   if [[ -n "$crush_override_file" ]]; then
     trap 'rm -f "$crush_override_file"' EXIT HUP INT TERM
@@ -996,7 +1005,7 @@ case "${1:-}" in
     shift
     ax_clear "$@"
     ;;
-  claude|pi|opencode|crush)
+  claude|codex|pi|opencode|crush)
     agent="$1"
     shift
     launch_agent "$agent" "$@"

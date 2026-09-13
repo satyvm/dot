@@ -3,7 +3,8 @@
   "$schema": "https://charm.land/crush.json",
   "options": {
     "context_paths": [
-      "{{ .chezmoi.homeDir }}/.config/agents/universal_context.md"
+      "{{ .chezmoi.homeDir }}/.config/agents/context/base.md",
+      "{{ .chezmoi.homeDir }}/.config/agents/context/environment.md"
     ]
   },
   "mcp": {
@@ -33,7 +34,7 @@
   "providers": {
     "cliproxy": {
       "type": "openai-compat",
-      "base_url": "{{ if eq $machine.features.aiMode "remote" }}http://cliproxyapi:8317{{ else }}{{ .aiAgentPlatform.proxy.url }}{{ end }}/v1",
+      "base_url": "{{ $machine.gatewayUrl }}/v1",
       "api_key": "$OPENAI_API_KEY",
       "discover_models": true,
       "models": [

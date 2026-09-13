@@ -5,24 +5,24 @@ machineModel:
     arch: [amd64, arm64]
     linuxDistros: [debian, ubuntu]
   presets:
-    laptop:
-      description: Portable personal machine with a focused GUI.
+    minimal:
+      description: Personal machine with a focused GUI set and no AI tooling.
       features:
         cli: true
         developer: false
         ai: false
-        aiMode: local
+        aiGateway: none
         guiTier: minimum
         osCustomization: true
         hardening: false
         ssh: false
     workstation:
-      description: Full development machine with all managed GUI applications.
+      description: Full development machine with every managed GUI application and local AI tooling.
       features:
         cli: true
         developer: true
         ai: true
-        aiMode: local
+        aiGateway: local
         guiTier: all
         osCustomization: true
         hardening: false
@@ -33,29 +33,29 @@ machineModel:
         cli: true
         developer: true
         ai: false
-        aiMode: local
+        aiGateway: none
         guiTier: none
         osCustomization: false
         hardening: true
         ssh: true
     container:
-      description: Generic image-provisioned environment.
+      description: Generic image-provisioned environment without AI tooling.
       features:
         cli: true
         developer: true
-        ai: true
-        aiMode: local
+        ai: false
+        aiGateway: none
         guiTier: none
         osCustomization: false
         hardening: false
         ssh: false
-    hermes:
-      description: Image-provisioned remote AI development environment for Hermes.
+    t3:
+      description: Image-provisioned T3 Code remote development environment.
       features:
         cli: true
         developer: true
         ai: true
-        aiMode: remote
+        aiGateway: sidecar
         guiTier: none
         osCustomization: false
         hardening: false

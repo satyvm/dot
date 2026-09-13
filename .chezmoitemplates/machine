@@ -6,7 +6,7 @@
   {{- $_ := set $features "cli" (index . "setupCli" | default false) -}}
   {{- $_ := set $features "developer" (index . "setupDeveloper" | default false) -}}
   {{- $_ := set $features "ai" (index . "setupAi" | default false) -}}
-  {{- $_ := set $features "aiMode" (index . "aiMode" | default "local") -}}
+  {{- $_ := set $features "aiGateway" (ternary "sidecar" "local" (eq (index . "aiMode" | default "local") "remote")) -}}
   {{- $_ := set $features "guiTier" (index . "guiTier" | default "none") -}}
   {{- $_ := set $features "osCustomization" (index . "setupMacos" | default false) -}}
   {{- $_ := set $features "hardening" (index . "setupLinuxHardening" | default false) -}}
@@ -17,13 +17,21 @@
   {{- if eq (len $presetData) 0 }}{{ fail (printf "unknown machine preset %q" $preset) }}{{ end -}}
   {{- $features = deepCopy $presetData.features -}}
   {{- if (index $raw "customize" | default false) -}}
-    {{- $overrides := index $raw "overrides" | default dict -}}
-    {{- $features = mergeOverwrite $features (deepCopy $overrides) -}}
+    {{- $overrides := deepCopy (index $raw "overrides" | default dict) -}}
+    {{- /* Compatibility: an override file may still carry the retired aiMode key. */ -}}
+    {{- if and (hasKey $overrides "aiMode") (not (hasKey $overrides "aiGateway")) -}}
+      {{- $_ := set $overrides "aiGateway" (ternary "sidecar" "local" (eq (index $overrides "aiMode") "remote")) -}}
+    {{- end -}}
+    {{- $_ := unset $overrides "aiMode" -}}
+    {{- $features = mergeOverwrite $features $overrides -}}
   {{- end -}}
 {{- end -}}
 
 {{- if not (index $features "cli") }}{{ $_ := set $features "developer" false }}{{ end -}}
-{{- if not (index $features "ai") }}{{ $_ := set $features "aiMode" "local" }}{{ end -}}
+{{- if not (index $features "ai") }}{{ $_ := set $features "aiGateway" "none" }}{{ end -}}
+{{- if not (has (index $features "aiGateway") (list "local" "sidecar" "none")) -}}
+  {{- fail (printf "unknown aiGateway %q; expected local, sidecar, or none" (index $features "aiGateway")) -}}
+{{- end -}}
 
 {{- $os := index $raw "os" | default .chezmoi.os -}}
 {{- $arch := index $raw "arch" | default .chezmoi.arch -}}
@@ -42,17 +50,22 @@
 
 {{- if ne $os "darwin" }}{{ $_ := set $features "guiTier" "none" }}{{ $_ := set $features "osCustomization" false }}{{ end -}}
 {{- if ne $os "linux" }}{{ $_ := set $features "hardening" false }}{{ end -}}
-{{- if or (eq $preset "container") (eq $preset "hermes") }}{{ $_ := set $features "hardening" false }}{{ end -}}
+{{- $isImageProvisioned := or (eq $preset "container") (eq $preset "t3") -}}
+{{- if $isImageProvisioned }}{{ $_ := set $features "hardening" false }}{{ end -}}
 
-{{- $manageHostPackages := not (or (eq $preset "container") (eq $preset "hermes")) -}}
+{{- $manageHostPackages := not $isImageProvisioned -}}
 {{- $manageShell := or (index $features "cli") (index $features "ai") -}}
 {{- $manageGui := and (eq $os "darwin") (ne (index $features "guiTier") "none") -}}
-{{- $manageLocalProxy := and (index $features "ai") (eq (index $features "aiMode") "local") -}}
+{{- $useGateway := and (index $features "ai") (ne (index $features "aiGateway") "none") -}}
+{{- $manageLocalProxy := and (index $features "ai") (eq (index $features "aiGateway") "local") -}}
 {{- $manageSystemPackages := and $manageHostPackages (eq $os "linux") -}}
 {{- $manageLoginShell := and $manageSystemPackages $manageShell -}}
 {{- $packageMode := "none" -}}
 {{- if $manageHostPackages }}{{ $packageMode = ternary "brew" "apt+brew" (eq $os "darwin") }}{{ end -}}
-{{- $environment := ternary "remote-dev" "local-dev" (eq (index $features "aiMode") "remote") -}}
+{{- $environment := ternary "remote-dev" "local-dev" $isImageProvisioned -}}
+{{- $gatewayUrl := "" -}}
+{{- if eq (index $features "aiGateway") "local" }}{{ $gatewayUrl = "http://127.0.0.1:8317" }}{{ end -}}
+{{- if eq (index $features "aiGateway") "sidecar" }}{{ $gatewayUrl = "http://cliproxyapi:8317" }}{{ end -}}
 
 {{- dict
   "schemaVersion" 1
@@ -65,6 +78,7 @@
   "packageMode" $packageMode
   "devRoot" $devRoot
   "environment" $environment
+  "gatewayUrl" $gatewayUrl
   "features" $features
   "predicates" (dict
     "manageHostPackages" $manageHostPackages
@@ -73,5 +87,7 @@
     "manageLoginShell" $manageLoginShell
     "manageGui" $manageGui
     "manageLocalProxy" $manageLocalProxy
+    "useGateway" $useGateway
+    "imageProvisioned" $isImageProvisioned
   )
   | toJson -}}

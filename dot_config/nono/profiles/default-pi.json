@@ -32,7 +32,9 @@
       "$HOME/.go"
     ],
     "read_file": [
-      "$HOME/.config/agents/universal_context.md"
+      "$HOME/.config/agents/context/base.md",
+      "$HOME/.config/agents/context/environment.md",
+      "$HOME/.config/agents/context/ax-context.md"
     ]
   },
   "network": {

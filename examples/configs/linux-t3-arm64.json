@@ -2,9 +2,9 @@
   "data": {
     "machine": {
       "schemaVersion": 1,
-      "preset": "hermes",
+      "preset": "t3",
       "os": "linux",
-      "arch": "amd64",
+      "arch": "arm64",
       "distro": "debian",
       "homebrewPrefix": "/home/linuxbrew/.linuxbrew",
       "devRoot": "/home/ubuntu/dev",

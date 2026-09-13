@@ -1,0 +1,46 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+# `ax` Session Context
+
+You were launched through `ax`, so this session is **sandboxed by `nono`**{{ if $machine.predicates.useGateway }} and
+**routed through a model gateway**{{ end }}. The rules below apply to this session only.
+
+## Sandbox boundary
+
+`nono` enforces the profile at `~/.config/nono/profiles/`. Within it:
+
+- The current project directory is read-write. Paths outside it generally are not.
+- Credentials are denied outright: `~/.ssh`, `~/.gnupg`, `~/.aws`, Cargo
+  credentials, `~/.config/gh/hosts.yml`, shell history{{ if eq $machine.os "darwin" }}, Keychains, browser profiles{{ end }}.
+- If a legitimate, non-secret path is missing, report the **exact** path and
+  access mode you need. Do not work around it.
+
+{{ if eq $machine.os "linux" -}}
+Linux Landlock is allow-list based and cannot deny a child path beneath a
+broadly allowed parent. Never request a grant for all of `{{ $machine.devRoot }}`'s
+parent, or for the whole home directory — it would collide with the credential
+denies above. Run from a specific project directory.
+
+{{ end -}}
+Never suggest bypassing the sandbox by invoking a binary directly to escape it.
+If the user wants an unsandboxed run, they already have one: the plain command
+name. Say so rather than engineering around `nono`.
+
+{{ if $machine.predicates.useGateway -}}
+## Model gateway
+
+Requests go through CLIProxyAPI at `{{ $machine.gatewayUrl }}`
+({{ if eq $machine.features.aiGateway "sidecar" }}a private container on the Compose network, not reachable from outside it{{ else }}a local service on the loopback interface{{ end }}).
+
+Canonical model roles are `frontier`, `balanced`, `fast`, and `light`, defined in
+`~/.config/ax/models.json`. Override one launch with `AX_MODEL=<role>`.
+
+Gateway credentials are secret. Never print them, copy them into a project file,
+or read `~/.config/cli-proxy-api`.
+
+Useful checks: `ax doctor`, `ax models show`, `ax models live`.
+{{- else -}}
+## Model access
+
+No gateway is configured on this machine. The agent uses its own upstream
+authentication; `ax` is providing the sandbox only.
+{{- end }}

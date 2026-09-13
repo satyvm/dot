@@ -9,9 +9,10 @@ AGENTS.md
 .local/handoffs
 .local/reports
 backup
-hermes
+t3code
 examples
 tests
+docs
 .config/agents/skills/add-dotfiles-app/evals
 
 # Existing pre-machine-model configs are a compatibility lane. This prevents
@@ -58,6 +59,9 @@ install-system-packages.sh
 {{- end }}
 
 {{- if not $machine.features.ai }}
+.agents
+.claude
+.codex
 .config/agents
 .config/ai-tools
 .config/ax
@@ -69,10 +73,6 @@ install-system-packages.sh
 .config/opencode
 .pi
 .local/bin/ax
-.local/bin/claude
-.local/bin/crush
-.local/bin/opencode
-.local/bin/pi
 setup-ai-agent-platform.sh
 sync-nono-packs.sh
 {{- end }}

@@ -132,6 +132,9 @@ aiAgentPlatform:
     claude:
       defaultRole: balanced
       profile: default-claude
+    codex:
+      defaultRole: frontier
+      profile: default-codex
     pi:
       defaultRole: fast
       profile: default-pi
@@ -151,10 +154,11 @@ aiAgentPlatform:
       large: balanced
       small: light
   minimumVersions:
-    nono: 0.69.0
+    nono: 0.77.0
     herdr: 0.7.5
     cliproxyapi: 7.2.95
     claude: 2.1.0
+    codex: 0.60.0
     pi: 0.81.0
     opencode: 1.1.0
     crush: 0.40.0
