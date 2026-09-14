@@ -37,6 +37,7 @@ and Debian/Ubuntu on `amd64` and `arm64`.
 │   ├── ghostty/config.ghostty   #   Ghostty terminal
 │   ├── git/config.tmpl          #   Git config (delta, SSH signing, rebase)
 │   ├── nono/profiles/           #   Nono sandbox profiles for AI agents
+│   ├── agents/context/          #   base / environment / ax-context layers
 │   ├── ax/models.json.tmpl      #   Rendered canonical agent/model registry
 │   ├── agents/skills/           #   AI agent skills (downloaded via external archives)
 │   └── ...                      #   alacritty, herdr, pet, cli-proxy-api
@@ -48,12 +49,12 @@ and Debian/Ubuntu on `amd64` and `arm64`.
 │   └── scripts/
 │       ├── executable_backup-local.sh
 │       └── executable_restore-local.sh
-└── hermes/                      # Repository-only Coolify remote-development platform
+└── t3code/                      # Repository-only Coolify T3 Code platform
 ```
 
 ## Machine Profiles
 
-`chezmoi init` first selects `laptop`, `workstation`, `server`, or `container`,
+`chezmoi init` first selects `minimal`, `workstation`, `server`, `container`, or `t3`,
 then offers optional feature overrides. Host facts and choices are persisted
 under `data.machine`. `.chezmoidata/machine.yaml` owns preset defaults and
 `.chezmoitemplates/machine` derives the resolved features and predicates.
@@ -67,7 +68,8 @@ All `.tmpl` files are [chezmoi Go templates](https://chezmoi.io/reference/templa
 |----------|--------|---------|
 | `$machine.os` | resolved machine template | `"darwin"` / `"linux"` |
 | `$machine.arch` | resolved machine template | `"amd64"` / `"arm64"` |
-| `$machine.features` | preset plus overrides | CLI/developer/AI/GUI/etc. |
+| `$machine.features` | preset plus overrides | CLI/developer/AI/aiGateway/GUI/etc. |
+| `$machine.gatewayUrl` | derived from `aiGateway` | `""` / loopback / `http://cliproxyapi:8317` |
 | `$machine.predicates` | derived policy | host packages/GUI/proxy/etc. |
 | `.name` | `.chezmoi.json.tmpl` prompt | Git user name |
 | `.email` | `.chezmoi.json.tmpl` prompt | Git email |
@@ -95,7 +97,7 @@ Path mapping: `dot_config/nvim/init.lua` → `~/.config/nvim/init.lua`. The dire
 Listed in `.chezmoiignore.tmpl`. These files stay in the source directory only:
 
 - `README.md`, `AGENTS.md`, `.setup.sh`
-- `examples/`, `tests/`, `backup/`, and `hermes/`
+- `examples/`, `tests/`, `docs/`, `backup/`, and `t3code/`
 
 ## AI Agent Infrastructure
 
@@ -110,27 +112,35 @@ Skills are refreshed every 168h (7 days) and symlinked from `dot_agents/symlink_
 
 ### AI CLI Tools & Sandboxing
 These AI CLI tools are all installed:
-- **Crush** (`crush` / `charm`): Personal AI assistant
 - **Claude Code** (`claude`): Anthropic's CLI agent
+- **Codex** (`codex`): OpenAI's CLI agent
 - **PI Coding Agent** (`pi`): @earendil-works agent
 - **OpenCode** (`opencode`): Open-source CLI agent
+- **Crush** (`crush` / `charm`): Personal AI assistant
 
-On macOS `dev`, managed PATH shims for all four native command names always
-delegate to `ax`. `ax` is the single policy gateway: Nono is the default,
-`--direct` is the explicit escape hatch, and Herdr resume arguments pass through
-unchanged. The real binaries are resolved with `~/.local/bin` removed from the
-search path so the shims cannot recurse.
+There are **no managed shims**. `claude`, `codex`, `pi`, `opencode`, and `crush`
+on `PATH` are the real upstream binaries with their own authentication, and
+running one directly gives stock behaviour.
+
+`ax <agent>` is the opt-in path: it runs the same binary under Nono and, when
+`aiGateway` is not `none`, routes it through CLIProxyAPI. There is no
+`--direct` flag — the unsandboxed path is the plain command name. Herdr resume
+arguments pass through unchanged.
 
 ### Nono Sandbox Profiles
 Located in `dot_config/nono/profiles/`. Each agent has a profile:
-- `default-claude.json`, `default-pi.json`, and `default-opencode.json` extend the
-  signed `always-further` registry packs with only shared-context, home-toolchain,
-  npm-cache, and CLIProxy grants
+- `default-claude.json`, `default-pi.json`, `default-opencode.json`, and
+  `default-codex.json` are thin overlays on signed registry packs, adding only
+  shared-context, home-toolchain, npm-cache, and gateway grants
 - `default-agent.json` is the shared base for `default-crush.json`; Crush has no
   upstream `nono-packs` profile
-- `run_after_sync-nono-packs.sh.tmpl` installs and updates the three official
-  packs on AI-enabled machines; Codex is intentionally not managed by Nono
+- `run_after_sync-nono-packs.sh.tmpl` installs `nolabs-ai/codex` plus
+  `always-further/{claude,pi,opencode}`; the namespace preference is nolabs-ai
+  first, always-further as fallback, verified against registry.nono.sh
 - `ax` grants resolved Herdr and Tea sockets dynamically at launch
+- context layers: `base.md` + `environment.md` reach every agent through its own
+  native global config; `ax-context.md` is injected by `ax` alone, because the
+  sandbox it describes is only true for `ax` launches
 - Nono controls filesystem access, network, workdir permissions for sandboxed AI agents
 
 ## Shell Initialization Order
@@ -201,16 +211,17 @@ Backups are timestamped (`local_DDMMYY`). Auto-detects first non-system volume i
 1. **`.tmpl` files are Go templates** — don't edit them as plain config files. Pay attention to template conditionals.
 2. **App additions belong in `.chezmoidata/packages.yaml`** — use the
    `add-dotfiles-app` skill; don't hardcode installs in provider scripts.
-3. **Agent names are managed shims** — `claude`, `pi`, `opencode`, and `crush`
-   always enter `ax`, including through `command`. Use `ax <agent> --direct`
-   only for an explicit diagnostic sandbox bypass.
+3. **Agent names are NOT shims** — `claude`, `codex`, `pi`, `opencode`, and
+   `crush` are the real binaries. Only `ax <agent>` adds the sandbox and
+   gateway. Never reintroduce a file in `~/.local/bin` that shadows an agent
+   name; T3 Code spawns these CLIs off `PATH` and a wrapper breaks it.
 4. **External skills are refreshed weekly** — repo-owned skills such as
    `add-dotfiles-app` are tracked here; upstream archive targets may be replaced
    on external refresh.
 5. **Sensitive data is not in this repo** — SSH keys, browser profiles, personal docs are backed up separately to external SSD.
 6. **Platform-sensitive files** may not be present (e.g., macOS scripts are ignored entirely on Linux via `.chezmoiignore.tmpl`).
-7. **Platform tests are shell-based** — run `bash tests/test_machine_matrix.sh`
-   and `bash dot_local/bin/tests/test_ax.sh`; also validate with `chezmoi diff`
-   or `chezmoi apply --dry-run`.
+7. **Platform tests are shell-based** — run `bash tests/test_machine_matrix.sh`,
+   `bash dot_local/bin/tests/test_ax.sh`, and `bash t3code/tests/test_stack.sh`;
+   also validate with `chezmoi diff` or `chezmoi apply --dry-run`.
 8. **Docker on macOS** is started and managed with Colima (`colima start`), not Docker Desktop.
 9. **fzf initialization is deferred** via precmd hook for faster shell startup.

@@ -1,0 +1,227 @@
+# T3 Code remote development stack.
+#
+# Deliberately has no Coolify domain and no published TCP port. The only
+# ingress is the Tailscale sidecar, which owns its own tailnet node; upstream
+# advises against exposing a T3 Code server to the public internet because its
+# only authentication is a pairing token.
+services:
+  tailscale:
+    image: tailscale/tailscale:v1.90.10
+    hostname: t3-dev
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      # Docker's embedded resolver at 127.0.0.11 must keep serving Compose
+      # service names such as `cliproxyapi`. Accepting tailnet DNS would
+      # overwrite /etc/resolv.conf in this shared namespace and break that.
+      # This is a name-resolution setting, not a security control: traffic is
+      # still WireGuard-encrypted and tailnet-authenticated either way.
+      TS_ACCEPT_DNS: "false"
+      TS_SERVE_CONFIG: /config/tailscale-serve.json
+      # tag:t3 keeps the node key from expiring; --port avoids contending with
+      # the host's tailscaled for the same external UDP mapping.
+      TS_EXTRA_ARGS: --advertise-tags=tag:t3 --port=41642
+    volumes:
+      - ts-state:/var/lib/tailscale
+      - ./t3code/tailscale-serve.json:/config/tailscale-serve.json:ro
+    ports:
+      - "41642:41642/udp"
+    networks:
+      - t3-net
+    healthcheck:
+      test: ["CMD", "tailscale", "status", "--peers=false"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  t3code:
+    build:
+      context: .
+      dockerfile: t3code/Dockerfile
+      args:
+        REMOTE_UID: ${REMOTE_UID:-1000}
+        REMOTE_GID: ${REMOTE_GID:-1000}
+    restart: unless-stopped
+    # Shares the sidecar's network namespace: reachable at the tailnet node,
+    # and therefore cannot declare its own ports or networks.
+    network_mode: service:tailscale
+    depends_on:
+      tailscale:
+        condition: service_healthy
+    environment:
+      DEV_SSH_PUBLIC_KEY: ${DEV_SSH_PUBLIC_KEY:?}
+      REMOTE_DOTFILES_REPO: ${REMOTE_DOTFILES_REPO:-https://github.com/satyvm/dot.git}
+      REMOTE_GIT_NAME: ${REMOTE_GIT_NAME:-Satyam}
+      REMOTE_GIT_EMAIL: ${REMOTE_GIT_EMAIL:-75127014+satyvm@users.noreply.github.com}
+      T3CODE_HOME: /home/ubuntu/.t3
+      TEA_SOCKET_PATH: /run/tea/tea.sock
+    volumes:
+      - /home/ubuntu/dev:/home/ubuntu/dev
+      - t3-home:/home/ubuntu
+      - t3-state:/home/ubuntu/.t3
+      - npm-global:/home/ubuntu/.npm-global
+      - ssh-host-keys:/etc/ssh/host-keys
+      - platform-secrets:/run/platform-secrets:ro
+      - tea-socket:/run/tea
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/3773'"]
+      interval: 30s
+      timeout: 8s
+      start_period: 180s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: "4.0"
+
+  cliproxyapi:
+    # Opt-in: `docker compose --profile gateway up`. Direct `claude`/`codex`
+    # never touch this service; only `ax` does.
+    profiles: ["gateway"]
+    image: eceasy/cli-proxy-api:latest
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    command:
+      - /bin/bash
+      - -euc
+      - |
+        umask 077
+        printf '%s\n' "$${CLIPROXY_CLIENT_KEY}" > /secrets/client-key
+        cat > /config/config.yaml <<EOF
+        host: "0.0.0.0"
+        port: 8317
+        tls:
+          enable: false
+        remote-management:
+          allow-remote: false
+          secret-key: "$${CLIPROXY_MANAGEMENT_KEY}"
+          disable-control-panel: true
+        auth-dir: "/root/.cli-proxy-api"
+        api-keys:
+          - "$${CLIPROXY_CLIENT_KEY}"
+        debug: false
+        logging-to-file: true
+        logs-max-total-size-mb: 100
+        usage-statistics-enabled: false
+        request-retry: 5
+        max-retry-credentials: 3
+        max-retry-interval: 60
+        quota-exceeded:
+          switch-project: true
+          switch-preview-model: true
+          antigravity-credits: false
+        routing:
+          strategy: "round-robin"
+          session-affinity: true
+          session-affinity-ttl: "24h"
+        ws-auth: true
+        oauth-model-alias:
+          antigravity:
+            - name: "gemini-3.6-flash-high"
+              alias: "fast"
+              display-name: "Fast"
+              fork: true
+              force-mapping: true
+          codex:
+            - name: "gpt-5.6-sol"
+              alias: "frontier"
+              display-name: "Frontier"
+              fork: true
+              force-mapping: true
+            - name: "gpt-5.6-terra"
+              alias: "balanced"
+              display-name: "Balanced"
+              fork: true
+              force-mapping: true
+            - name: "gpt-5.4-mini"
+              alias: "light"
+              display-name: "Light"
+              fork: true
+              force-mapping: true
+        EOF
+        chmod 0600 /config/config.yaml /secrets/client-key
+        exec ./CLIProxyAPI -config /config/config.yaml
+    environment:
+      CLIPROXY_CLIENT_KEY: ${CLIPROXY_CLIENT_KEY:?}
+      CLIPROXY_MANAGEMENT_KEY: ${CLIPROXY_MANAGEMENT_KEY:?}
+      DEPLOY: cloud
+      PORT: "8317"
+    volumes:
+      - cliproxy-config:/config
+      - cliproxy-auth:/root/.cli-proxy-api
+      - platform-secrets:/secrets
+    networks:
+      - t3-net
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/8317'"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  tea-sidecar:
+    build:
+      context: ./t3code
+      dockerfile: Dockerfile.tea
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      GITEA_TOKEN: ${GITEA_TOKEN:-}
+      GITEA_URL: ${GITEA_URL:-https://gitea.satyvm.com}
+      TEA_SOCKET_PATH: /run/tea/tea.sock
+    volumes:
+      - tea-socket:/run/tea
+    networks:
+      - t3-net
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - import socket; s = socket.socket(socket.AF_UNIX); s.settimeout(2); s.connect("/run/tea/tea.sock"); s.close()
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+
+networks:
+  t3-net:
+    driver: bridge
+
+volumes:
+  ts-state:
+  t3-home:
+  t3-state:
+  npm-global:
+  ssh-host-keys:
+  platform-secrets:
+  cliproxy-config:
+  cliproxy-auth:
+  tea-socket:

@@ -336,6 +336,11 @@ packages:
       providers:
         cask: { darwin: claude-code }
         npm: { name: "@anthropic-ai/claude-code", version: "latest" }
+    - id: codex
+      feature: ai
+      providers:
+        brew: { darwin: codex, linux: codex }
+        npm: { name: "@openai/codex", version: "latest" }
 
     # macOS GUI tiers.
     - id: raycast
@@ -438,6 +443,10 @@ packages:
       feature: gui-all
       os: [darwin]
       providers: { cask: { darwin: zed } }
+    - id: visual-studio-code
+      feature: gui-all
+      os: [darwin]
+      providers: { cask: { darwin: visual-studio-code } }
     - id: antigravity
       feature: gui-all
       os: [darwin]

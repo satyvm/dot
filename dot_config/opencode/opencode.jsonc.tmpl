@@ -3,7 +3,8 @@
   "$schema": "https://opencode.ai/config.json",
   "autoupdate": false,
   "instructions": [
-    "{{ .chezmoi.homeDir }}/.config/agents/universal_context.md"
+    "{{ .chezmoi.homeDir }}/.config/agents/context/base.md",
+    "{{ .chezmoi.homeDir }}/.config/agents/context/environment.md"
   ],
   "enabled_providers": ["cliproxy"],
   "model": "cliproxy/{{ .aiAgentPlatform.agents.opencode.defaultRole }}",
@@ -35,7 +36,7 @@
       "npm": "@ai-sdk/openai-compatible",
       "name": "CLIProxyAPI",
       "options": {
-        "baseURL": "{{ if eq $machine.features.aiMode "remote" }}http://cliproxyapi:8317{{ else }}{{ .aiAgentPlatform.proxy.url }}{{ end }}/v1",
+        "baseURL": "{{ $machine.gatewayUrl }}/v1",
         "apiKey": "{env:OPENAI_API_KEY}",
         "timeout": 600000,
         "chunkTimeout": 300000

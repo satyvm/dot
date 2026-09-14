@@ -1,10 +1,10 @@
 {
   "meta": {
-    "name": "default-claude",
-    "version": "2.1.0",
-    "description": "Thin ax overlay for the official Claude Code nono pack"
+    "name": "default-codex",
+    "version": "1.0.0",
+    "description": "Thin ax overlay for the official Codex nono pack"
   },
-  "extends": "always-further/claude",
+  "extends": "nolabs-ai/codex",
   "security": {
     "signal_mode": "isolated",
     "capability_elevation": false

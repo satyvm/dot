@@ -4,7 +4,7 @@ Personal dotfiles managed with [Chezmoi](https://www.chezmoi.io/) for:
 
 - macOS on Apple Silicon (`arm64`) and Intel (`amd64`);
 - Ubuntu and Debian on `arm64` and `amd64`;
-- interactive laptop, workstation, server, and container setups.
+- interactive minimal, workstation, server, container, and T3 Code setups.
 
 ## Install or update from anywhere
 
@@ -34,12 +34,13 @@ The first run uses the following question flow.
 
 Choose the closest complete setup:
 
-| Choice | Intended use | CLI | Developer | AI | AI mode | macOS GUI | OS customization | Linux hardening | SSH signing |
+| Choice | Intended use | CLI | Developer | AI | AI gateway | macOS GUI | OS customization | Linux hardening | SSH signing |
 |---|---|---:|---:|---:|---|---|---:|---:|---:|
-| `laptop` | Portable personal development machine | Yes | Yes | Yes | Local | Minimum | Yes | No | Yes |
+| `minimal` | Personal machine with a focused GUI set | Yes | No | No | None | Minimum | Yes | No | No |
 | `workstation` | Full development machine | Yes | Yes | Yes | Local | All | Yes | No | Yes |
-| `server` | Headless host | Yes | No | No | Local | None | No | Yes | Yes |
-| `container` | Image-provisioned remote development environment | Yes | Yes | Yes | Remote | None | No | No | No |
+| `server` | Headless host | Yes | Yes | No | None | None | No | Yes | Yes |
+| `container` | Generic image-provisioned environment | Yes | Yes | No | None | None | No | No | No |
+| `t3` | T3 Code remote development container | Yes | Yes | Yes | Sidecar | None | No | No | No |
 
 The default is `workstation` on macOS and `server` on Linux.
 
@@ -71,7 +72,7 @@ These appear only after answering `Yes` to **Customize preset features**.
 | **Install core CLI setup** | Always | Yes | Installs the shell/CLI package set and manages Zsh, Neovim, tmux, Starship, aliases, functions, and shell environment. |
 | **Install developer toolchain** | Core CLI is Yes | No | Installs language runtimes, LSPs, Docker tooling, cloud/Kubernetes tools, database tools, formatters, and build dependencies. It is forced off when core CLI is off. |
 | **Install AI setup** | Always | No | Installs and configures Claude Code, PI, OpenCode, Crush, Herdr, Nono, the `ax` gateway, shared model/MCP configuration, and agent skills. |
-| **AI deployment mode** | AI setup is Yes | `local` | `local` installs and manages CLIProxyAPI on this host. `remote` points agents at a remote/container proxy and does not manage a local proxy service. |
+| **AI gateway for ax** | AI setup is Yes | `none` | `none` means agents use their own upstream authentication and `ax` provides the sandbox only. `local` installs and manages CLIProxyAPI on this host. `sidecar` points `ax` at a private `cliproxyapi` container. |
 | **GUI tools** | macOS only | `none` | `none` installs no GUI tier, `minimum` installs the focused app set, and `all` installs both minimum and full GUI sets. |
 | **Apply OS customization** | Always | No | Applies the managed macOS Dock, Finder, keyboard, trackpad, Spotlight, and screenshot defaults. It currently resolves to off on Linux. |
 | **Configure Linux firewall and fail2ban** | Linux only | No | Installs/configures UFW and fail2ban. UFW denies incoming traffic except SSH, HTTP, and HTTPS. The active/configured SSH port is preserved. |
@@ -93,7 +94,7 @@ updates the existing setup and does not ask these questions again.
 ## Recommended answers
 
 - Personal Mac with the full setup: `workstation`, then do not customize.
-- Personal Mac with fewer GUI apps: `laptop`, then do not customize.
+- Personal Mac with fewer GUI apps: `minimal`, then do not customize.
 - Ubuntu/Debian server: `server`, then do not customize.
 - Dev container whose image already contains the programs: `container`, then
   do not customize.
@@ -173,24 +174,34 @@ docker context use colima
 
 The AI feature includes:
 
-- Claude Code, PI Coding Agent, OpenCode, and Crush;
+- Claude Code, Codex, PI Coding Agent, OpenCode, and Crush;
 - `ax`, the common policy gateway for launching those agents;
 - Nono sandbox profiles and Herdr integrations;
 - a canonical model registry and shared MCP configuration;
 - managed agent skills and CLIProxyAPI for local AI mode.
 
-Normal launches go through `ax` and Nono:
+Agent commands are the **stock upstream binaries** with their own
+authentication. Running one directly gives you exactly what its vendor ships:
+
+```bash
+claude
+codex
+pi
+opencode
+crush
+```
+
+`ax` is a separate, opt-in launcher. It runs the same binary under the Nono
+sandbox and, when a gateway is configured, routes it through that gateway:
 
 ```bash
 ax claude
-ax pi
+ax codex
 ax opencode
-ax crush
 ```
 
-The native commands `claude`, `pi`, `opencode`, and `crush` are managed shims
-that also enter `ax`. Use `ax <agent> --direct` only when intentionally
-bypassing the sandbox for diagnosis.
+Nothing shadows a real agent binary on `PATH`. There is no sandbox-bypass flag,
+because the unsandboxed path is simply the plain command name.
 
 Common AI administration:
 
@@ -351,7 +362,8 @@ machine model is intentional.
 Example configs are in [`examples/configs`](examples/configs):
 
 - `linux-server-amd64.json`
-- `linux-laptop-arm64.json`
+- `linux-minimal-arm64.json`
+- `linux-t3-arm64.json`
 - `linux-container-amd64.json`
 - `macos-workstation-arm64.json`
 - `macos-server-amd64.json`
@@ -403,7 +415,7 @@ preferred way to add, remove, or reclassify applications.
 - Account enrollment, SSH upload, App Store installation, and destructive macOS
   cleanup are never automatic.
 - Sensitive authentication material is not committed to this repository.
-- Repository-only backup and Hermes platform files are never deployed.
+- Repository-only backup and T3 Code platform files are never deployed.
 - Unsupported operating systems, Linux distributions, architectures, and
   provisioning failures stop the run.
 - macOS uses Colima, not Docker Desktop.
@@ -414,7 +426,7 @@ preferred way to add, remove, or reclassify applications.
 bash tests/test_machine_matrix.sh
 bash dot_local/bin/tests/test_ax.sh
 bash dot_local/bin/tests/test_one.sh
-bash hermes/tests/test_stack.sh
+bash t3code/tests/test_stack.sh
 chezmoi managed --refresh-externals=never
 chezmoi diff
 chezmoi apply --dry-run

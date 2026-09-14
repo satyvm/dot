@@ -20,13 +20,13 @@
 
 {{- $presetDefault := "server" -}}
 {{- if eq $os "darwin" }}{{ $presetDefault = "workstation" }}{{ end -}}
-{{- $preset := promptChoice "Machine preset" (list "laptop" "workstation" "server" "container" "hermes") $presetDefault -}}
+{{- $preset := promptChoice "Machine preset" (list "minimal" "workstation" "server" "container" "t3") $presetDefault -}}
 {{- $customize := promptBool "Customize preset features" false -}}
 
 {{- $setupCli := false -}}
 {{- $setupDeveloper := false -}}
 {{- $setupAi := false -}}
-{{- $aiMode := "local" -}}
+{{- $aiGateway := "none" -}}
 {{- $guiTier := "none" -}}
 {{- $setupOs := false -}}
 {{- $setupHardening := false -}}
@@ -35,7 +35,7 @@
   {{- $setupCli = promptBool "Install core CLI setup" true -}}
   {{- if $setupCli }}{{ $setupDeveloper = promptBool "Install developer toolchain" false }}{{ end -}}
   {{- $setupAi = promptBool "Install AI setup" false -}}
-  {{- if $setupAi }}{{ $aiMode = promptChoice "AI deployment mode" (list "local" "remote") "local" }}{{ end -}}
+  {{- if $setupAi }}{{ $aiGateway = promptChoice "AI gateway for ax" (list "none" "local" "sidecar") "none" }}{{ end -}}
   {{- if eq $os "darwin" }}{{ $guiTier = promptChoice "GUI tools" (list "none" "minimum" "all") "none" }}{{ end -}}
   {{- $setupOs = promptBool "Apply OS customization" false -}}
   {{- if eq $os "linux" }}{{ $setupHardening = promptBool "Configure Linux firewall and fail2ban" false }}{{ end -}}
@@ -66,7 +66,7 @@
         "cli": {{ $setupCli }},
         "developer": {{ $setupDeveloper }},
         "ai": {{ $setupAi }},
-        "aiMode": {{ $aiMode | quote }},
+        "aiGateway": {{ $aiGateway | quote }},
         "guiTier": {{ $guiTier | quote }},
         "osCustomization": {{ $setupOs }},
         "hardening": {{ $setupHardening }},

@@ -8,7 +8,7 @@ aiTools:
         pinnedVersion: "2.1.1"
         environments: ["local-dev", "remote-dev"]
         roots: ["{{ .devRoot }}"]
-        clients: ["hermes", "claude", "pi", "opencode", "crush", "zed"]
+        clients: ["claude", "codex", "pi", "opencode", "crush", "zed"]
   lsp:
     servers:
       vtsls:

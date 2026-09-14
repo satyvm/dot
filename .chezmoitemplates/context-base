@@ -1,0 +1,55 @@
+# Developer Environment — Base Context
+
+This machine is managed with [chezmoi](https://chezmoi.io). The dotfiles source
+lives at `~/.local/share/chezmoi`. Files there use attribute prefixes
+(`dot_`, `private_`, `executable_`, `run_`, `symlink_`) that are **not** part of
+the deployed filename. Check `chezmoi target-path <source-path>` before assuming
+where something lands, and use `literal_` to escape a payload whose real name
+starts with a reserved prefix.
+
+## Shell and CLI
+
+- Interactive shell is Zsh; write scripts for Bash.
+- Common commands are replaced: `ls` → `eza`, `cat` → `bat --paging=never`,
+  `cd` → `z` (zoxide), `lg` → `lazygit`. Prefer these when suggesting commands.
+- `rg` (ripgrep), `fd`, `fzf`, `jq`, `delta`, and `gh` are available.
+
+## Toolchains
+
+- `mise` manages per-directory runtime versions via `mise.toml`, `.mise.toml`,
+  or `.tool-versions`, backed by shims in `~/.local/share/mise/shims`. Respect a
+  project's pinned versions instead of installing your own.
+- Language servers on `PATH`: `vtsls` (JS/TS), `pyright-langserver` (Python),
+  `gopls` (Go), `rust-analyzer` (Rust). Use the project's own typecheck or lint
+  command for final verification.
+
+## Project conventions
+
+- Read the nearest `AGENTS.md` before doing project work.
+- Durable multi-session artifacts belong under `./.local/` and nowhere else:
+  - `./.local/CONTEXT.md` — domain language and architectural vocabulary
+  - `./.local/adr/` — architecture decision records (`0001-*.md`)
+  - `./.local/specs/`, `./.local/tickets/`, `./.local/handoffs/`
+  - `./.local/reports/`, `./.local/prototypes/`, `./.local/triage/`
+- Check `./.local/` for prior session state before starting. Create
+  subdirectories lazily, only when writing an artifact.
+- Timestamp filenames in UTC as `YYYYMMDDTHHMMSSZ`.
+- Preserve the project's existing policy on whether `.local/` is committed.
+- User-authored deliverables are not agent state; leave them where the user put
+  them.
+
+## Working rules
+
+- Inspect surrounding code — conventions, imports, formatting — before editing.
+  Match what is already there.
+- Do not add explanatory comments unless asked.
+- Run the project's lint and typecheck after changes (`npm run lint`,
+  `npm run typecheck`, `pytest`, `cargo check`, and so on).
+- **Never commit, amend, push, or open a pull request unless explicitly asked.**
+
+## Session-scoped context
+
+If the environment variable `AX_SESSION_CONTEXT` is set, read the file it points
+at before doing anything else. It describes a sandbox and model-routing boundary
+that applies to this session only. If the variable is unset, you are running the
+agent directly and no such boundary exists — do not claim otherwise.

@@ -1,0 +1,51 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+# Environment Context
+
+You are running on the **`{{ $machine.preset }}`** machine profile
+({{ $machine.os }}/{{ $machine.arch }}{{ if ne $machine.distro "macos" }}, {{ $machine.distro }}{{ end }}).
+
+- Project workspace root: `{{ $machine.devRoot }}`
+- Package management: {{ if $machine.predicates.manageHostPackages }}`{{ $machine.packageMode }}` on this host, driven by `.chezmoidata/packages.yaml`{{ else }}provided by the container image; this host does **not** install packages. Ask before assuming a tool can be installed — it belongs in the image build{{ end }}
+{{- if eq $machine.os "darwin" }}
+- Container runtime is **Colima**, not Docker Desktop (`colima start`, `docker context use colima`).
+{{- end }}
+{{- if $machine.predicates.imageProvisioned }}
+- This is a disposable container. Only `{{ $machine.devRoot }}` is bound from
+  the host and survives a rebuild. Everything written elsewhere in the home
+  directory lives in a Docker volume; anything written into the image layer is
+  lost on redeploy.
+- Durable configuration changes belong in the chezmoi source repository or the
+  image build, not in live edits to the running container.
+{{- end }}
+
+## Where work belongs
+
+Create, clone, and modify repositories under `{{ $machine.devRoot }}`. Keep
+agent state inside the project's `./.local/`, never elsewhere in the home
+directory.
+
+{{ if $machine.features.ai -}}
+## Agents on this machine
+
+The agent CLIs (`claude`, `codex`, `pi`, `opencode`, `crush`) are the **stock
+upstream binaries** with their own authentication. Running one directly gives
+you exactly the tool its vendor ships — no wrapper, no sandbox, no model
+rewriting.
+
+`ax` is a separate, opt-in launcher. `ax <agent>` adds a sandbox{{ if $machine.predicates.useGateway }} and routes
+the agent through a model gateway{{ end }}. If you were launched through `ax`, a
+further context section describes that boundary; if you do not see one, you are
+running directly and none of it applies to you.
+
+{{ end -}}
+{{- if $machine.predicates.imageProvisioned }}
+## Forges
+
+- **GitHub is primary.** Pull requests and issues are opened there.
+- **Gitea (`gitea.satyvm.com`) is the secondary mirror**, used for pushing and
+  pulling copies. Use `gitea-ai` for its API; the token belongs to a sidecar
+  service and is deliberately not readable here.
+- Git transport uses dedicated SSH keys held in this container. `main` is
+  branch-protected on both forges: work on a branch and open a pull request.
+- Never attempt to read, print, or exfiltrate a forge token.
+{{- end }}
