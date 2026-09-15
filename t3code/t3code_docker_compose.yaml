@@ -29,7 +29,15 @@ services:
       TS_TAILSCALED_EXTRA_ARGS: --port=41642
     volumes:
       - ts-state:/var/lib/tailscale
-      - ./t3code/tailscale-serve.json:/config/tailscale-serve.json:ro
+    # Delivered inline rather than bind-mounted. Coolify runs `docker compose`
+    # inside a helper container while the host daemon resolves bind paths, so a
+    # relative source such as ./t3code/tailscale-serve.json does not exist from
+    # the daemon's point of view. Docker then silently creates a *directory* at
+    # the target and containerboot dies with "is a directory", restarting every
+    # 60s and failing the deploy through depends_on.
+    configs:
+      - source: tailscale-serve
+        target: /config/tailscale-serve.json
     ports:
       - "41642:41642/udp"
     networks:
@@ -223,6 +231,25 @@ services:
         limits:
           memory: 256M
           cpus: "0.25"
+
+configs:
+  tailscale-serve:
+    # $$ escapes Compose interpolation: TS_CERT_DOMAIN is substituted by
+    # tailscaled at runtime, not by Compose at parse time.
+    content: |
+      {
+        "TCP": {
+          "443": { "HTTPS": true }
+        },
+        "Web": {
+          "$${TS_CERT_DOMAIN}:443": {
+            "Handlers": {
+              "/": { "Proxy": "http://127.0.0.1:3773" }
+            }
+          }
+        },
+        "AllowFunnel": {}
+      }
 
 networks:
   t3-net:

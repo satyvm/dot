@@ -24,6 +24,20 @@ refute "the T3 server port is never published to the host" '3773:3773' "$compose
 check   "the only published port is the Tailscale UDP endpoint" '41642:41642/udp' "$compose"
 check   "t3code shares the Tailscale network namespace" 'network_mode: service:tailscale' "$compose"
 
+# --- no relative host bind mounts ------------------------------------------
+# Coolify runs `docker compose` inside a helper container while the host daemon
+# resolves bind sources, so a relative path does not exist from the daemon's
+# point of view. Docker then creates an empty *directory* at the target instead
+# of failing, which is how the serve config broke: containerboot exited with
+# "is a directory" and restarted every 60s.
+if grep -nE '^\s+- \.{1,2}/' "$compose"; then
+  fail "no volume binds a path relative to the compose file" "relative sources break under Coolify"
+else
+  pass "no volume binds a path relative to the compose file"
+fi
+check "the serve config is delivered inline, not bind-mounted" 'source: tailscale-serve' "$compose"
+check "the cert domain survives Compose interpolation" '$${TS_CERT_DOMAIN}' "$compose"
+
 # --- the DNS setting that keeps Compose service names resolvable -----------
 check "tailnet DNS is not accepted inside the shared namespace" 'TS_ACCEPT_DNS: "false"' "$compose"
 
@@ -187,6 +201,20 @@ if [[ "${T3_CHECK_RUNTIME:-0}" == "1" ]]; then
   done
   ts_log=$(docker logs "$name" 2>&1)
   docker rm -f "$name" >/dev/null 2>&1
+
+  # The serve config must arrive as a regular file with ${TS_CERT_DOMAIN}
+  # unexpanded, so tailscaled can substitute the node's own cert domain.
+  served=$(TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" \
+           CLIPROXY_CLIENT_KEY=x CLIPROXY_MANAGEMENT_KEY=x \
+           docker compose -f "$compose" run --rm --no-deps --entrypoint sh tailscale \
+             -c 'test -f /config/tailscale-serve.json && cat /config/tailscale-serve.json' 2>/dev/null)
+  TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" CLIPROXY_CLIENT_KEY=x \
+    CLIPROXY_MANAGEMENT_KEY=x docker compose -f "$compose" down -v --remove-orphans >/dev/null 2>&1
+  if grep -qF '${TS_CERT_DOMAIN}' <<<"$served"; then
+    pass "the serve config lands as a file with the cert domain unexpanded"
+  else
+    fail "the serve config lands as a file with the cert domain unexpanded" "got: ${served:-<not a file>}"
+  fi
   if grep -qF "flag provided but not defined" <<<"$ts_log"; then
     fail "tailscale accepts every flag the compose file passes it" \
          "$(grep -F 'flag provided but not defined' <<<"$ts_log" | head -1)"
