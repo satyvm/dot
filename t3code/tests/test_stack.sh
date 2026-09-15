@@ -29,8 +29,18 @@ check "tailnet DNS is not accepted inside the shared namespace" 'TS_ACCEPT_DNS: 
 
 # --- node identity durability ---------------------------------------------
 check "tailscale state is persisted"        'ts-state:/var/lib/tailscale' "$compose"
-check "the node is tagged so its key never expires" '--advertise-tags=tag:t3' "$compose"
-check "a distinct UDP port avoids host contention"  '--port=41642' "$compose"
+check "the node is tagged so its key never expires" 'TS_EXTRA_ARGS: --advertise-tags=tag:t3' "$compose"
+# TS_EXTRA_ARGS goes to `tailscale up`, TS_TAILSCALED_EXTRA_ARGS to tailscaled.
+# --port exists only on the latter; putting it in TS_EXTRA_ARGS makes
+# containerboot exit 2 with "flag provided but not defined: -port" before it
+# ever authenticates. Grepping the file for the string is not enough — it has
+# to be on the right line.
+check "a distinct UDP port avoids host contention" 'TS_TAILSCALED_EXTRA_ARGS: --port=41642' "$compose"
+if grep -E '^\s*TS_EXTRA_ARGS:' "$compose" | grep -qF -e '--port'; then
+  fail "--port is not passed to 'tailscale up', which has no such flag" "found on the TS_EXTRA_ARGS line"
+else
+  pass "--port is not passed to 'tailscale up', which has no such flag"
+fi
 
 # --- persistence contract --------------------------------------------------
 check "T3 Code state has a durable volume"  't3-state:/home/ubuntu/.t3' "$compose"
@@ -155,6 +165,37 @@ check "t3 serve inherits the chezmoi-managed bin directory" 'PATH="/home/ubuntu/
 # for interactive shells, so without SetEnv an `ssh t3-dev <cmd>` finds nothing
 # and even an interactive login misses the npm-installed agents.
 check "sshd sessions get the full PATH" 'SetEnv PATH=/home/ubuntu/.local/bin:/home/ubuntu/.npm-global/bin:' "$dockerfile"
+
+# --- the sidecar's flags are actually accepted by the binaries -------------
+# The string checks above cannot prove tailscaled and `tailscale up` accept
+# these flags. Boot the real image with a deliberately invalid auth key: a
+# flag error exits 2 before any network call, whereas correct flags get all
+# the way to the control plane and fail on the key. Needs docker + network.
+if [[ "${T3_CHECK_RUNTIME:-0}" == "1" ]]; then
+  ts_image=$(awk '/image: tailscale/{print $2}' "$compose")
+  ts_up=$(awk -F': ' '/^ *TS_EXTRA_ARGS:/{print $2}' "$compose")
+  ts_daemon=$(awk -F': ' '/^ *TS_TAILSCALED_EXTRA_ARGS:/{print $2}' "$compose")
+  name="t3-flagcheck-$$"
+  docker rm -f "$name" >/dev/null 2>&1
+  docker run -d --name "$name" \
+    -e TS_AUTHKEY=tskey-auth-invalid-onpurpose -e TS_USERSPACE=true \
+    -e TS_ACCEPT_DNS=false -e TS_EXTRA_ARGS="$ts_up" \
+    -e TS_TAILSCALED_EXTRA_ARGS="$ts_daemon" "$ts_image" >/dev/null 2>&1
+  for _ in $(seq 1 20); do
+    docker logs "$name" 2>&1 | grep -qE "flag provided but not defined|invalid key|API key" && break
+    sleep 1
+  done
+  ts_log=$(docker logs "$name" 2>&1)
+  docker rm -f "$name" >/dev/null 2>&1
+  if grep -qF "flag provided but not defined" <<<"$ts_log"; then
+    fail "tailscale accepts every flag the compose file passes it" \
+         "$(grep -F 'flag provided but not defined' <<<"$ts_log" | head -1)"
+  else
+    pass "tailscale accepts every flag the compose file passes it"
+  fi
+else
+  printf '# skipped sidecar flag check (set T3_CHECK_RUNTIME=1 to enable)\n'
+fi
 
 # --- pinned images actually exist for arm64 --------------------------------
 # Two deploys have now failed on a pin that resolved nowhere. Network-gated so

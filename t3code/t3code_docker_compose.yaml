@@ -20,9 +20,13 @@ services:
       # still WireGuard-encrypted and tailnet-authenticated either way.
       TS_ACCEPT_DNS: "false"
       TS_SERVE_CONFIG: /config/tailscale-serve.json
-      # tag:t3 keeps the node key from expiring; --port avoids contending with
-      # the host's tailscaled for the same external UDP mapping.
-      TS_EXTRA_ARGS: --advertise-tags=tag:t3 --port=41642
+      # tag:t3 keeps the node key from expiring. TS_EXTRA_ARGS is appended to
+      # `tailscale up`, which has no --port flag; --port belongs to tailscaled
+      # and must go through TS_TAILSCALED_EXTRA_ARGS or containerboot dies with
+      # "flag provided but not defined: -port" before it ever authenticates.
+      TS_EXTRA_ARGS: --advertise-tags=tag:t3
+      # Avoids contending with the host's tailscaled for the same UDP mapping.
+      TS_TAILSCALED_EXTRA_ARGS: --port=41642
     volumes:
       - ts-state:/var/lib/tailscale
       - ./t3code/tailscale-serve.json:/config/tailscale-serve.json:ro
