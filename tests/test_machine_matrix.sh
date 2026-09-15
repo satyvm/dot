@@ -221,6 +221,7 @@ linux_config="$fixture_root/linux-workstation.json"
 make_config "$linux_config" workstation linux amd64
 linux_brew="$(render_template "$linux_config" run_onchange_before_install-homebrew-packages.sh.tmpl)"
 linux_apt="$(render_template "$linux_config" run_onchange_before_install-system-packages.sh.tmpl)"
+linux_developer="$(render_template "$linux_config" run_onchange_after_install-developer-tools.sh.tmpl)"
 if grep -q '^brew "ripgrep"$' <<<"$linux_brew"; then
   pass "Linux renders portable CLI tools through Brew"
 else
@@ -294,6 +295,25 @@ if grep -q '^cask "ghostty"$' <<<"$mac_brew"; then
   pass "macOS workstation renders GUI casks"
 else
   fail "macOS workstation renders GUI casks"
+fi
+
+# Codex ships as a Homebrew cask, not a formula. Requesting it as a formula
+# fails `brew bundle` on macOS and cannot work at all on Linux, where casks do
+# not exist — npm is the only provider there.
+if grep -q '^cask "codex"$' <<<"$mac_brew"; then
+  pass "macOS renders Codex as the cask it actually is"
+else
+  fail "macOS renders Codex as the cask it actually is"
+fi
+if grep -q '^brew "codex"$' <<<"$mac_brew" || grep -q '^brew "codex"$' <<<"$linux_brew"; then
+  fail "Codex is never requested as a Homebrew formula"
+else
+  pass "Codex is never requested as a Homebrew formula"
+fi
+if grep -qF 'npm install --global "@openai/codex@latest"' <<<"$linux_developer"; then
+  pass "Linux installs Codex from npm, its only provider there"
+else
+  fail "Linux installs Codex from npm, its only provider there"
 fi
 if grep -qxF 'cargo install "cargo-clean-all" --version "0.6.4" --locked' <<<"$mac_developer"; then
   pass "developer tools render a published cargo-clean-all release"

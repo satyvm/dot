@@ -339,7 +339,9 @@ packages:
     - id: codex
       feature: ai
       providers:
-        brew: { darwin: codex, linux: codex }
+        # Codex ships as a Homebrew *cask*, so it is macOS-only and cannot be
+        # requested as a formula on either platform. npm is the Linux provider.
+        cask: { darwin: codex }
         npm: { name: "@openai/codex", version: "latest" }
 
     # macOS GUI tiers.
