@@ -12,7 +12,7 @@ ARG REMOTE_GID=1000
 ENV DEBIAN_FRONTEND=noninteractive \
     T3CODE_HOME=/home/ubuntu/.t3 \
     NPM_CONFIG_PREFIX=/home/ubuntu/.npm-global \
-    PATH=/home/ubuntu/.npm-global/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    PATH=/home/ubuntu/.local/bin:/home/ubuntu/.npm-global/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Build toolchain is required: T3 Code compiles native dependencies on install.
 RUN apt-get update \
@@ -146,6 +146,7 @@ RUN install -d /var/run/sshd /etc/ssh/host-keys \
       'AllowTcpForwarding yes' \
       'X11Forwarding no' \
       'UsePAM no' \
+      'SetEnv PATH=/home/ubuntu/.local/bin:/home/ubuntu/.npm-global/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' \
       > /etc/ssh/sshd_config.d/99-t3code.conf
 
 COPY supervisord.conf /etc/supervisor/conf.d/t3code.conf

@@ -128,6 +128,17 @@ refute "the node-duplicating Pi formula is not brew-installed" 'brew install non
 check "the image fails the build if a required agent is missing" 'required tools missing' "$dockerfile"
 check "the entrypoint reconciles npm agents past the home volume" 'ensure_npm_agents' "$entrypoint"
 
+# ax is deployed by chezmoi to ~/.local/bin, and T3 Code spawns provider CLIs
+# off the PATH it inherits from supervisord. If that directory is missing from
+# either PATH, ax is unreachable from a T3 Code session.
+check "the image PATH includes the chezmoi-managed bin directory" 'PATH=/home/ubuntu/.local/bin:' "$dockerfile"
+check "t3 serve inherits the chezmoi-managed bin directory" 'PATH="/home/ubuntu/.local/bin:' "$repo_root/t3code/supervisord.conf"
+
+# sshd does not inherit the image environment and the managed .zshrc only runs
+# for interactive shells, so without SetEnv an `ssh t3-dev <cmd>` finds nothing
+# and even an interactive login misses the npm-installed agents.
+check "sshd sessions get the full PATH" 'SetEnv PATH=/home/ubuntu/.local/bin:/home/ubuntu/.npm-global/bin:' "$dockerfile"
+
 # --- pinned images actually exist for arm64 --------------------------------
 # Two deploys have now failed on a pin that resolved nowhere. Network-gated so
 # the default offline run stays green: T3_CHECK_IMAGES=1 to enable.
