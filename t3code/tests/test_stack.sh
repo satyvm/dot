@@ -69,6 +69,28 @@ for df in "$repo_root"/t3code/Dockerfile*; do
   done < <(awk '$1 == "COPY" && $2 !~ /^--/ { print $2 }' "$df")
 done
 
+# --- pinned images actually exist for arm64 --------------------------------
+# Two deploys have now failed on a pin that resolved nowhere. Network-gated so
+# the default offline run stays green: T3_CHECK_IMAGES=1 to enable.
+if [[ "${T3_CHECK_IMAGES:-0}" == "1" ]]; then
+  while read -r ref; do
+    name="${ref%%@*}"; repo="${name%:*}"; tag="${name##*:}"
+    [[ "$repo" == */* ]] || repo="library/$repo"
+    archs=$(curl -sS --max-time 20 "https://hub.docker.com/v2/repositories/$repo/tags/$tag" \
+      | python3 -c 'import json,sys
+try: d=json.load(sys.stdin)
+except Exception: sys.exit(0)
+print(" ".join(sorted({i["architecture"] for i in d.get("images",[]) if i.get("architecture")})))' 2>/dev/null)
+    if [[ "$archs" == *arm64* ]]; then
+      pass "$name resolves and ships arm64"
+    else
+      fail "$name resolves and ships arm64" "registry returned: ${archs:-<no such tag>}"
+    fi
+  done < <(awk '$1 == "image:" { print $2 }' "$compose")
+else
+  printf '# skipped image-registry checks (set T3_CHECK_IMAGES=1 to enable)\n'
+fi
+
 # --- compose is syntactically valid ---------------------------------------
 if TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" \
    CLIPROXY_CLIENT_KEY=a CLIPROXY_MANAGEMENT_KEY=b \

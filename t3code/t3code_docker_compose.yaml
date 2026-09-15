@@ -6,7 +6,7 @@
 # only authentication is a pairing token.
 services:
   tailscale:
-    image: tailscale/tailscale:v1.90.10
+    image: tailscale/tailscale:v1.102.3
     hostname: t3-dev
     restart: unless-stopped
     environment:
@@ -89,7 +89,9 @@ services:
     # Opt-in: `docker compose --profile gateway up`. Direct `claude`/`codex`
     # never touch this service; only `ax` does.
     profiles: ["gateway"]
-    image: eceasy/cli-proxy-api:latest
+    # Digest-pinned: this container holds the Antigravity/Codex OAuth
+    # credentials, so a redeploy must not silently adopt a new upstream build.
+    image: eceasy/cli-proxy-api:v7.3.3@sha256:f9abbf3fa5fed1ca5410cf207eeae6d7c3d7d1b5305397fc928d4d43d4474d15
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]
