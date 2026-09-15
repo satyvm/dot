@@ -4,7 +4,7 @@
     "version": "2.1.0",
     "description": "Thin ax overlay for the official Pi nono pack"
   },
-  "extends": "always-further/pi",
+  "extends": "nolabs-ai/pi",
   "security": {
     "signal_mode": "isolated",
     "capability_elevation": false

@@ -116,12 +116,16 @@ fi
 # `t3` is image-provisioned, so chezmoi never runs install-developer-tools.sh.
 # Anything the preset's ai feature needs must be baked into the image, or
 # sync-nono-packs.sh aborts chezmoi apply on first boot.
-for tool in nono herdr opencode pi-coding-agent; do
-  check "the image installs $tool for the ai feature" "$tool" "$dockerfile"
+for tool in nono herdr opencode uv; do
+  check "the image brew-installs $tool for the ai feature" "$tool" "$dockerfile"
 done
 check "the image installs Claude Code, which has no Linux formula" '@anthropic-ai/claude-code' "$dockerfile"
 check "the image installs Codex, which has no Homebrew formula at all" '@openai/codex' "$dockerfile"
-check "the image fails the build if a required agent is missing" 'missing required tool' "$dockerfile"
+# Homebrew's pi-coding-agent depends on `node`, which would duplicate the
+# runtime this image is built on. npm reuses it.
+check "Pi comes from npm, not the node-duplicating formula" '@earendil-works/pi-coding-agent' "$dockerfile"
+refute "the node-duplicating Pi formula is not brew-installed" 'brew install nono herdr opencode pi-coding-agent' "$dockerfile"
+check "the image fails the build if a required agent is missing" 'required tools missing' "$dockerfile"
 check "the entrypoint reconciles npm agents past the home volume" 'ensure_npm_agents' "$entrypoint"
 
 # --- pinned images actually exist for arm64 --------------------------------
@@ -141,7 +145,8 @@ print(" ".join(sorted({i["architecture"] for i in d.get("images",[]) if i.get("a
     else
       fail "$name resolves and ships arm64" "registry returned: ${archs:-<no such tag>}"
     fi
-  done < <(awk '$1 == "image:" { print $2 }' "$compose")
+  done < <( { awk '$1 == "image:" { print $2 }' "$compose"
+              awk 'toupper($1) == "FROM" { print $2 }' "$repo_root"/t3code/Dockerfile*; } | sort -u)
 else
   printf '# skipped image-registry checks (set T3_CHECK_IMAGES=1 to enable)\n'
 fi

@@ -10,21 +10,24 @@ if ! command -v nono >/dev/null 2>&1; then
   exit 1
 fi
 
-# Pack namespace policy: prefer nolabs-ai, fall back to always-further.
-# Verified against registry.nono.sh — only codex has migrated to nolabs-ai so
-# far. Re-probe with `nono pull <namespace>/<agent>` before changing a line
-# here; a missing pack makes the dependent profile fail to resolve.
+# Pack namespace policy: nolabs-ai. The always-further org was renamed to
+# nolabs-ai upstream (github.com/always-further/nono now redirects there), and
+# the packs left behind under the old name are stale: nono 0.77.0 rejects them
+# with `unknown field \`undo\``, so every ax launch for that agent would fail.
+# Verified by pulling each one with nono 0.77.0 inside the t3 image.
 # Crush has no published pack in either namespace and uses default-agent.
 required_packs=(
   nolabs-ai/codex
-  always-further/claude
-  always-further/pi
-  always-further/opencode
+  nolabs-ai/claude
+  nolabs-ai/pi
+  nolabs-ai/opencode
 )
 
 # Packs retired upstream. Leaving a stale copy installed shadows the live one.
 retired_packs=(
-  nolabs-ai/claude
+  always-further/claude
+  always-further/pi
+  always-further/opencode
 )
 
 installed_packs="$(nono list --installed)"

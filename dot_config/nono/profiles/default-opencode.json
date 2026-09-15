@@ -4,7 +4,7 @@
     "version": "2.1.0",
     "description": "Thin ax overlay for the official OpenCode nono pack"
   },
-  "extends": "always-further/opencode",
+  "extends": "nolabs-ai/opencode",
   "security": {
     "signal_mode": "isolated",
     "capability_elevation": false

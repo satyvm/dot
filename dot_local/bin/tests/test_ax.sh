@@ -710,13 +710,13 @@ if command -v chezmoi >/dev/null 2>&1; then
     fail "rendered Nono pack synchronization script parses" "invalid shell syntax"
   fi
   NONO_PACK_SCRIPT="$(cat "$RENDER_ROOT/sync-nono-packs.sh")"
-  assert_contains "$NONO_PACK_SCRIPT" "always-further/claude" "Nono sync installs the official Claude pack"
-  assert_contains "$NONO_PACK_SCRIPT" "always-further/pi" "Nono sync installs the official Pi pack"
+  assert_contains "$NONO_PACK_SCRIPT" "nolabs-ai/claude" "Nono sync installs the Claude pack from the nolabs-ai namespace"
+  assert_contains "$NONO_PACK_SCRIPT" "nolabs-ai/pi" "Nono sync installs the Pi pack from the nolabs-ai namespace"
   assert_contains "$NONO_PACK_SCRIPT" "nolabs-ai/codex" "Nono sync installs the Codex pack from the nolabs-ai namespace"
-  assert_contains "$NONO_PACK_SCRIPT" "always-further/opencode" "Nono sync installs the official OpenCode pack"
+  assert_contains "$NONO_PACK_SCRIPT" "nolabs-ai/opencode" "Nono sync installs the OpenCode pack from the nolabs-ai namespace"
   assert_contains "$NONO_PACK_SCRIPT" "retired_packs=(" "Nono sync declares a retired-pack list"
   assert_contains "$NONO_PACK_SCRIPT" "nono remove \"\$pack\"" "Nono sync prunes retired packs"
-  if grep -A3 'retired_packs=(' <<<"$NONO_PACK_SCRIPT" | grep -qF 'nolabs-ai/claude'; then
+  if grep -A5 'retired_packs=(' <<<"$NONO_PACK_SCRIPT" | grep -qF 'always-further/claude'; then
     pass "Nono sync retires the migrated Claude pack"
   else
     fail "Nono sync retires the migrated Claude pack" "$NONO_PACK_SCRIPT"
@@ -764,7 +764,7 @@ if command -v nono >/dev/null 2>&1; then
     fi
   done
   if jq -e '
-    .extends == "always-further/claude" and
+    .extends == "nolabs-ai/claude" and
     .security.capability_elevation == false and
     ([.groups.include[] | if type == "object" then .name else . end] |
       contains(["mise_manager", "bun_runtime", "go_runtime", "go_runtime_macos"])) and
@@ -787,10 +787,10 @@ if command -v nono >/dev/null 2>&1; then
     fail "Codex is a thin ax overlay on the nolabs-ai pack" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-codex.json")"
   fi
   if jq -e '
-    .extends == "always-further/pi" and .security.capability_elevation == false
+    .extends == "nolabs-ai/pi" and .security.capability_elevation == false
   ' "$REPO_ROOT/dot_config/nono/profiles/default-pi.json" >/dev/null &&
     jq -e '
-      .extends == "always-further/opencode" and .security.capability_elevation == false
+      .extends == "nolabs-ai/opencode" and .security.capability_elevation == false
     ' "$REPO_ROOT/dot_config/nono/profiles/default-opencode.json" >/dev/null; then
     pass "Pi and OpenCode inherit their official packs without interactive elevation"
   else

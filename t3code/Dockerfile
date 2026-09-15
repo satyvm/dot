@@ -91,9 +91,14 @@ RUN install -d -o ubuntu -g ubuntu /home/linuxbrew /home/linuxbrew/.linuxbrew \
 # outside the t3-home volume, so these survive an image rebuild, whereas
 # anything under /home/ubuntu is masked by the volume after the first deploy.
 # All four have arm64_linux bottles, so this resolves without a source build.
+#
+# pi-coding-agent is deliberately absent: its formula depends on Homebrew's
+# `node`, which would install a second Node runtime and its whole dependency
+# tree alongside the one this image is already built on. It comes from npm
+# below instead, at the same upstream version.
 RUN runuser -u ubuntu -- env HOME=/home/ubuntu NONINTERACTIVE=1 \
       HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_AUTO_UPDATE=1 \
-      /home/linuxbrew/.linuxbrew/bin/brew install nono herdr opencode pi-coding-agent uv
+      /home/linuxbrew/.linuxbrew/bin/brew install nono herdr opencode uv
 
 # Crush lives in a third-party tap, so it is best effort: a tap outage should
 # degrade one agent rather than fail the whole image build.
@@ -102,7 +107,8 @@ RUN runuser -u ubuntu -- env HOME=/home/ubuntu NONINTERACTIVE=1 \
       /home/linuxbrew/.linuxbrew/bin/brew install charmbracelet/tap/crush \
     || echo "WARNING: crush was not installed; ax crush will be unavailable"
 
-# Claude Code and Codex have no Linux formula — npm is their only provider.
+# Claude Code and Codex have no Linux formula, and Pi is here to avoid a
+# duplicate Node — npm reuses the runtime this image is already built on.
 # T3 Code itself stays here too so `npm i -g t3@latest` upgrades it in place
 # without an image rebuild. The entrypoint reconciles this directory on boot,
 # because the t3-home volume masks image updates to it.
@@ -110,14 +116,22 @@ RUN runuser -u ubuntu -- env HOME=/home/ubuntu npm install -g \
       t3@latest \
       @anthropic-ai/claude-code@latest \
       @openai/codex@latest \
+      @earendil-works/pi-coding-agent@latest \
     && runuser -u ubuntu -- env HOME=/home/ubuntu /home/ubuntu/.npm-global/bin/t3 --version
 
-# Fail the build rather than ship an image whose ax cannot run.
-RUN for tool in nono herdr opencode pi claude codex t3; do \
-      runuser -u ubuntu -- env HOME=/home/ubuntu PATH="$PATH" \
-        command -v "$tool" >/dev/null \
-        || { echo "missing required tool: $tool"; exit 1; }; \
-    done
+# Fail the build rather than ship an image whose ax cannot run. `command` is a
+# shell builtin, so it has to be reached through `sh -c` — `env` cannot exec it.
+# Reports every missing tool rather than stopping at the first.
+RUN missing=""; \
+    for tool in nono herdr opencode uv crush pi claude codex t3; do \
+      if resolved=$(runuser -u ubuntu -- env HOME=/home/ubuntu PATH="$PATH" \
+                      sh -c "command -v $tool" 2>/dev/null); then \
+        echo "  ok  $tool -> $resolved"; \
+      else \
+        echo "  MISSING  $tool"; missing="$missing $tool"; \
+      fi; \
+    done; \
+    if [ -n "$missing" ]; then echo "required tools missing:$missing"; exit 1; fi
 
 RUN install -d /var/run/sshd /etc/ssh/host-keys \
     && printf '%s\n' \

@@ -138,7 +138,8 @@ ensure_npm_agents() {
   local missing=() spec bin pkg
   for spec in "t3:t3@latest" \
               "claude:@anthropic-ai/claude-code@latest" \
-              "codex:@openai/codex@latest"; do
+              "codex:@openai/codex@latest" \
+              "pi:@earendil-works/pi-coding-agent@latest"; do
     bin="${spec%%:*}"; pkg="${spec#*:}"
     [[ -x "$remote_home/.npm-global/bin/$bin" ]] || missing+=("$pkg")
   done
