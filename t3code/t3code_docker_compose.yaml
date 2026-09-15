@@ -81,9 +81,14 @@ services:
       retries: 5
     deploy:
       resources:
+        # Docker rejects a cpus limit above the host's core count, and this one
+        # shares an Ampere A1 with Coolify, Traefik and the live sites. These
+        # are ceilings, not reservations: under contention the scheduler still
+        # shares fairly. Raise them in the Coolify environment on a bigger host
+        # rather than editing this file.
         limits:
-          memory: 8G
-          cpus: "4.0"
+          memory: ${T3CODE_MEMORY:-4G}
+          cpus: "${T3CODE_CPUS:-1.5}"
 
   cliproxyapi:
     # Opt-in: `docker compose --profile gateway up`. Direct `claude`/`codex`

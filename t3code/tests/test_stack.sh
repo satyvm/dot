@@ -46,6 +46,23 @@ check  "the gateway cannot escalate privileges" 'no-new-privileges:true' "$compo
 check  "the gateway keeps its remote control panel disabled" 'disable-control-panel: true' "$compose"
 check  "the gateway refuses remote management" 'allow-remote: false' "$compose"
 
+# --- resource limits fit the host -----------------------------------------
+# Docker refuses to create a container whose cpus limit exceeds the host core
+# count; the Ampere A1 running Coolify has 2. Resolve the rendered config and
+# check every limit, so a future bump cannot silently exceed the box again.
+host_cpus=2
+while read -r svc cpus; do
+  if awk -v c="$cpus" -v h="$host_cpus" 'BEGIN{exit !(c<=h)}'; then
+    pass "$svc cpus limit ($cpus) fits a ${host_cpus}-core host"
+  else
+    fail "$svc cpus limit ($cpus) fits a ${host_cpus}-core host" "docker will refuse to create it"
+  fi
+done < <(TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" \
+         CLIPROXY_CLIENT_KEY=x CLIPROXY_MANAGEMENT_KEY=x \
+           docker compose -f "$compose" --profile gateway config 2>/dev/null \
+         | awk '/^  [a-z][a-z0-9-]*:$/{svc=$1; sub(":","",svc)} /cpus:/{gsub(/[",]/,"",$2); print svc, $2}')
+check "the workspace limits can be raised without editing the file" 'T3CODE_CPUS' "$compose"
+
 # --- no Hermes remnants ----------------------------------------------------
 refute "no Hermes WebUI service remains"  'hermes' "$compose"
 refute "no port 8787 ingress remains"     '8787' "$compose"
