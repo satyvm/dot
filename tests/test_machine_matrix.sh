@@ -118,10 +118,17 @@ for os in darwin linux; do
       assert_lacks "$managed" "backup/scripts/backup-local.sh" "$case_name excludes repository-only backup scripts"
       assert_lacks "$managed" "t3code/t3code_docker_compose.yaml" "$case_name excludes the repository-only T3 Code platform"
 
-      if [[ "$preset" == "container" || "$preset" == "t3" ]]; then
+      if [[ "$preset" == "container" ]]; then
         assert_lacks "$managed" "install-homebrew-packages.sh" "$case_name skips host Brew packages"
         assert_lacks "$managed" "install-system-packages.sh" "$case_name skips system packages"
         assert_lacks "$managed" "install-developer-tools.sh" "$case_name uses image-baked developer tools"
+      elif [[ "$preset" == "t3" ]]; then
+        # System packages need root and land outside every volume, so they stay
+        # the image's job. Homebrew sits in a persistent volume, so chezmoi owns
+        # it from the same catalog as every other machine.
+        assert_has  "$managed" "install-homebrew-packages.sh" "$case_name manages Brew packages through chezmoi"
+        assert_lacks "$managed" "install-system-packages.sh" "$case_name leaves system packages to the image"
+        assert_has  "$managed" "install-developer-tools.sh" "$case_name manages pinned developer tools"
       else
         assert_has "$managed" "install-homebrew-packages.sh" "$case_name manages portable Brew packages"
         if [[ "$os" == "linux" ]]; then
@@ -300,6 +307,23 @@ fi
 # Codex ships as a Homebrew cask, not a formula. Requesting it as a formula
 # fails `brew bundle` on macOS and cannot work at all on Linux, where casks do
 # not exist — npm is the only provider there.
+# Homebrew 5 refuses to load formulae from untrusted taps, and `brew tap`
+# readalls the whole tap — so trusting after tapping never runs, and the tap's
+# other formulae make it exit non-zero. Trust must come first and the tap must
+# be best effort, or a fresh machine cannot install crush at all.
+trust_line=$(grep -n 'brew trust --formula "charmbracelet/tap/crush"' <<<"$mac_brew" | cut -d: -f1)
+tap_line=$(grep -n 'brew tap "charmbracelet/tap"' <<<"$mac_brew" | cut -d: -f1)
+if [[ -n "$trust_line" && -n "$tap_line" && "$trust_line" -lt "$tap_line" ]]; then
+  pass "third-party taps are trusted before they are tapped"
+else
+  fail "third-party taps are trusted before they are tapped" "trust=$trust_line tap=$tap_line"
+fi
+if grep -q 'brew tap "charmbracelet/tap" || true' <<<"$mac_brew"; then
+  pass "tapping tolerates untrusted formulae elsewhere in the tap"
+else
+  fail "tapping tolerates untrusted formulae elsewhere in the tap"
+fi
+
 if grep -q '^cask "codex"$' <<<"$mac_brew"; then
   pass "macOS renders Codex as the cask it actually is"
 else

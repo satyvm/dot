@@ -7,7 +7,6 @@ readonly dev_root="/home/ubuntu/dev"
 readonly chezmoi_source="$remote_home/.local/share/chezmoi"
 readonly chezmoi_config="$remote_home/.config/chezmoi/chezmoi.json"
 readonly bootstrap_marker="$remote_home/.local/state/t3code/bootstrap-v1"
-readonly failure_log="$remote_home/.local/state/t3code/bootstrap-failures.log"
 
 log() { printf 't3code: %s\n' "$*"; }
 die() { printf 't3code: error: %s\n' "$*" >&2; return 1; }
@@ -131,21 +130,14 @@ setup_forge_ssh() {
   chmod 0600 "$config_file"
 }
 
-ensure_npm_agents() {
-  # The t3-home volume masks image content under /home/ubuntu, so packages
-  # baked into the image are invisible once the volume exists. Reinstall only
-  # what is missing; a no-op on a healthy container.
-  local missing=() spec bin pkg
-  for spec in "t3:t3@latest" \
-              "claude:@anthropic-ai/claude-code@latest" \
-              "codex:@openai/codex@latest" \
-              "pi:@earendil-works/pi-coding-agent@latest"; do
-    bin="${spec%%:*}"; pkg="${spec#*:}"
-    [[ -x "$remote_home/.npm-global/bin/$bin" ]] || missing+=("$pkg")
-  done
-  if ((${#missing[@]})); then
-    log "reinstalling npm-provided agents: ${missing[*]}"
-    run_as_ubuntu npm install -g "${missing[@]}" || return 1
+ensure_t3_cli() {
+  # The t3-home volume masks image content under /home/ubuntu, so the T3 Code
+  # CLI baked into the image is invisible once the volume exists. Every other
+  # agent comes from the chezmoi catalog during provisioning; this one does not,
+  # because it is the server itself. A no-op on a healthy container.
+  if [[ ! -x "$remote_home/.npm-global/bin/t3" ]]; then
+    log "reinstalling the T3 Code CLI"
+    run_as_ubuntu npm install -g t3@latest || return 1
   fi
 }
 
@@ -191,32 +183,52 @@ register_projects() {
   done
 }
 
-main() {
+report() {
+  local phase="$1" log_path="$remote_home/.local/state/t3code/bootstrap-failures.log"
+  if ((${#failed_steps[@]})); then
+    printf '%s\n' "${failed_steps[@]}" >"$log_path" 2>/dev/null || true
+    chown ubuntu:ubuntu "$log_path" 2>/dev/null || true
+    log "===================================================================="
+    log "${phase} INCOMPLETE — ${#failed_steps[@]} step(s) failed:"
+    printf 't3code:   - %s\n' "${failed_steps[@]}"
+    log "Recorded in $log_path"
+    log "===================================================================="
+    return 1
+  fi
+  log "${phase,,} complete"
+}
+
+# Fast path: everything needed to make the box reachable. Must stay quick —
+# nothing here may wait on the network beyond a key generation.
+boot() {
   attempt "prepare runtime directories" prepare_runtime_directories
   attempt "validate the development mount" validate_development_mount
   attempt "install SSH host keys" install_ssh_host_keys
   attempt "install the authorized key" install_authorized_key
   attempt "install the gateway client key" install_gateway_client_key
   attempt "configure forge SSH" setup_forge_ssh
-  attempt "reconcile npm-provided agents" ensure_npm_agents
+  attempt "reconcile the T3 Code CLI" ensure_t3_cli
+  attempt "validate the sshd configuration" /usr/sbin/sshd -t
+  report "BOOT" || log "Services are starting anyway. Connect and repair."
+  exec /usr/bin/supervisord -c /etc/supervisor/conf.d/t3code.conf
+}
+
+# Slow path: supervisord runs this alongside sshd and t3 serve, so a first boot
+# that installs the whole package catalog does not hold up the deploy or lock
+# you out while it runs. Re-runs on every restart and is idempotent.
+provision() {
+  log "provisioning from the dotfiles catalog; sshd and t3 serve are already up"
   attempt "bootstrap dotfiles" bootstrap_dotfiles
   attempt "register projects" register_projects
-  attempt "validate the sshd configuration" /usr/sbin/sshd -t
+  report "PROVISIONING"
+}
 
-  if ((${#failed_steps[@]})); then
-    printf '%s\n' "${failed_steps[@]}" >"$failure_log" 2>/dev/null || true
-    chown ubuntu:ubuntu "$failure_log" 2>/dev/null || true
-    log "===================================================================="
-    log "BOOTSTRAP INCOMPLETE — ${#failed_steps[@]} step(s) failed:"
-    printf 't3code:   - %s\n' "${failed_steps[@]}"
-    log "Services are starting anyway. Connect and repair, then restart."
-    log "Recorded in $failure_log"
-    log "===================================================================="
-  else
-    log "bootstrap complete"
-  fi
-
-  exec /usr/bin/supervisord -c /etc/supervisor/conf.d/t3code.conf
+main() {
+  case "${1:-boot}" in
+    boot)      boot ;;
+    provision) provision ;;
+    *)         printf 't3code: unknown mode %q\n' "$1" >&2; exit 64 ;;
+  esac
 }
 
 main "$@"

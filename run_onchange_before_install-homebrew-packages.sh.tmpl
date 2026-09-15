@@ -30,7 +30,11 @@ if [[ -z "$brew_bin" ]]; then
 fi
 eval "$("$brew_bin" shellenv)"
 
-# Third-party taps must be trusted before Brew evaluates their formulae.
+# Third-party taps must be trusted before Brew evaluates their formulae, and
+# the trust has to come first: `brew tap` readalls the whole tap, so any formula
+# in it that we have not trusted is reported invalid and the tap exits non-zero
+# even when ours is fine. The clone still lands and the fully-qualified name in
+# the Brewfile resolves, so tapping is best effort.
 {{- range $pkg := .packages.inventory -}}
   {{- $oses := index $pkg "os" | default (list "darwin" "linux") -}}
   {{- $arches := index $pkg "arch" | default (list "amd64" "arm64") -}}
@@ -40,12 +44,12 @@ eval "$("$brew_bin" shellenv)"
   {{- $homebrew := index $pkg "homebrew" | default dict -}}
   {{- $tap := index $homebrew "tap" | default "" -}}
   {{- if and (has $pkg.feature $enabled) (has $machine.os $oses) (has $machine.arch $arches) $formula $tap }}
-brew tap {{ $tap | quote }}
     {{- if eq (index $homebrew "trust" | default "") "formula" }}
 brew trust --formula {{ $formula | quote }}
     {{- else if eq (index $homebrew "trust" | default "") "tap" }}
 brew trust {{ $tap | quote }}
     {{- end }}
+brew tap {{ $tap | quote }} || true
   {{- end }}
 {{- end }}
 

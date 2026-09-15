@@ -53,15 +53,19 @@
 {{- $isImageProvisioned := or (eq $preset "container") (eq $preset "t3") -}}
 {{- if $isImageProvisioned }}{{ $_ := set $features "hardening" false }}{{ end -}}
 
-{{- $manageHostPackages := not $isImageProvisioned -}}
+{{- /* System packages need root and land outside every volume, so on an
+       image-provisioned machine they stay the image's job. Homebrew lives in a
+       persistent volume there, so chezmoi owns it from the same catalog as
+       every other machine rather than a hand-maintained Dockerfile list. */ -}}
+{{- $manageHostPackages := ne $preset "container" -}}
 {{- $manageShell := or (index $features "cli") (index $features "ai") -}}
 {{- $manageGui := and (eq $os "darwin") (ne (index $features "guiTier") "none") -}}
 {{- $useGateway := and (index $features "ai") (ne (index $features "aiGateway") "none") -}}
 {{- $manageLocalProxy := and (index $features "ai") (eq (index $features "aiGateway") "local") -}}
-{{- $manageSystemPackages := and $manageHostPackages (eq $os "linux") -}}
+{{- $manageSystemPackages := and (not $isImageProvisioned) (eq $os "linux") -}}
 {{- $manageLoginShell := and $manageSystemPackages $manageShell -}}
 {{- $packageMode := "none" -}}
-{{- if $manageHostPackages }}{{ $packageMode = ternary "brew" "apt+brew" (eq $os "darwin") }}{{ end -}}
+{{- if $manageHostPackages }}{{ $packageMode = ternary "apt+brew" "brew" $manageSystemPackages }}{{ end -}}
 {{- $environment := ternary "remote-dev" "local-dev" $isImageProvisioned -}}
 {{- $gatewayUrl := "" -}}
 {{- if eq (index $features "aiGateway") "local" }}{{ $gatewayUrl = "http://127.0.0.1:8317" }}{{ end -}}

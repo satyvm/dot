@@ -82,6 +82,9 @@ services:
       - t3-home:/home/ubuntu
       - t3-state:/home/ubuntu/.t3
       - npm-global:/home/ubuntu/.npm-global
+      # chezmoi installs the package catalog into this prefix at first boot, so
+      # it has to outlive the container filesystem like every other state dir.
+      - linuxbrew:/home/linuxbrew
       - ssh-host-keys:/etc/ssh/host-keys
       - platform-secrets:/run/platform-secrets:ro
       - tea-socket:/run/tea
@@ -260,6 +263,7 @@ volumes:
   t3-home:
   t3-state:
   npm-global:
+  linuxbrew:
   ssh-host-keys:
   platform-secrets:
   cliproxy-config:

@@ -71,8 +71,6 @@ RUN if getent group "${REMOTE_GID}" >/dev/null; then \
       /home/ubuntu/.local/share \
       /home/ubuntu/.local/state
 
-RUN sh -c "$(curl -fsLS https://get.chezmoi.io)" -- -b /usr/local/bin
-
 # Homebrew on Linux ARM64 became a Tier 1 target in Homebrew 5.0.0, so the
 # repository's Brewfile works unchanged on the Ampere host.
 RUN install -d -o ubuntu -g ubuntu /home/linuxbrew /home/linuxbrew/.linuxbrew \
@@ -84,46 +82,23 @@ RUN install -d -o ubuntu -g ubuntu /home/linuxbrew /home/linuxbrew/.linuxbrew \
       HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_AUTO_UPDATE=1 \
       /home/linuxbrew/.linuxbrew/bin/brew --version
 
-# The `t3` preset declares `ai: true` but is image-provisioned, so chezmoi
-# never runs install-developer-tools.sh here. The agent toolchain has to be
-# baked in instead, or `sync-nono-packs.sh` aborts `chezmoi apply` on first
-# boot. Homebrew rather than npm wherever a formula exists: /home/linuxbrew is
-# outside the t3-home volume, so these survive an image rebuild, whereas
-# anything under /home/ubuntu is masked by the volume after the first deploy.
-# All four have arm64_linux bottles, so this resolves without a source build.
-#
-# pi-coding-agent is deliberately absent: its formula depends on Homebrew's
-# `node`, which would install a second Node runtime and its whole dependency
-# tree alongside the one this image is already built on. It comes from npm
-# below instead, at the same upstream version.
-RUN runuser -u ubuntu -- env HOME=/home/ubuntu NONINTERACTIVE=1 \
-      HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_AUTO_UPDATE=1 \
-      /home/linuxbrew/.linuxbrew/bin/brew install nono herdr opencode uv
+# chezmoi is the bootstrap tool, so it is the one thing that cannot come from
+# the catalog it installs. Everything else — the cli, developer and ai tiers —
+# is installed by `chezmoi apply` at first boot from .chezmoidata/packages.yaml
+# into the persistent /home/linuxbrew volume, exactly as on every other machine.
+# Nothing is duplicated between this file and the catalog.
+RUN sh -c "$(curl -fsLS https://get.chezmoi.io)" -- -b /usr/local/bin
 
-# Crush lives in a third-party tap, so it is best effort: a tap outage should
-# degrade one agent rather than fail the whole image build.
-RUN runuser -u ubuntu -- env HOME=/home/ubuntu NONINTERACTIVE=1 \
-      HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_AUTO_UPDATE=1 \
-      /home/linuxbrew/.linuxbrew/bin/brew install charmbracelet/tap/crush \
-    || echo "WARNING: crush was not installed; ax crush will be unavailable"
-
-# Claude Code and Codex have no Linux formula, and Pi is here to avoid a
-# duplicate Node — npm reuses the runtime this image is already built on.
-# T3 Code itself stays here too so `npm i -g t3@latest` upgrades it in place
-# without an image rebuild. The entrypoint reconciles this directory on boot,
-# because the t3-home volume masks image updates to it.
-RUN runuser -u ubuntu -- env HOME=/home/ubuntu npm install -g \
-      t3@latest \
-      @anthropic-ai/claude-code@latest \
-      @openai/codex@latest \
-      @earendil-works/pi-coding-agent@latest \
+# T3 Code is the server this image exists to run and is not in the catalog, so
+# it stays here. The entrypoint reconciles it on boot because the t3-home
+# volume masks image updates under /home/ubuntu.
+RUN runuser -u ubuntu -- env HOME=/home/ubuntu npm install -g t3@latest \
     && runuser -u ubuntu -- env HOME=/home/ubuntu /home/ubuntu/.npm-global/bin/t3 --version
 
-# Fail the build rather than ship an image whose ax cannot run. `command` is a
-# shell builtin, so it has to be reached through `sh -c` — `env` cannot exec it.
-# Reports every missing tool rather than stopping at the first.
+# Fail the build rather than ship an image that cannot bootstrap itself. Only
+# the bootstrap set is checked; the catalog's tools arrive at first boot.
 RUN missing=""; \
-    for tool in nono herdr opencode uv crush pi claude codex t3; do \
+    for tool in brew chezmoi node npm t3; do \
       if resolved=$(runuser -u ubuntu -- env HOME=/home/ubuntu PATH="$PATH" \
                       sh -c "command -v $tool" 2>/dev/null); then \
         echo "  ok  $tool -> $resolved"; \

@@ -128,7 +128,7 @@ while read -r fn; do
   else
     fail "attempt target $fn is defined" "no such function"
   fi
-done < <(grep -oE '^  attempt "[^"]+" [a-z_]+' "$entrypoint" | awk '{print $NF}')
+done < <(grep -oE '^  attempt "[^"]+" [a-z0-9_]+' "$entrypoint" | awk '{print $NF}')
 
 # Bash disables errexit for the whole duration of a call made in a condition
 # context, and subshells inherit that suppression. A step function that relies
@@ -153,25 +153,28 @@ else
   fail "attempt records a failed step and still reaches the end" "got: $probe_out"
 fi
 
-# --- the image provides what the t3 preset assumes -------------------------
-# `t3` is image-provisioned, so chezmoi never runs install-developer-tools.sh.
-# Anything the preset's ai feature needs must be baked into the image, or
-# sync-nono-packs.sh aborts chezmoi apply on first boot.
-for tool in nono herdr opencode uv; do
-  check "the image brew-installs $tool for the ai feature" "$tool" "$dockerfile"
+# --- chezmoi owns the packages, the image owns the bootstrap ---------------
+# The image must not carry a second copy of the package catalog: that is what
+# drifted and left a bare prompt with `command not found: eza`.
+for tool in eza starship neovim ripgrep nono herdr opencode; do
+  refute "the image does not hand-maintain $tool" "install $tool" "$dockerfile"
 done
-check "the image installs Claude Code, which has no Linux formula" '@anthropic-ai/claude-code' "$dockerfile"
-check "the image installs Codex, which has no Homebrew formula at all" '@openai/codex' "$dockerfile"
-# Homebrew's pi-coding-agent depends on `node`, which would duplicate the
-# runtime this image is built on. npm reuses it.
-check "Pi comes from npm, not the node-duplicating formula" '@earendil-works/pi-coding-agent' "$dockerfile"
-refute "the node-duplicating Pi formula is not brew-installed" 'brew install nono herdr opencode pi-coding-agent' "$dockerfile"
-check "the image fails the build if a required agent is missing" 'required tools missing' "$dockerfile"
-check "the entrypoint reconciles npm agents past the home volume" 'ensure_npm_agents' "$entrypoint"
+refute "the image installs no Homebrew formulae of its own" 'brew install' "$dockerfile"
+check  "the image installs chezmoi, which bootstraps everything else" 'get.chezmoi.io' "$dockerfile"
+check  "the image installs T3 Code, which is not in the catalog" 'npm install -g t3@latest' "$dockerfile"
+check  "the Homebrew prefix survives a redeploy" 'linuxbrew:/home/linuxbrew' "$compose"
 
-# ax is deployed by chezmoi to ~/.local/bin, and T3 Code spawns provider CLIs
-# off the PATH it inherits from supervisord. If that directory is missing from
-# either PATH, ax is unreachable from a T3 Code session.
+# Provisioning must not gate the server, or a first boot that installs the whole
+# catalog would time out the deploy and withhold the shell needed to debug it.
+check "provisioning runs under supervisord, beside the server" 't3code-entrypoint provision' "$repo_root/t3code/supervisord.conf"
+check "provisioning is one-shot, not a restart loop" 'autorestart=false' "$repo_root/t3code/supervisord.conf"
+check "the entrypoint separates boot from provisioning" 'provision) provision ;;' "$entrypoint"
+if awk '/^boot\(\) \{/,/^}/' "$entrypoint" | grep -q "bootstrap_dotfiles"; then
+  fail "the boot path does not wait on the package catalog" "bootstrap_dotfiles runs before supervisord"
+else
+  pass "the boot path does not wait on the package catalog"
+fi
+
 check "the image PATH includes the chezmoi-managed bin directory" 'PATH=/home/ubuntu/.local/bin:' "$dockerfile"
 check "t3 serve inherits the chezmoi-managed bin directory" 'PATH="/home/ubuntu/.local/bin:' "$repo_root/t3code/supervisord.conf"
 
