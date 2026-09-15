@@ -84,10 +84,40 @@ RUN install -d -o ubuntu -g ubuntu /home/linuxbrew /home/linuxbrew/.linuxbrew \
       HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_AUTO_UPDATE=1 \
       /home/linuxbrew/.linuxbrew/bin/brew --version
 
-# T3 Code lives in a volume-backed npm prefix so `npm i -g t3@latest` upgrades
-# it without an image rebuild.
-RUN runuser -u ubuntu -- env HOME=/home/ubuntu npm install -g t3@latest \
+# The `t3` preset declares `ai: true` but is image-provisioned, so chezmoi
+# never runs install-developer-tools.sh here. The agent toolchain has to be
+# baked in instead, or `sync-nono-packs.sh` aborts `chezmoi apply` on first
+# boot. Homebrew rather than npm wherever a formula exists: /home/linuxbrew is
+# outside the t3-home volume, so these survive an image rebuild, whereas
+# anything under /home/ubuntu is masked by the volume after the first deploy.
+# All four have arm64_linux bottles, so this resolves without a source build.
+RUN runuser -u ubuntu -- env HOME=/home/ubuntu NONINTERACTIVE=1 \
+      HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_AUTO_UPDATE=1 \
+      /home/linuxbrew/.linuxbrew/bin/brew install nono herdr opencode pi-coding-agent uv
+
+# Crush lives in a third-party tap, so it is best effort: a tap outage should
+# degrade one agent rather than fail the whole image build.
+RUN runuser -u ubuntu -- env HOME=/home/ubuntu NONINTERACTIVE=1 \
+      HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_AUTO_UPDATE=1 \
+      /home/linuxbrew/.linuxbrew/bin/brew install charmbracelet/tap/crush \
+    || echo "WARNING: crush was not installed; ax crush will be unavailable"
+
+# Claude Code and Codex have no Linux formula — npm is their only provider.
+# T3 Code itself stays here too so `npm i -g t3@latest` upgrades it in place
+# without an image rebuild. The entrypoint reconciles this directory on boot,
+# because the t3-home volume masks image updates to it.
+RUN runuser -u ubuntu -- env HOME=/home/ubuntu npm install -g \
+      t3@latest \
+      @anthropic-ai/claude-code@latest \
+      @openai/codex@latest \
     && runuser -u ubuntu -- env HOME=/home/ubuntu /home/ubuntu/.npm-global/bin/t3 --version
+
+# Fail the build rather than ship an image whose ax cannot run.
+RUN for tool in nono herdr opencode pi claude codex t3; do \
+      runuser -u ubuntu -- env HOME=/home/ubuntu PATH="$PATH" \
+        command -v "$tool" >/dev/null \
+        || { echo "missing required tool: $tool"; exit 1; }; \
+    done
 
 RUN install -d /var/run/sshd /etc/ssh/host-keys \
     && printf '%s\n' \

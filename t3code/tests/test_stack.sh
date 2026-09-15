@@ -69,6 +69,61 @@ for df in "$repo_root"/t3code/Dockerfile*; do
   done < <(awk '$1 == "COPY" && $2 !~ /^--/ { print $2 }' "$df")
 done
 
+# --- the entrypoint can never withhold the shell ---------------------------
+# This container is the only way into the machine, so a failed bootstrap step
+# must degrade the environment rather than stop supervisord from starting.
+entrypoint="$repo_root/t3code/entrypoint.sh"
+
+if bash -n "$entrypoint" 2>/dev/null; then pass "the entrypoint parses"; else fail "the entrypoint parses"; fi
+check "every bootstrap step runs through attempt" 'attempt "bootstrap dotfiles" bootstrap_dotfiles' "$entrypoint"
+check "the entrypoint always reaches supervisord" 'exec /usr/bin/supervisord' "$entrypoint"
+check "failures are recorded where they can be read later" 'bootstrap-failures.log' "$entrypoint"
+refute "no bootstrap step aborts the entrypoint outright" 'exit 1' "$entrypoint"
+
+# Every attempt target must name a function that exists.
+while read -r fn; do
+  if grep -qE "^${fn}\(\) \{" "$entrypoint"; then
+    pass "attempt target $fn is defined"
+  else
+    fail "attempt target $fn is defined" "no such function"
+  fi
+done < <(grep -oE '^  attempt "[^"]+" [a-z_]+' "$entrypoint" | awk '{print $NF}')
+
+# Bash disables errexit for the whole duration of a call made in a condition
+# context, and subshells inherit that suppression. A step function that relies
+# on `set -e` alone would run past its own failure and be reported as passing,
+# so each must propagate explicitly. Verify against the real `attempt`.
+probe="$(mktemp "${TMPDIR:-/tmp}/t3-attempt.XXXXXX")"
+{
+  printf 'set -euo pipefail\n'
+  sed -n '/^failed_steps=()/,/^}/p' "$entrypoint"
+  printf 'log() { :; }\n'
+  printf 'good() { true; }\n'
+  printf 'bad_propagating() { false || return 1; echo RAN_ON; }\n'
+  printf 'attempt ok good\n'
+  printf 'attempt broken bad_propagating\n'
+  printf 'printf "reached_end:%%s\\n" "${#failed_steps[@]}"\n'
+} >"$probe"
+probe_out="$(bash "$probe" 2>&1)"
+rm -f "$probe"
+if [[ "$probe_out" == *"reached_end:1"* && "$probe_out" != *RAN_ON* ]]; then
+  pass "attempt records a failed step and still reaches the end"
+else
+  fail "attempt records a failed step and still reaches the end" "got: $probe_out"
+fi
+
+# --- the image provides what the t3 preset assumes -------------------------
+# `t3` is image-provisioned, so chezmoi never runs install-developer-tools.sh.
+# Anything the preset's ai feature needs must be baked into the image, or
+# sync-nono-packs.sh aborts chezmoi apply on first boot.
+for tool in nono herdr opencode pi-coding-agent; do
+  check "the image installs $tool for the ai feature" "$tool" "$dockerfile"
+done
+check "the image installs Claude Code, which has no Linux formula" '@anthropic-ai/claude-code' "$dockerfile"
+check "the image installs Codex, which has no Homebrew formula at all" '@openai/codex' "$dockerfile"
+check "the image fails the build if a required agent is missing" 'missing required tool' "$dockerfile"
+check "the entrypoint reconciles npm agents past the home volume" 'ensure_npm_agents' "$entrypoint"
+
 # --- pinned images actually exist for arm64 --------------------------------
 # Two deploys have now failed on a pin that resolved nowhere. Network-gated so
 # the default offline run stays green: T3_CHECK_IMAGES=1 to enable.
