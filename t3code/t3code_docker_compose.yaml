@@ -44,8 +44,10 @@ services:
 
   t3code:
     build:
-      context: .
-      dockerfile: t3code/Dockerfile
+      # Relative to the Compose project directory (the repository root under
+      # Coolify), and the Dockerfile's COPY paths are relative to this context.
+      context: ./t3code
+      dockerfile: Dockerfile
       args:
         REMOTE_UID: ${REMOTE_UID:-1000}
         REMOTE_GID: ${REMOTE_GID:-1000}

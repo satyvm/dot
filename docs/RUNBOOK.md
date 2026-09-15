@@ -10,6 +10,57 @@ Legend: 🖥️ VPS host · 🐳 container · 💻 Mac · 🌐 browser
 
 ---
 
+## Phase 0 — Safety net and reconnaissance
+
+> The Coolify host serves live sites. Nothing in Phase A should break them, but
+> "should" is not a recovery plan. Do this first, every time.
+
+### 0a 🌐 Prove you can get in without SSH
+
+OCI console → your instance → **Console connection → Launch Cloud Shell
+connection**. Open it and log in **now**, while everything works.
+
+This is the only path back if a firewall or routing change locks you out of
+SSH. Testing it after you need it is too late.
+
+### 0b 🌐 Snapshot the boot volume
+
+OCI console → **Block Storage → Boot Volumes** → your volume → **Create Manual
+Backup**. Wait for it to finish before continuing.
+
+### 0c 🖥️ Reconnaissance — read-only, changes nothing
+
+Run this and keep the output. Phase A's firewall step depends on it.
+
+```bash
+{
+  echo "== os/arch ==";      uname -m; . /etc/os-release && echo "$PRETTY_NAME"
+  echo "== ssh port ==";     sudo ss -lntp | grep sshd
+  echo "== ip_forward ==";   sysctl net.ipv4.ip_forward net.ipv6.conf.all.forwarding
+  echo "== ufw ==";          sudo ufw status verbose 2>/dev/null || echo "ufw not installed"
+  echo "== firewalld ==";    systemctl is-active firewalld 2>/dev/null || true
+  echo "== iptables save ==";dpkg -l | grep -c iptables-persistent || true
+  echo "== docker ==";       docker --version; docker ps --format '{{.Names}}\t{{.Ports}}'
+  echo "== :443 owner ==";   sudo ss -lntp | grep -E ':(80|443)\b'
+  echo "== existing vpn ==";  ip -br link | grep -E 'wg|tun|tailscale' || echo "none"
+  echo "== wg services ==";  systemctl list-units --type=service --state=running | grep -E 'wg-quick|cloudflared' || echo "none"
+} 2>&1
+```
+
+**What you are looking for, and why it matters:**
+
+| Finding | Consequence for Phase A |
+|---|---|
+| `ufw` is **active** | Use UFW for the firewall rule, not raw iptables. Exit-node forwarding also needs a UFW route rule. |
+| `ip_forward` already `1` | Docker set it. A4 becomes a no-op — good. |
+| `iptables-persistent` installed | **Do not run `netfilter-persistent save`.** See A6. |
+| An existing `wg0` | That is the old WireGuard you plan to retire. Leave it alone until Phase G. |
+| Traefik on `:443` | Confirms why the T3 container needs its own tailnet node rather than `tailscale serve` on the host. |
+
+**Gate 0:** serial console works, backup completed, recon output saved.
+
+---
+
 ## Phase A — Tailscale on the VPS host (exit node)
 
 > Goal: one tailnet node on the host, advertising an exit node, so your phone
@@ -34,12 +85,23 @@ Legend: 🖥️ VPS host · 🐳 container · 💻 Mac · 🌐 browser
 
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
+sudo tailscale up --accept-dns=false
 ```
 
-### A3 🖥️ Enable IP forwarding — **this is silently required**
+`--accept-dns=false` is deliberate on this host. Accepting tailnet DNS rewrites
+`/etc/resolv.conf`, which Docker containers inherit as their upstream resolver —
+so if tailscaled ever stops, name resolution for your sites goes with it. The
+host does not need MagicDNS; refer to tailnet machines by their `100.x` address
+from here.
 
-Without it the exit node accepts traffic and drops it.
+This is **not** the same as the tailnet-wide MagicDNS setting in A1. That stays
+enabled — the T3 container needs it to obtain a TLS certificate.
+
+### A3 🖥️ Enable IP forwarding — **silently required**
+
+Without it the exit node accepts traffic and drops it. Docker has almost
+certainly already set `net.ipv4.ip_forward=1`; check your Phase 0 output. Making
+it explicit and persistent is still correct, and is a no-op if already on.
 
 ```bash
 printf 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\n' \
@@ -71,12 +133,40 @@ Oracle Cloud has two independent firewalls and people routinely forget the secon
 
 1. OCI console → VCN → Security List → **Ingress rule**: UDP, source
    `0.0.0.0/0`, destination port `41641`.
-2. On the instance:
+
+2. On the instance — **which command depends on your Phase 0 recon**:
+
+   **If `ufw` is active** (most likely, since the `server` preset enables it):
+
+   ```bash
+   sudo ufw allow 41641/udp comment 'tailscale'
+   sudo ufw status verbose
+   ```
+
+   Exit-node forwarding additionally needs a route rule, because UFW's default
+   FORWARD policy is DROP:
+
+   ```bash
+   NETDEV=$(ip -o route get 8.8.8.8 | cut -f 5 -d " ")
+   sudo ufw route allow in on tailscale0 out on "$NETDEV"
+   ```
+
+   **If `ufw` is not installed**, the OCI Security List rule is sufficient —
+   Oracle images ship a restrictive iptables INPUT chain, so also add:
 
    ```bash
    sudo iptables -I INPUT 1 -p udp --dport 41641 -j ACCEPT
-   sudo netfilter-persistent save
    ```
+
+> ⚠️ **Do not run `netfilter-persistent save` on this host.** It snapshots the
+> *current* ruleset, including the chains Docker generates at runtime. On the
+> next boot `iptables-restore` replays those stale Docker rules before Docker
+> starts and recreates its own, and your published container ports start
+> behaving unpredictably. Persist the rule with UFW, or with a small systemd
+> unit that adds only your line — never by dumping the whole table.
+
+**Rollback for this step:** `sudo ufw delete allow 41641/udp`, or
+`sudo iptables -D INPUT -p udp --dport 41641 -j ACCEPT`. Neither touches Docker.
 
 ### A7 💻📱 Test from a real network
 
@@ -88,6 +178,20 @@ tailscale status   # on the Mac, with the exit node selected
 ```
 
 **Gate A:** the connection reads `direct`, not `relay`, and you can browse.
+
+### A8 🖥️ Rollback, if anything looks wrong
+
+Tailscale is additive — it creates its own interface and its own chains, and
+removing it restores the previous state:
+
+```bash
+sudo tailscale down                 # stop routing, keep the install
+sudo tailscale set --advertise-exit-node=false   # stop being an exit node only
+sudo systemctl stop tailscaled      # full stop
+sudo apt remove --purge tailscale   # complete removal
+```
+
+Your sites do not depend on any of it, so none of these affect Coolify.
 
 > ⚠️ **Live with this for a day before Phase B.** A datacenter IP attracts
 > CAPTCHAs and soft blocks from Google, banks, and shopping sites. This is the

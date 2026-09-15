@@ -56,6 +56,19 @@ check "the image provides the build toolchain T3 Code compiles against" 'g++' "$
 check "Node is new enough for T3 Code"   'node:22.19.0' "$dockerfile"
 refute "the image no longer carries the Hermes runtime" 'hermes' "$dockerfile"
 
+# --- build context ---------------------------------------------------------
+# Compose resolves a relative build context against the project directory, which
+# under Coolify is the repository root rather than this folder. Every COPY source
+# must therefore exist inside the declared context, or the build fails at solve
+# time with "failed to compute cache key".
+check "the image build context is the t3code directory" 'context: ./t3code' "$compose"
+for df in "$repo_root"/t3code/Dockerfile*; do
+  while read -r src; do
+    label="$(basename "$df") copies $src from inside its build context"
+    if [[ -e "$repo_root/t3code/$src" ]]; then pass "$label"; else fail "$label" "not found: t3code/$src"; fi
+  done < <(awk '$1 == "COPY" && $2 !~ /^--/ { print $2 }' "$df")
+done
+
 # --- compose is syntactically valid ---------------------------------------
 if TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" \
    CLIPROXY_CLIENT_KEY=a CLIPROXY_MANAGEMENT_KEY=b \
