@@ -250,6 +250,16 @@ actual: $output"
   fi
 }
 
+assert_not_contains() {
+  local output="$1" unexpected="$2" label="$3"
+  if [[ "$output" != *"$unexpected"* ]]; then
+    pass "$label"
+  else
+    fail "$label" "unexpected: $unexpected
+actual: $output"
+  fi
+}
+
 assert_status() {
   local expected="$1" actual="$2" label="$3"
   if [[ "$expected" == "$actual" ]]; then
@@ -529,6 +539,7 @@ jq '.proxy.url = "http://cliproxyapi:8317" | .proxy.mode = "sidecar"' "$CONFIG_H
 mv "$CONFIG_HOME/cli-proxy-api/antigravity-test.json" "$FIXTURE_ROOT/antigravity-remote-test.json"
 OUTPUT="$(AX_REGISTRY_PATH="$REMOTE_REGISTRY" AX_PLATFORM=Linux run_ax doctor)"
 assert_contains "$OUTPUT" "managed by the cliproxyapi sidecar" "sidecar doctor does not require locally owned provider files"
+assert_not_contains "$OUTPUT" "cliproxyapi: missing" "sidecar doctor does not demand a local cliproxyapi binary"
 mv "$FIXTURE_ROOT/antigravity-remote-test.json" "$CONFIG_HOME/cli-proxy-api/antigravity-test.json"
 
 for agent in claude codex pi opencode crush; do

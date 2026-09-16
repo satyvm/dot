@@ -563,6 +563,11 @@ doctor() {
   fi
 
   while IFS=$'\t' read -r name minimum; do
+    # The cliproxyapi binary only exists where the gateway runs locally; on a
+    # sidecar machine it lives in another container and is never on PATH.
+    if [[ "$name" == "cliproxyapi" ]] && ! proxy_is_local; then
+      continue
+    fi
     doctor_check_binary "$name" "$minimum" || failures=$((failures + 1))
   done < <(jq -r '.minimumVersions | to_entries[] | [.key, .value] | @tsv' "$models_file")
 
