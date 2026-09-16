@@ -177,11 +177,27 @@ services:
               fork: true
               force-mapping: true
         EOF
+        # Optional: OpenRouter is a plain API key, not an OAuth login, so it
+        # only needs a config block, never `ax auth setup`. Add more entries
+        # under `models:` for every OpenRouter model you want an alias for.
+        if [[ -n "$${OPENROUTER_API_KEY:-}" ]]; then
+          cat >> /config/config.yaml <<EOF
+        openai-compatibility:
+          - name: "openrouter"
+            base-url: "https://openrouter.ai/api/v1"
+            api-key-entries:
+              - api-key: "$${OPENROUTER_API_KEY}"
+            models:
+              - name: "openrouter/auto"
+                alias: "openrouter-auto"
+        EOF
+        fi
         chmod 0600 /config/config.yaml /secrets/client-key
         exec ./CLIProxyAPI -config /config/config.yaml
     environment:
       CLIPROXY_CLIENT_KEY: ${CLIPROXY_CLIENT_KEY:?}
       CLIPROXY_MANAGEMENT_KEY: ${CLIPROXY_MANAGEMENT_KEY:?}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       DEPLOY: cloud
       PORT: "8317"
     volumes:

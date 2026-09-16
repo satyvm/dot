@@ -260,5 +260,49 @@ else
   fail "docker compose config parses the stack"
 fi
 
+# --- OPENROUTER_API_KEY is optional and, when set, produces valid config ---
+# The cliproxyapi command script appends an openai-compatibility block only
+# when the key is present; a broken conditional would either always emit it
+# (with an empty api-key) or never emit it (silently dropping the provider).
+if command -v python3 >/dev/null 2>&1 && python3 -c "import yaml" 2>/dev/null; then
+  work=$(mktemp -d)
+
+  render_cliproxy_config() {
+    local key="$1" out="$2" script
+    script=$(TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" \
+      CLIPROXY_CLIENT_KEY=a CLIPROXY_MANAGEMENT_KEY=b OPENROUTER_API_KEY="$key" \
+      docker compose --project-directory "$repo_root" -f "$compose" --profile gateway config 2>/dev/null |
+      python3 -c 'import sys, yaml; print(yaml.safe_load(sys.stdin)["services"]["cliproxyapi"]["command"][-1])')
+    mkdir -p "$work/secrets"
+    # docker compose config leaves the literal "$$" escaping in place (that
+    # collapse to "$" only happens when the *daemon* runs the command), so it
+    # must be undone here or bash reads "$$" as its own PID variable instead.
+    # -u (nounset) is part of the real command's shebang, so the vars it
+    # substitutes into config.yaml must actually be exported here too.
+    CLIPROXY_CLIENT_KEY=a CLIPROXY_MANAGEMENT_KEY=b OPENROUTER_API_KEY="$key" \
+      bash -euc "$(sed "s#/secrets#$work/secrets#g; s#/config/config.yaml#$out#g; s/\\$\\$/\\$/g" <<<"${script%exec ./CLIProxyAPI*}")" 2>/dev/null
+  }
+
+  render_cliproxy_config "" "$work/unset.yaml"
+  render_cliproxy_config "sk-or-v1-test" "$work/set.yaml"
+
+  if [[ -s "$work/unset.yaml" ]] && ! grep -q "openai-compatibility" "$work/unset.yaml"; then
+    pass "cliproxyapi config omits openai-compatibility when OPENROUTER_API_KEY is unset"
+  else
+    fail "cliproxyapi config omits openai-compatibility when OPENROUTER_API_KEY is unset"
+  fi
+
+  if [[ -s "$work/set.yaml" ]] && grep -q 'name: "openrouter"' "$work/set.yaml" &&
+    python3 -c "import yaml; yaml.safe_load(open('$work/set.yaml'))" 2>/dev/null; then
+    pass "cliproxyapi config adds a valid openai-compatibility block when OPENROUTER_API_KEY is set"
+  else
+    fail "cliproxyapi config adds a valid openai-compatibility block when OPENROUTER_API_KEY is set"
+  fi
+
+  rm -rf "$work"
+else
+  printf '# skipped openrouter config-generation check (needs python3 + pyyaml)\n'
+fi
+
 printf '\n%d passed, %d failed\n' "$pass_count" "$fail_count"
 ((fail_count == 0))
