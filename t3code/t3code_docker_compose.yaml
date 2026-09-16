@@ -190,6 +190,8 @@ services:
             models:
               - name: "openrouter/auto"
                 alias: "openrouter-auto"
+              - name: "stealth/union-alpha"
+                alias: "union-alpha"
         EOF
         fi
         chmod 0600 /config/config.yaml /secrets/client-key
