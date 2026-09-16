@@ -272,7 +272,7 @@ packages:
     - id: mole
       feature: developer
       providers:
-        brew: { darwin: mole}
+        brew: { darwin: mole }
     - id: shellcheck
       feature: developer
       providers:
@@ -449,10 +449,6 @@ packages:
       feature: gui-all
       os: [darwin]
       providers: { cask: { darwin: visual-studio-code } }
-    - id: antigravity
-      feature: gui-all
-      os: [darwin]
-      providers: { cask: { darwin: antigravity } }
     - id: alacritty
       feature: gui-all
       os: [darwin]
