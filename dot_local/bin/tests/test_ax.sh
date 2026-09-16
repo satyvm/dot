@@ -780,13 +780,31 @@ if command -v nono >/dev/null 2>&1; then
     ([.groups.include[] | if type == "object" then .name else . end] |
       contains(["mise_manager", "bun_runtime", "go_runtime", "go_runtime_macos"])) and
     (.filesystem.allow | length == 3) and
-    (.filesystem.read == ["$HOME/.config/agents/skills", "$HOME/.local/state/fnm_multishells", "$HOME/.go"]) and
+    (.filesystem.read == ["$HOME/.config/agents/skills", "$HOME/.go", "$HOME/.local/state/fnm_multishells", "$HOME/.npm-global/bin"]) and
     (.filesystem.read_file | index("$HOME/.config/agents/context/ax-context.md")) != null and
     (.filesystem.suppress_save_prompt? == null)
   ' "$REPO_ROOT/dot_config/nono/profiles/default-claude.json" >/dev/null; then
     pass "Claude is a thin ax overlay on the official pack"
   else
     fail "Claude is a thin ax overlay on the official pack" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-claude.json")"
+  fi
+
+  # In the container the agents are npm-installed, so the binary nono execs
+  # lives in ~/.npm-global/bin. nono grants the binary itself but not its
+  # directory, and without read access there the sandbox dies with exit 127
+  # before the agent ever starts. macOS misses this: Homebrew's prefix is
+  # already covered by the official packs.
+  npm_bin_missing=""
+  for profile_path in "$REPO_ROOT"/dot_config/nono/profiles/default-{agent,claude,codex,opencode,pi}.json; do
+    jq -e '[.filesystem.read[] | if type == "object" then .path else . end] |
+      index("$HOME/.npm-global/bin")' "$profile_path" >/dev/null ||
+      npm_bin_missing="$npm_bin_missing $(basename "$profile_path")"
+  done
+  if [[ -z "$npm_bin_missing" ]]; then
+    pass "npm-installed agents can read their own bin directory in the sandbox"
+  else
+    fail "npm-installed agents can read their own bin directory in the sandbox" \
+      "missing \$HOME/.npm-global/bin:$npm_bin_missing"
   fi
   if jq -e '
     .extends == "nolabs-ai/codex" and

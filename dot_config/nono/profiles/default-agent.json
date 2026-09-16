@@ -47,8 +47,9 @@
     "read": [
       "$HOME/.agents/skills",
       "$HOME/.config/agents/skills",
+      "$HOME/.go",
       "$HOME/.local/state/fnm_multishells",
-      "$HOME/.go"
+      "$HOME/.npm-global/bin"
     ],
     "read_file": [
       "$HOME/.config/agents/context/base.md",
@@ -74,8 +75,14 @@
   "network": {
     "block": false,
     "network_profile": "developer",
-    "open_port": [8317],
-    "no_proxy": ["127.0.0.1", "localhost", "cliproxyapi"]
+    "open_port": [
+      8317
+    ],
+    "no_proxy": [
+      "127.0.0.1",
+      "localhost",
+      "cliproxyapi"
+    ]
   },
   "workdir": {
     "access": "readwrite"
