@@ -230,15 +230,23 @@ proxy_ready() {
 
 proxy_has_model() {
   local base_url="$1" model_id="$2"
-  local base_name=""
+  local base_name="" registry_id="$model_id" target_name=""
   if [[ "$model_id" =~ ^(.+)\((minimal|low|medium|high|xhigh|max)\)$ ]]; then
     base_name="${BASH_REMATCH[1]}"
+    registry_id="$base_name"
   fi
+  target_name="$(jq -r --arg model_id "$registry_id" '
+    (.roles[$model_id] // .catalog[$model_id] // {}).target // ""
+  ' "$models_file")"
   curl --silent --fail --max-time 2 \
     -H "Authorization: Bearer $proxy_key" \
     "$base_url/v1/models" |
-    jq -e --arg model_id "$model_id" --arg base_name "$base_name" \
-      'any(.data[]?; .id == $model_id or ($base_name != "" and .id == $base_name))' >/dev/null 2>&1
+    jq -e --arg model_id "$model_id" --arg base_name "$base_name" --arg target_name "$target_name" \
+      'any(.data[]?;
+        .id == $model_id or
+        ($base_name != "" and .id == $base_name) or
+        ($target_name != "" and .id == $target_name)
+      )' >/dev/null 2>&1
 }
 
 proxy_model_owner() {
@@ -725,7 +733,7 @@ sync_opencode_models() {
   if ! jq -e 'type == "object"' <<<"$current_config" >/dev/null 2>&1; then
     die "$AX_EXIT_CONFIG" "OPENCODE_CONFIG_CONTENT must contain a JSON object"
   fi
-  managed_config="$(jq -cn --slurpfile registry "$models_file" --argjson live "$live_json" '
+  managed_config="$(jq -cn --slurpfile registry "$models_file" --argjson live "$live_json" --arg base_url "$base_url" '
     ($registry[0].roles) as $rawRoles |
     ($registry[0].roles + $registry[0].catalog) as $rawModels |
     (reduce ($rawRoles | keys[]) as $key ({};
@@ -758,6 +766,14 @@ sync_opencode_models() {
     {
       "provider": {
         "cliproxy": {
+          "npm": "@ai-sdk/openai-compatible",
+          "name": "CLIProxyAPI",
+          "options": {
+            "baseURL": ($base_url + "/v1"),
+            "apiKey": "{env:OPENAI_API_KEY}",
+            "timeout": 600000,
+            "chunkTimeout": 300000
+          },
           "models": (
             $expanded | with_entries(
               .key as $id |
@@ -933,7 +949,7 @@ launch_agent() {
       set -- --append-system-prompt-file "$ax_context" "$@"
       ;;
     pi)
-      set -- --append-system-prompt "$ax_context" "$@"
+      set -- --append-system-prompt "$(<"$ax_context")" "$@"
       ;;
   esac
   if [[ "$agent" == "claude" ]] && gateway_enabled; then
@@ -948,7 +964,13 @@ launch_agent() {
         set -- --model "$model_id" "$@"
         ;;
       codex)
-        set -- -c "model_provider=cliproxy" --model "$target_model" "$@"
+        set -- \
+          -c "model_provider=cliproxy" \
+          -c 'model_providers.cliproxy.name="CLIProxyAPI"' \
+          -c "model_providers.cliproxy.base_url=\"$base_url/v1\"" \
+          -c 'model_providers.cliproxy.env_key="OPENAI_API_KEY"' \
+          -c "model_providers.cliproxy.wire_api=responses" \
+          --model "$target_model" "$@"
         ;;
       pi)
         set -- --model "cliproxy/$target_model" "$@"
@@ -961,9 +983,30 @@ launch_agent() {
         [[ -r "$crush_config" ]] || die "$AX_EXIT_CONFIG" "Crush config is missing: $crush_config"
         mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/crush"
         crush_override_file="$(mktemp "${XDG_CACHE_HOME:-$HOME/.cache}/crush/ax-model.XXXXXX.json")"
-        jq --arg model "$target_model" '
-          .models.large.model = $model |
-          .providers.cliproxy.discover_models = true
+        jq --arg model "$target_model" --arg base_url "$base_url" --slurpfile registry "$models_file" '
+          ($registry[0].roles + $registry[0].catalog) as $catalog |
+          .providers.cliproxy = {
+            "type": "openai-compat",
+            "base_url": ($base_url + "/v1"),
+            "api_key": "$OPENAI_API_KEY",
+            "discover_models": true,
+            "models": [
+              $catalog | to_entries[] | {
+                "id": .key,
+                "name": (.value.displayName + " (" + .key + ")"),
+                "context_window": .value.contextWindow,
+                "default_max_tokens": .value.maxTokens
+              }
+            ]
+          } |
+          .models.large = {
+            "model": $model,
+            "provider": "cliproxy"
+          } |
+          .models.small = {
+            "model": "light",
+            "provider": "cliproxy"
+          }
         ' "$crush_config" >"$crush_override_file"
         export CRUSH_GLOBAL_CONFIG="$crush_override_file"
         ;;

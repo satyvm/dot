@@ -30,51 +30,5 @@
       "args": {{ $server.args | toJson }}
     }{{ if lt $index (sub (len $lspServers) 1) }},{{ end }}
 {{- end }}
-  },
-  "providers": {
-    "cliproxy": {
-      "type": "openai-compat",
-      "base_url": "{{ $machine.gatewayUrl }}/v1",
-      "api_key": "$OPENAI_API_KEY",
-      "discover_models": true,
-      "models": [
-{{- $rawModels := merge (deepCopy .aiAgentPlatform.roles) (deepCopy .aiAgentPlatform.catalog) -}}
-{{- $expanded := dict -}}
-{{- range $key, $model := $rawModels -}}
-  {{- $_ := set $expanded $key $model -}}
-  {{- if $model.target -}}
-    {{- $_ := set $expanded $model.target $model -}}
-  {{- end -}}
-  {{- if $model.reasoningSuffix -}}
-    {{- $suffix := printf "(%s)" $model.reasoningSuffix -}}
-    {{- $_ := set $expanded (printf "%s%s" $key $suffix) $model -}}
-    {{- if $model.target -}}
-      {{- $_ := set $expanded (printf "%s%s" $model.target $suffix) $model -}}
-    {{- end -}}
-  {{- end -}}
-{{- end -}}
-{{- $modelKeys := keys $expanded | sortAlpha -}}
-{{- range $index, $modelID := $modelKeys -}}
-{{- $model := index $expanded $modelID }}
-        {
-          "id": "{{ $modelID }}",
-          "name": "{{ $model.displayName }} ({{ $modelID }})",
-          "context_window": {{ $model.contextWindow }},
-          "default_max_tokens": {{ $model.maxTokens }}
-        }{{ if lt $index (sub (len $modelKeys) 1) }},{{ end }}
-{{- end }}
-      ]
-    }
-  },
-  "models": {
-    "large": {
-      "model": "{{ .aiAgentPlatform.classes.crush.large }}",
-      "provider": "cliproxy",
-      "max_tokens": {{ (index .aiAgentPlatform.roles .aiAgentPlatform.classes.crush.large).maxTokens }}
-    },
-    "small": {
-      "model": "{{ .aiAgentPlatform.classes.crush.small }}",
-      "provider": "cliproxy"
-    }
   }
 }

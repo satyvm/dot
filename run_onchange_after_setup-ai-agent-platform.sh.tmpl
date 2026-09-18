@@ -4,6 +4,28 @@ set -euo pipefail
 
 warn() { printf 'warning: %s\n' "$*" >&2; }
 
+# Older revisions made the gateway Pi's global default. Remove only those
+# catalog-owned selections so a plain `pi` launch returns to Pi's own provider
+# and authentication while preserving every unrelated preference.
+pi_settings="$HOME/.pi/agent/settings.json"
+if command -v jq >/dev/null 2>&1 && [[ -s "$pi_settings" ]]; then
+  pi_tmp="$(mktemp "${TMPDIR:-/tmp}/pi-settings.XXXXXX")"
+  if jq '
+    if .defaultProvider == "cliproxy" then
+      del(.defaultProvider, .defaultModel)
+    else . end |
+    if ((.enabledModels? // null) | type) == "array" then
+      .enabledModels |= map(select(startswith("cliproxy/") | not)) |
+      if (.enabledModels | length) == 0 then del(.enabledModels) else . end
+    else . end
+  ' "$pi_settings" >"$pi_tmp"; then
+    install -m 0600 "$pi_tmp" "$pi_settings"
+  else
+    warn "Could not remove the legacy Pi gateway defaults"
+  fi
+  rm -f "$pi_tmp"
+fi
+
 # Claude Code keeps user-scoped MCPs in ~/.claude.json alongside mutable
 # session state. Merge only the catalog-owned server names and preserve every
 # other key rather than managing that whole file with chezmoi.

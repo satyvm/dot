@@ -90,6 +90,8 @@ if [[ "$*" == *"/v1/models"* ]]; then
     printf '%s\n' '{"data":[{"id":"unmanaged-only","owned_by":"unknown"}]}'
   elif [[ "${AX_TEST_HIDE_MODEL:-}" == "balanced" ]]; then
     printf '%s\n' '{"data":[{"id":"frontier","owned_by":"antigravity"},{"id":"fast","owned_by":"antigravity"},{"id":"light","owned_by":"antigravity"}]}'
+  elif [[ "${AX_TEST_UPSTREAM_ONLY:-}" == "1" ]]; then
+    printf '%s\n' '{"data":[{"id":"upstream-frontier","owned_by":"openai"},{"id":"upstream-balanced","owned_by":"openai"},{"id":"upstream-fast","owned_by":"antigravity"},{"id":"upstream-light","owned_by":"openai"}]}'
   else
     printf '%s\n' '{"data":[{"id":"frontier","owned_by":"antigravity"},{"id":"balanced","owned_by":"antigravity"},{"id":"fast","owned_by":"antigravity"},{"id":"light","owned_by":"antigravity"},{"id":"gpt-5.6-sol","owned_by":"openai"},{"id":"gpt-5.6-luna","owned_by":"openai"},{"id":"gemini-3.6-flash-high","owned_by":"antigravity"},{"id":"experimental/model","owned_by":"antigravity"},{"id":"future-model(preview)","owned_by":"openai"},{"id":"unrelated-anthropic-model","owned_by":"anthropic"}]}'
   fi
@@ -312,7 +314,7 @@ assert_contains "$OUTPUT" "pi_agent_dir=$HOME_DIR/.pi/agent" "Pi uses its docume
 assert_contains "$OUTPUT" "arg[0]=<--model>" "Pi receives an explicit model default"
 assert_contains "$OUTPUT" "arg[1]=<cliproxy/balanced>" "Pi's canonical default uses clean base model"
 assert_contains "$OUTPUT" "arg[2]=<--append-system-prompt>" "Pi receives the ax session context through its system-prompt flag"
-assert_contains "$OUTPUT" "arg[3]=<$CONFIG_HOME/agents/context/ax-context.md>" "Pi receives the ax session context file path"
+assert_contains "$OUTPUT" "arg[3]=<# Test context layer: ax-context>" "Pi receives the ax session context contents"
 if [[ -d "$HOME_DIR/.pi/agent/sessions" ]]; then
   pass "Pi session root exists before the sandbox starts"
 else
@@ -358,6 +360,13 @@ OUTPUT="$(AX_MODEL=frontier run_ax opencode)"
 assert_contains "$OUTPUT" "<run> <--profile> <default-opencode>" "OpenCode selects its agent-specific profile"
 assert_contains "$OUTPUT" "<--model> <cliproxy/frontier>" "OpenCode selects the clean canonical role"
 assert_contains "$OUTPUT" "opencode_live_model=true" "OpenCode receives live proxy models through an ephemeral config merge"
+
+OUTPUT="$(run_ax codex)"
+assert_contains "$OUTPUT" "<model_providers.cliproxy.wire_api=responses>" "Codex uses the supported Responses API through ax"
+assert_contains "$OUTPUT" "<model_providers.cliproxy.base_url=\"http://127.0.0.1:8317/v1\">" "Codex receives its gateway provider only for the ax session"
+
+OUTPUT="$(AX_TEST_UPSTREAM_ONLY=1 run_ax codex)"
+assert_contains "$OUTPUT" "<--model> <balanced>" "a canonical role remains usable when the gateway advertises only its upstream target"
 
 OUTPUT="$(AX_MODEL=gpt-5.6-sol run_ax opencode)"
 assert_contains "$OUTPUT" "<--model> <cliproxy/gpt-5.6-sol>" "OpenCode accepts a live Codex model by its real name"
@@ -634,9 +643,11 @@ if command -v chezmoi >/dev/null 2>&1; then
   MAC_CONFIG="$FIXTURE_ROOT/mac_config.json"
   echo '{"data":{"setupCli":true,"setupAi":true,"aiMode":"local"}}' > "$MAC_CONFIG"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/ax/models.json.tmpl" >"$RENDER_ROOT/models.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_codex/config.toml.tmpl" >"$RENDER_ROOT/codex.toml"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/opencode/opencode.jsonc.tmpl" >"$RENDER_ROOT/opencode.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_pi/agent/create_settings.json.tmpl" >"$RENDER_ROOT/pi-settings.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_pi/agent/create_private_models.json.tmpl" >"$RENDER_ROOT/pi-models.json"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_pi/agent/AGENTS.md.tmpl" >"$RENDER_ROOT/pi-agents.md"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/crush/crush.json.tmpl" >"$RENDER_ROOT/crush.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/ai-tools/claude-mcp.json.tmpl" >"$RENDER_ROOT/claude-mcp.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_zed/settings.json.tmpl" >"$RENDER_ROOT/zed.json"
@@ -695,17 +706,14 @@ if command -v chezmoi >/dev/null 2>&1; then
   else
     fail "CLIProxyAPI renders four non-conflicting forked role aliases" "$PROXY_JSON"
   fi
-  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"model": "cliproxy/frontier"' "OpenCode receives the canonical frontier default"
-  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"gpt-5.6-luna": {' "OpenCode receives original model IDs in the broader catalog"
-  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"small_model": "cliproxy/light"' "OpenCode keeps background tasks on the canonical light model"
-  assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"npm": "@ai-sdk/openai-compatible"' "OpenCode uses the proxy's Chat Completions protocol"
+  assert_not_contains "$(cat "$RENDER_ROOT/codex.toml")" 'model_providers.cliproxy' "direct Codex config does not define the ax-only gateway"
+  assert_not_contains "$(cat "$RENDER_ROOT/opencode.json")" 'cliproxy' "direct OpenCode config does not select or define the ax-only gateway"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '/.config/agents/context/base.md"' "OpenCode loads the base context as an instruction file"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"extensions": [".go"]' "OpenCode maps Go files to gopls"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"extensions": [".ts",".tsx",".js",".jsx",".mjs",".cjs",".mts",".cts"]' "OpenCode maps JavaScript and TypeScript files to vtsls"
-  assert_contains "$(cat "$RENDER_ROOT/pi-settings.json")" '"defaultModel": "fast"' "Pi receives the canonical fast default"
-  assert_contains "$(cat "$RENDER_ROOT/pi-settings.json")" '"cliproxy/gpt-5.6-luna"' "Pi enables original model IDs in the broader catalog"
-  assert_contains "$(cat "$RENDER_ROOT/crush.json")" '"model": "balanced"' "Crush receives the canonical balanced default"
-  assert_contains "$(cat "$RENDER_ROOT/crush.json")" '"id": "gpt-5.6-luna"' "Crush receives original model IDs in the broader catalog"
+  assert_not_contains "$(cat "$RENDER_ROOT/pi-settings.json")" 'cliproxy' "direct Pi settings do not select the ax-only gateway"
+  assert_contains "$(cat "$RENDER_ROOT/pi-agents.md")" 'Developer Environment — Base Context' "direct Pi receives the shared system context"
+  assert_not_contains "$(cat "$RENDER_ROOT/crush.json")" 'cliproxy' "direct Crush config does not select or define the ax-only gateway"
   assert_contains "$(cat "$RENDER_ROOT/crush.json")" '/.config/agents/context/base.md"' "Crush loads the base context through context_paths"
   assert_contains "$(cat "$RENDER_ROOT/claude-mcp.json")" '"@upstash/context7-mcp@2.1.1"' "local Claude MCP uses the supported Context7 server"
   assert_contains "$(cat "$RENDER_ROOT/zed.json")" '"host": "t3-dev"' "Zed renders the remote development SSH alias"
@@ -715,6 +723,7 @@ if command -v chezmoi >/dev/null 2>&1; then
     fail "rendered AI platform setup script parses" "invalid shell syntax"
   fi
   assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" "PI_CODING_AGENT_DIR=\"\$HOME/.pi/agent\" herdr integration install \"\$agent\"" "Herdr installs Pi integration in Pi's documented agent directory"
+  assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" 'del(.defaultProvider, .defaultModel)' "setup removes legacy direct-Pi gateway defaults"
   if bash -n "$RENDER_ROOT/sync-nono-packs.sh"; then
     pass "rendered Nono pack synchronization script parses"
   else
@@ -758,7 +767,7 @@ if command -v chezmoi >/dev/null 2>&1; then
   HOME="$HOME_DIR" chezmoi execute-template --config "$REMOTE_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/zed/settings.json.tmpl" >"$RENDER_ROOT/zed-remote.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$REMOTE_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/cli-proxy-api/private_config.yaml.tmpl" >"$RENDER_ROOT/proxy-remote.yaml"
   assert_contains "$(cat "$RENDER_ROOT/models-remote.json")" '"url": "http://cliproxyapi:8317"' "legacy remote aiMode still renders the sidecar gateway URL"
-  assert_contains "$(cat "$RENDER_ROOT/opencode-remote.json")" '"baseURL": "http://cliproxyapi:8317/v1"' "legacy remote aiMode still renders the sidecar gateway URL for OpenCode"
+  assert_not_contains "$(cat "$RENDER_ROOT/opencode-remote.json")" 'cliproxy' "legacy remote config keeps the gateway scoped to ax"
   assert_contains "$(cat "$RENDER_ROOT/claude-mcp-remote.json")" '"@upstash/context7-mcp@2.1.1"' "remote Claude MCP uses the supported Context7 server"
   assert_contains "$(cat "$RENDER_ROOT/zed-remote.json")" '"@upstash/context7-mcp@2.1.1"' "remote Zed MCP uses the supported Context7 server"
   assert_contains "$(cat "$RENDER_ROOT/proxy-remote.yaml")" 'host: "127.0.0.1"' "local proxy configuration remains loopback-only"
