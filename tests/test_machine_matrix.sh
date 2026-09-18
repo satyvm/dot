@@ -349,17 +349,25 @@ else
   fail "developer tools render a published cargo-clean-all release"
 fi
 
-if grep -qF 'npm install --global "@oh-my-pi/pi-coding-agent@18.2.2"' <<<"$linux_developer"; then
-  pass "Linux installs the pinned Oh My Pi replacement"
-else
-  fail "Linux installs the pinned Oh My Pi replacement" "$linux_developer"
-fi
 native_ai="$(render_template "$linux_config" run_onchange_after_install-ai-native-tools.sh.tmpl)"
+if grep -qF 'https://omp.sh/install' <<<"$native_ai" &&
+   grep -qF '"--binary" "--ref" "v18.2.2"' <<<"$native_ai" &&
+   ! grep -qF '@oh-my-pi/pi-coding-agent@18.2.2' <<<"$linux_developer"; then
+  pass "Linux installs the pinned Oh My Pi release binary instead of a Bun package"
+else
+  fail "Linux installs the pinned Oh My Pi release binary instead of a Bun package" "$linux_developer $native_ai"
+fi
 if grep -qF 'https://cursor.com/install' <<<"$native_ai" &&
    grep -qF 'https://antigravity.google/cli/install.sh' <<<"$native_ai"; then
   pass "AI native installer renders Cursor and Antigravity from canonical inventory"
 else
   fail "AI native installer renders Cursor and Antigravity from canonical inventory" "$native_ai"
+fi
+if grep -qF '"$1" --version >/dev/null 2>&1' <<<"$native_ai" &&
+   grep -qF 'tool_is_healthy "$command_name"' <<<"$native_ai"; then
+  pass "native AI installer repairs a command that exists but cannot start"
+else
+  fail "native AI installer repairs a command that exists but cannot start" "$native_ai"
 fi
 if grep -Eq -- '--skip-aliases|--skip-path' <<<"$native_ai"; then
   fail "Antigravity installer receives only currently supported arguments" "$native_ai"

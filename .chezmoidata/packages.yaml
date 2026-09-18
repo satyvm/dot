@@ -317,7 +317,10 @@ packages:
     - id: oh-my-pi
       feature: ai
       providers:
-        npm: { name: "@oh-my-pi/pi-coding-agent", version: "18.2.2" }
+        installScript:
+          command: omp
+          url: https://omp.sh/install
+          args: [--binary, --ref, v18.2.2]
     - id: crush
       feature: ai
       providers:
