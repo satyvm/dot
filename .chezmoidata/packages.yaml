@@ -363,7 +363,7 @@ packages:
         installScript:
           command: agy
           url: https://antigravity.google/cli/install.sh
-          args: [--skip-aliases, --skip-path]
+          args: []
 
     # macOS GUI tiers.
     - id: raycast

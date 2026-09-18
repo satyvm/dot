@@ -361,6 +361,18 @@ if grep -qF 'https://cursor.com/install' <<<"$native_ai" &&
 else
   fail "AI native installer renders Cursor and Antigravity from canonical inventory" "$native_ai"
 fi
+if grep -Eq -- '--skip-aliases|--skip-path' <<<"$native_ai"; then
+  fail "Antigravity installer receives only currently supported arguments" "$native_ai"
+else
+  pass "Antigravity installer receives only currently supported arguments"
+fi
+
+if grep -qF "alias ls='eza -l --group-directories-first --icons --hyperlink=auto'" \
+  "$repo_root/dot_dotfiles/dot_aliases.tmpl"; then
+  pass "the eza hyperlink option cannot consume the first ls pathname"
+else
+  fail "the eza hyperlink option cannot consume the first ls pathname"
+fi
 
 t3_config="$fixture_root/t3.json"
 make_config "$t3_config" t3 linux arm64
