@@ -106,8 +106,8 @@ services:
           cpus: "${T3CODE_CPUS:-1.5}"
 
   cliproxyapi:
-    # Opt-in: `docker compose --profile gateway up`. Direct `claude`/`codex`
-    # never touch this service; only `ax` does.
+    # Opt-in: `docker compose --profile gateway up`. Plain agent commands never
+    # touch it; ax gateway mode and explicitly configured T3 instances do.
     profiles: ["gateway"]
     # Digest-pinned: this container holds the Antigravity/Codex OAuth
     # credentials, so a redeploy must not silently adopt a new upstream build.

@@ -1,12 +1,15 @@
 {{- $machine := includeTemplate "machine" . | fromJson -}}
 # `ax` Session Context
 
-You were launched through `ax`, so this session is **sandboxed by `nono`**{{ if $machine.predicates.useGateway }} and
-**routed through a model gateway**{{ end }}. The rules below apply to this session only.
+You were launched through `ax`. Its two controls are independent: the process
+environment contains `AX_SANDBOX_ENABLED=true|false` and
+`AX_GATEWAY_ENABLED=true|false`, which are authoritative for this session.
+The rules below apply only when their corresponding value is `true`.
 
 ## Sandbox boundary
 
-`nono` enforces the profile at `~/.config/nono/profiles/`. Within it:
+When `AX_SANDBOX_ENABLED=true`, `nono` enforces the profile at
+`~/.config/nono/profiles/`. Within it:
 
 - The current project directory is read-write. Paths outside it generally are not.
 - Credentials are denied outright: `~/.ssh`, `~/.gnupg`, `~/.aws`, Cargo
@@ -28,7 +31,7 @@ name. Say so rather than engineering around `nono`.
 {{ if $machine.predicates.useGateway -}}
 ## Model gateway
 
-Requests go through CLIProxyAPI at `{{ $machine.gatewayUrl }}`
+When `AX_GATEWAY_ENABLED=true`, requests go through CLIProxyAPI at `{{ $machine.gatewayUrl }}`
 ({{ if eq $machine.features.aiGateway "sidecar" }}a private container on the Compose network, not reachable from outside it{{ else }}a local service on the loopback interface{{ end }}).
 
 Canonical model roles are `frontier`, `balanced`, `fast`, and `light`, defined in

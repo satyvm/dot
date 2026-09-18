@@ -27,13 +27,16 @@ directory.
 {{ if $machine.features.ai -}}
 ## Agents on this machine
 
-The agent CLIs (`claude`, `codex`, `pi`, `opencode`, `crush`) are the **stock
+The agent CLIs (`claude`, `codex`, `omp`, `opencode`, `crush`, `kimi`, `grok`,
+`cursor-agent`, and `agy`) are the **stock
 upstream binaries** with their own authentication. Running one directly gives
 you exactly the tool its vendor ships — no wrapper, no sandbox, no model
 rewriting.
 
-`ax` is a separate, opt-in launcher. `ax <agent>` adds a sandbox{{ if $machine.predicates.useGateway }} and routes
-the agent through a model gateway{{ end }}. If you were launched through `ax`, a
+`ax` is a separate, opt-in launcher for `claude`, `codex`, `omp`, and
+`opencode`. `ax <agent>` keeps the legacy sandbox-plus-gateway behavior;
+`ax --sandbox <agent>` and `ax --gateway <agent>` select either boundary
+independently. If you were launched through `ax`, a
 further context section describes that boundary; if you do not see one, you are
 running directly and none of it applies to you.
 

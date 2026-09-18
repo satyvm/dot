@@ -1,0 +1,31 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+{{- if and $machine.features.ai $machine.predicates.manageHostPackages -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:$PATH"
+
+install_from_script() {
+  local command_name="$1" url="$2"
+  shift 2
+  if command -v "$command_name" >/dev/null 2>&1; then
+    return 0
+  fi
+  local installer
+  installer="$(mktemp "${TMPDIR:-/tmp}/dot-install.XXXXXX")"
+  trap 'rm -f "$installer"' RETURN
+  curl --proto '=https' --tlsv1.2 -fsSL "$url" -o "$installer"
+  bash "$installer" "$@"
+  command -v "$command_name" >/dev/null 2>&1 || {
+    printf 'Installer completed but %s is still not on PATH.\n' "$command_name" >&2
+    return 1
+  }
+}
+
+{{- range $pkg := .packages.inventory }}
+  {{- $provider := index (index $pkg "providers" | default dict) "installScript" | default dict }}
+  {{- if and (eq $pkg.feature "ai") (ne (len $provider) 0) }}
+install_from_script {{ $provider.command | quote }} {{ $provider.url | quote }}{{ range $provider.args }} {{ . | quote }}{{ end }}
+  {{- end }}
+{{- end }}
+{{- end }}

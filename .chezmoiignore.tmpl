@@ -23,6 +23,7 @@ docs
 install-homebrew-packages.sh
 install-system-packages.sh
 install-developer-tools.sh
+install-ai-native-tools.sh
 configure-macos-defaults.sh
 configure-linux-hardening.sh
 setup-shell.sh
@@ -50,6 +51,9 @@ setup-shell.sh
 {{- if or (not $machine.features.developer) (not $machine.predicates.manageHostPackages) }}
 install-developer-tools.sh
 {{- end }}
+{{- if or (not $machine.features.ai) (not $machine.predicates.manageHostPackages) }}
+install-ai-native-tools.sh
+{{- end }}
 
 {{- if not $machine.predicates.manageHostPackages }}
 install-homebrew-packages.sh
@@ -71,7 +75,12 @@ install-system-packages.sh
 .config/herdr
 .config/nono
 .config/opencode
-.pi
+.config/t3-code
+.cursor
+.gemini
+.grok
+.kimi
+.omp
 .local/bin/ax
 setup-ai-agent-platform.sh
 sync-nono-packs.sh

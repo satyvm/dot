@@ -1,0 +1,11 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+# Use this directory as the T3 Codex instance's CODEX_HOME.
+model = "frontier"
+model_provider = "cliproxy"
+
+[model_providers.cliproxy]
+name = "CLIProxyAPI"
+base_url = {{ printf "%s/v1" $machine.gatewayUrl | quote }}
+env_key = "CLIPROXY_CLIENT_KEY"
+wire_api = "responses"
+supports_websockets = false

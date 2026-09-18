@@ -135,23 +135,17 @@ aiAgentPlatform:
     codex:
       defaultRole: frontier
       profile: default-codex
-    pi:
+    omp:
       defaultRole: fast
-      profile: default-pi
+      profile: default-omp
     opencode:
       defaultRole: frontier
       profile: default-opencode
-    crush:
-      defaultRole: balanced
-      profile: default-crush
   classes:
     claude:
       large: frontier
       normal: balanced
       fast: fast
-      small: light
-    crush:
-      large: balanced
       small: light
   minimumVersions:
     nono: 0.77.0
@@ -159,6 +153,5 @@ aiAgentPlatform:
     cliproxyapi: 7.2.95
     claude: 2.1.0
     codex: 0.60.0
-    pi: 0.81.0
+    omp: 18.2.2
     opencode: 1.1.0
-    crush: 0.40.0

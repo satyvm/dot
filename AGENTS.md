@@ -114,29 +114,34 @@ Skills are refreshed every 168h (7 days) and symlinked from `dot_agents/symlink_
 These AI CLI tools are all installed:
 - **Claude Code** (`claude`): Anthropic's CLI agent
 - **Codex** (`codex`): OpenAI's CLI agent
-- **PI Coding Agent** (`pi`): @earendil-works agent
+- **Oh My Pi** (`omp`): @oh-my-pi/pi-coding-agent
 - **OpenCode** (`opencode`): Open-source CLI agent
+- **Antigravity CLI** (`agy`): Google's Antigravity subscription CLI
+- **Cursor Agent** (`cursor-agent`): Cursor's CLI agent
+- **Grok Build** (`grok`): xAI's coding CLI
+- **Kimi Code** (`kimi`): Moonshot AI's coding CLI
 - **Crush** (`crush` / `charm`): Personal AI assistant
 
-There are **no managed shims**. `claude`, `codex`, `pi`, `opencode`, and `crush`
-on `PATH` are the real upstream binaries with their own authentication, and
+There are **no managed shims**. Agent commands on `PATH` are the real upstream
+binaries with their own authentication, and
 running one directly gives stock behaviour.
 
-`ax <agent>` is the opt-in path: it runs the same binary under Nono and, when
-`aiGateway` is not `none`, routes it through CLIProxyAPI. There is no
+`ax <agent>` is the backward-compatible opt-in path for Nono plus CLIProxyAPI.
+`ax --sandbox`/`-s` and `ax --gateway`/`-g` select those boundaries
+independently. Ax supports only Claude, Codex, Oh My Pi, and OpenCode. There is no
 `--direct` flag — the unsandboxed path is the plain command name. Herdr resume
 arguments pass through unchanged.
 
 ### Nono Sandbox Profiles
 Located in `dot_config/nono/profiles/`. Each agent has a profile:
-- `default-claude.json`, `default-pi.json`, `default-opencode.json`, and
+- `default-claude.json`, `default-omp.json`, `default-opencode.json`, and
   `default-codex.json` are thin overlays on signed registry packs, adding only
   shared-context, home-toolchain, npm-cache, and gateway grants
 - `default-agent.json` is the shared base for `default-crush.json`; Crush has no
   upstream `nono-packs` profile
-- `run_after_sync-nono-packs.sh.tmpl` installs `nolabs-ai/codex` plus
-  `always-further/{claude,pi,opencode}`; the namespace preference is nolabs-ai
-  first, always-further as fallback, verified against registry.nono.sh
+- `run_after_sync-nono-packs.sh.tmpl` installs the `nolabs-ai` packs for
+  Codex, Claude, OMP, and OpenCode; stale `always-further` packs are retired
+  first; pack names are verified against registry.nono.sh
 - `ax` grants resolved Herdr and Tea sockets dynamically at launch
 - context layers: `base.md` + `environment.md` reach every agent through its own
   native global config; `ax-context.md` is injected by `ax` alone, because the
@@ -211,7 +216,7 @@ Backups are timestamped (`local_DDMMYY`). Auto-detects first non-system volume i
 1. **`.tmpl` files are Go templates** — don't edit them as plain config files. Pay attention to template conditionals.
 2. **App additions belong in `.chezmoidata/packages.yaml`** — use the
    `add-dotfiles-app` skill; don't hardcode installs in provider scripts.
-3. **Agent names are NOT shims** — `claude`, `codex`, `pi`, `opencode`, and
+3. **Agent names are NOT shims** — `claude`, `codex`, `omp`, `opencode`, and
    `crush` are the real binaries. Only `ax <agent>` adds the sandbox and
    gateway. Never reintroduce a file in `~/.local/bin` that shadows an agent
    name; T3 Code spawns these CLIs off `PATH` and a wrapper breaks it.

@@ -314,11 +314,10 @@ packages:
       feature: ai
       providers:
         brew: { darwin: opencode, linux: opencode }
-    - id: pi-coding-agent
+    - id: oh-my-pi
       feature: ai
       providers:
-        brew: { darwin: pi-coding-agent, linux: pi-coding-agent }
-        npm: { name: "@earendil-works/pi-coding-agent", version: "latest" }
+        npm: { name: "@oh-my-pi/pi-coding-agent", version: "18.2.2" }
     - id: crush
       feature: ai
       providers:
@@ -343,6 +342,28 @@ packages:
         # requested as a formula on either platform. npm is the Linux provider.
         cask: { darwin: codex }
         npm: { name: "@openai/codex", version: "latest" }
+    - id: kimi-code
+      feature: ai
+      providers:
+        npm: { name: "@moonshot-ai/kimi-code", version: "2.0.0" }
+    - id: grok-cli
+      feature: ai
+      providers:
+        npm: { name: "@xai-official/grok", version: "1.0.34" }
+    - id: cursor-agent
+      feature: ai
+      providers:
+        installScript:
+          command: cursor-agent
+          url: https://cursor.com/install
+          args: []
+    - id: antigravity-cli
+      feature: ai
+      providers:
+        installScript:
+          command: agy
+          url: https://antigravity.google/cli/install.sh
+          args: [--skip-aliases, --skip-path]
 
     # macOS GUI tiers.
     - id: raycast

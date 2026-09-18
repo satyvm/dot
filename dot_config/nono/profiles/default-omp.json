@@ -1,10 +1,10 @@
 {
   "meta": {
-    "name": "default-pi",
-    "version": "2.1.0",
-    "description": "Thin ax overlay for the official Pi nono pack"
+    "name": "default-omp",
+    "version": "1.0.0",
+    "description": "Thin ax overlay for the official Oh My Pi nono pack"
   },
-  "extends": "nolabs-ai/pi",
+  "extends": "nolabs-ai/omp",
   "security": {
     "signal_mode": "isolated",
     "capability_elevation": false
@@ -24,7 +24,8 @@
     "allow": [
       "$HOME/.npm/_cacache",
       "$HOME/.npm/_npx",
-      "$HOME/.npm/_logs"
+      "$HOME/.npm/_logs",
+      "$HOME/.cache/ax/omp-agent"
     ],
     "read": [
       "$HOME/.config/agents/skills",
@@ -35,18 +36,13 @@
     "read_file": [
       "$HOME/.config/agents/context/base.md",
       "$HOME/.config/agents/context/environment.md",
-      "$HOME/.config/agents/context/ax-context.md"
+      "$HOME/.config/agents/context/ax-context.md",
+      "$HOME/.config/ax/omp-models.yml"
     ]
   },
   "network": {
     "block": false,
-    "open_port": [
-      8317
-    ],
-    "no_proxy": [
-      "127.0.0.1",
-      "localhost",
-      "cliproxyapi"
-    ]
+    "open_port": [8317],
+    "no_proxy": ["127.0.0.1", "localhost", "cliproxyapi"]
   }
 }

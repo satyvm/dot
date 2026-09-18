@@ -3,6 +3,29 @@
 A Coolify-deployed Docker Compose application: T3 Code server, SSH, the full
 chezmoi CLI toolset, and the agent CLIs — reachable only over Tailscale.
 
+## Three-environment topology
+
+The T3 client connects to three independent environments. Chezmoi deliberately
+keeps their agent behavior consistent, while T3 keeps each environment's
+threads, projects, provider instances, OAuth sessions, and API keys local to
+the server that owns them.
+
+| Environment | Chezmoi preset | T3 lifecycle | Gateway route |
+|---|---|---|---|
+| macOS | `workstation` | T3 desktop app, or `npx t3@latest serve --tailscale-serve` | local CLIProxyAPI at `127.0.0.1:8317` |
+| Ubuntu WSL | `workstation` | `npx t3@latest service install` when systemd is enabled; otherwise run `npx t3@latest serve --tailscale-serve` | local CLIProxyAPI at `127.0.0.1:8317` |
+| Coolify | `t3` | Compose/Supervisord, managed by this directory | `cliproxyapi:8317` sidecar |
+
+Pair each server separately in **Settings → Connections**. Provider login and
+the instance matrix below must also be completed once per environment; a T3
+client connection does not copy server credentials. Use the HTTPS MagicDNS
+endpoint produced by Tailscale Serve for browser clients. Plain Tailnet HTTP is
+usable by native clients but is blocked as mixed content by `app.t3.codes`.
+
+The repository does not enroll personal machines into a tailnet or create their
+T3 pairing credentials. Those operations create external account state and are
+intentionally left to `tailscale up` and T3's one-time pairing flow.
+
 ## Services
 
 | Service | Role | Ingress | Limits |
@@ -67,13 +90,56 @@ Only base tooling changes need an image rebuild.
 docker compose --profile gateway up -d
 ```
 
-Direct `claude`/`codex` never touch it; only `ax` does. Adding a provider later
+Direct agent commands never touch it. `ax <agent>` keeps the compatibility
+default of Nono plus gateway; the boundaries can also be selected separately:
+
+```bash
+ax --sandbox codex          # or: ax -s codex
+ax --gateway codex          # or: ax -g codex
+ax --sandbox --gateway codex # or: ax -sg codex
+```
+
+`ax` intentionally supports only `claude`, `codex`, `opencode`, and `omp`.
+Adding a gateway provider later
 needs no rebuild, because auth lives in a writable volume:
 
 ```bash
 docker exec -it <cliproxyapi> /CLIProxyAPI/CLIProxyAPI \
   -config /config/config.yaml -no-browser -antigravity-login
+docker exec -it <cliproxyapi> /CLIProxyAPI/CLIProxyAPI \
+  -config /config/config.yaml -no-browser -codex-login
 ```
+
+Set `OPENROUTER_API_KEY` in Coolify before starting the gateway profile; it is
+the third and only key-based gateway channel.
+
+## T3 provider instances
+
+Do not edit T3's SQLite state from chezmoi. In **Settings → Providers**, add
+instances using the managed configuration below; T3 persists the choices and
+sensitive environment variables in its own state volume.
+
+| T3 instance | Driver | Configuration |
+|---|---|---|
+| Codex — ChatGPT Plus | Codex | Binary `codex`; default `CODEX_HOME`; run `codex login` |
+| Codex — OpenRouter | Codex | Binary `codex`; `CODEX_HOME=~/.config/t3-code/codex/openrouter`; sensitive `OPENROUTER_API_KEY` |
+| Codex — Pioneer | Codex | Binary `codex`; `CODEX_HOME=~/.config/t3-code/codex/pioneer`; sensitive `PIONEER_API_KEY` |
+| Codex — CLIProxy | Codex | Binary `codex`; `CODEX_HOME=~/.config/t3-code/codex/cliproxy`; sensitive `CLIPROXY_CLIENT_KEY` |
+| OpenCode — ChatGPT | OpenCode | Binary `opencode`; authenticate with `opencode auth login` |
+| OpenCode — OpenRouter | OpenCode | A second instance with sensitive `OPENROUTER_API_KEY`; select OpenRouter models |
+| OpenCode — Pioneer | OpenCode | A second instance; `/connect` → Pioneer, or sensitive `PIONEER_API_KEY`; choose Pioneer Auto |
+| Antigravity | Antigravity | Use T3's managed runtime and Google sign-in |
+| Cursor | Cursor | Binary `cursor-agent`; authenticate with `agent login` |
+| Grok | Grok Build | Binary `grok`; authenticate with `grok login` |
+
+ChatGPT Plus is used only by Codex/OpenCode flows that explicitly implement
+OpenAI account OAuth. It is not a credential for Cursor or Grok, so those two
+instances use their own vendor logins.
+
+T3 currently has no first-class Oh My Pi or Crush provider driver. They remain
+available in the terminal as `omp` and `crush`, but making either a native T3
+thread type requires an upstream T3 provider adapter. There is no settings-only
+or chezmoi-only way to add that thread type without maintaining code.
 
 ## Validation
 

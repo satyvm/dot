@@ -1,0 +1,17 @@
+{
+  "data": {
+    "machine": {
+      "schemaVersion": 1,
+      "preset": "workstation",
+      "os": "linux",
+      "arch": "amd64",
+      "distro": "ubuntu",
+      "homebrewPrefix": "/home/linuxbrew/.linuxbrew",
+      "devRoot": "/home/satyam/dev",
+      "customize": false,
+      "overrides": {}
+    },
+    "name": "Satyam",
+    "email": "75127014+satyvm@users.noreply.github.com"
+  }
+}

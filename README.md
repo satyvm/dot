@@ -42,7 +42,10 @@ Choose the closest complete setup:
 | `container` | Generic image-provisioned environment | Yes | Yes | No | None | None | No | No | No |
 | `t3` | T3 Code remote development container | Yes | Yes | Yes | Sidecar | None | No | No | No |
 
-The default is `workstation` on macOS and `server` on Linux.
+The default is `workstation` on macOS and Ubuntu under WSL, and `server` on
+other Linux hosts. An existing Chezmoi configuration keeps its saved preset;
+change that machine to `workstation` explicitly if it was initialized earlier
+as `server`.
 
 Platform rules still apply after choosing a preset:
 
@@ -94,6 +97,8 @@ updates the existing setup and does not ask these questions again.
 ## Recommended answers
 
 - Personal Mac with the full setup: `workstation`, then do not customize.
+- Ubuntu under WSL used as a T3 development environment: `workstation`, then
+  do not customize.
 - Personal Mac with fewer GUI apps: `minimal`, then do not customize.
 - Ubuntu/Debian server: `server`, then do not customize.
 - Dev container whose image already contains the programs: `container`, then
@@ -174,7 +179,8 @@ docker context use colima
 
 The AI feature includes:
 
-- Claude Code, Codex, PI Coding Agent, OpenCode, and Crush;
+- Claude Code, Codex, Oh My Pi, OpenCode, Kimi Code, Grok, Cursor CLI,
+  Antigravity CLI, and Crush;
 - `ax`, the common policy gateway for launching those agents;
 - Nono sandbox profiles and Herdr integrations;
 - a canonical model registry and shared MCP configuration;
@@ -186,18 +192,22 @@ authentication. Running one directly gives you exactly what its vendor ships:
 ```bash
 claude
 codex
-pi
+omp
 opencode
 crush
 ```
 
-`ax` is a separate, opt-in launcher. It runs the same binary under the Nono
-sandbox and, when a gateway is configured, routes it through that gateway:
+`ax` is a separate, opt-in launcher for Claude, Codex, OpenCode, and OMP. The
+legacy form enables Nono and the configured gateway; either boundary can be
+selected independently:
 
 ```bash
 ax claude
 ax codex
 ax opencode
+ax -s codex
+ax -g codex
+ax -sg omp
 ```
 
 Nothing shadows a real agent binary on `PATH`. There is no sandbox-bypass flag,
@@ -362,6 +372,7 @@ machine model is intentional.
 Example configs are in [`examples/configs`](examples/configs):
 
 - `linux-server-amd64.json`
+- `linux-workstation-amd64.json`
 - `linux-minimal-arm64.json`
 - `linux-t3-arm64.json`
 - `linux-container-amd64.json`

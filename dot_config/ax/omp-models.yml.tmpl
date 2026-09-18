@@ -1,0 +1,11 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+# Managed gateway-only model provider. ax copies this into an isolated OMP
+# agent directory; a plain `omp` launch never loads it.
+providers:
+  cliproxy:
+    baseUrl: {{ printf "%s/v1" $machine.gatewayUrl | quote }}
+    api: openai-responses
+    apiKey: OPENAI_API_KEY
+    authHeader: true
+    discovery:
+      type: proxy

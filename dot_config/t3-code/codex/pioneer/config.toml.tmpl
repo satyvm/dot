@@ -1,0 +1,11 @@
+# Use this directory as the T3 Codex instance's CODEX_HOME.
+model = "pioneer/auto"
+model_provider = "pioneer"
+model_reasoning_effort = "medium"
+
+[model_providers.pioneer]
+name = "Pioneer"
+base_url = "https://api.pioneer.ai/v1"
+env_key = "PIONEER_API_KEY"
+wire_api = "responses"
+supports_websockets = false

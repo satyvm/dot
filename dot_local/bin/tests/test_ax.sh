@@ -35,23 +35,31 @@ cat >"$CONFIG_HOME/ax/models.json" <<'JSON'
   "agents": {
     "claude": {"defaultRole": "balanced", "profile": "default-claude"},
     "codex": {"defaultRole": "balanced", "profile": "default-codex"},
-    "pi": {"defaultRole": "balanced", "profile": "default-pi"},
-    "opencode": {"defaultRole": "balanced", "profile": "default-opencode"},
-    "crush": {"defaultRole": "balanced", "profile": "default-crush"}
+    "omp": {"defaultRole": "balanced", "profile": "default-omp"},
+    "opencode": {"defaultRole": "balanced", "profile": "default-opencode"}
   },
   "classes": {
-    "claude": {"large": "frontier", "normal": "balanced", "fast": "fast", "small": "light"},
-    "crush": {"large": "balanced", "small": "light"}
+    "claude": {"large": "frontier", "normal": "balanced", "fast": "fast", "small": "light"}
   },
   "alternatives": {
     "balanced": [{"provider": "codex", "target": "candidate-not-active"}]
   },
   "minimumVersions": {
     "nono": "0.1.0", "herdr": "0.1.0", "cliproxyapi": "1.0.0",
-    "claude": "0.1.0", "codex": "0.1.0", "pi": "0.1.0", "opencode": "0.1.0", "crush": "0.1.0"
+    "claude": "0.1.0", "codex": "0.1.0", "omp": "0.1.0", "opencode": "0.1.0"
   }
 }
 JSON
+cat >"$CONFIG_HOME/ax/omp-models.yml" <<'YAML'
+providers:
+  cliproxy:
+    baseUrl: http://127.0.0.1:8317/v1
+    api: openai-responses
+    apiKey: OPENAI_API_KEY
+    authHeader: true
+    discovery:
+      type: proxy
+YAML
 cat >"$CONFIG_HOME/crush/crush.json" <<'JSON'
 {
   "providers": {
@@ -137,7 +145,7 @@ if ((${#command[@]} > 0)); then
 fi
 SH
 
-for agent in claude codex pi opencode crush; do
+for agent in claude codex omp opencode crush; do
   cat >"$FAKE_BIN/$agent" <<'SH'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "--version" ]]; then
@@ -185,11 +193,7 @@ if [[ "${1:-}" == "--version" ]]; then
   echo "herdr 99.0.0"
 elif [[ "${1:-}" == "integration" && "${2:-}" == "status" ]]; then
   printf '%s\n' "claude: current (v99)"
-  if [[ "${PI_CODING_AGENT_DIR:-}" == "$HOME/.pi/agent" ]]; then
-    printf '%s\n' "pi: current (v99)"
-  else
-    printf '%s\n' "pi: not installed"
-  fi
+  printf '%s\n' "omp: current (v99)"
   printf '%s\n' "opencode: current (v99)"
 fi
 SH
@@ -225,7 +229,7 @@ if [[ "${1:-}" == "services" ]]; then
 fi
 SH
 chmod +x "$FAKE_BIN/herdr" "$FAKE_BIN/cliproxyapi" "$FAKE_BIN/htpasswd" "$FAKE_BIN/chezmoi" "$FAKE_BIN/brew"
-for profile in default-claude default-codex default-pi default-opencode default-crush; do
+for profile in default-claude default-codex default-omp default-opencode; do
   printf '{}\n' >"$CONFIG_HOME/nono/profiles/$profile.json"
 done
 
@@ -308,46 +312,29 @@ assert_contains "$OUTPUT" "<--session> <herdr session>" "Herdr restore arguments
 OUTPUT="$(TEA_SOCKET_PATH="$FIXTURE_ROOT/tea.sock" run_ax opencode)"
 assert_contains "$OUTPUT" "<--allow-unix-socket> <$FIXTURE_ROOT/tea.sock>" "Tea socket is granted dynamically when configured"
 
-OUTPUT="$(run_ax pi --session 'path with spaces')"
-assert_contains "$OUTPUT" "agent=pi" "ax resolves the real Pi binary from PATH"
-assert_contains "$OUTPUT" "pi_agent_dir=$HOME_DIR/.pi/agent" "Pi uses its documented global agent directory"
-assert_contains "$OUTPUT" "arg[0]=<--model>" "Pi receives an explicit model default"
-assert_contains "$OUTPUT" "arg[1]=<cliproxy/balanced>" "Pi's canonical default uses clean base model"
-assert_contains "$OUTPUT" "arg[2]=<--append-system-prompt>" "Pi receives the ax session context through its system-prompt flag"
-assert_contains "$OUTPUT" "arg[3]=<# Test context layer: ax-context>" "Pi receives the ax session context contents"
-if [[ -d "$HOME_DIR/.pi/agent/sessions" ]]; then
-  pass "Pi session root exists before the sandbox starts"
+OUTPUT="$(run_ax omp --session 'path with spaces')"
+assert_contains "$OUTPUT" "agent=omp" "ax resolves the real OMP binary from PATH"
+assert_contains "$OUTPUT" "pi_agent_dir=$HOME_DIR/.cache/ax/omp-agent" "gateway launches isolate OMP's provider configuration"
+assert_contains "$OUTPUT" "<--model> <cliproxy/balanced>" "OMP receives its canonical gateway model"
+assert_contains "$OUTPUT" "<--append-system-prompt> <$CONFIG_HOME/agents/context/ax-context.md>" "OMP receives the ax context file"
+assert_contains "$OUTPUT" "<--session> <path with spaces>" "OMP arguments pass through unchanged"
+if [[ -f "$HOME_DIR/.cache/ax/omp-agent/models.yml" ]]; then
+  pass "OMP gateway config exists before the sandbox starts"
 else
-  fail "Pi session root exists before the sandbox starts" "missing: $HOME_DIR/.pi/agent/sessions"
+  fail "OMP gateway config exists before the sandbox starts" "missing isolated models.yml"
 fi
-if [[ -f "$HOME_DIR/.pi/agent/models.json" ]] && jq -e '.providers.cliproxy.models[] | select(.id == "gpt-5.6-sol")' "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
-  pass "Pi live catalog includes real Codex model names"
-else
-  fail "Pi live catalog includes real Codex model names" "missing generated Codex model"
-fi
-if jq -e '.providers.cliproxy.models[] | select(.id == "future-model(preview)")' \
-  "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
-  pass "Pi preserves parenthetical live IDs"
-else
-  fail "Pi preserves parenthetical live IDs" "missing parenthetical model"
-fi
-if jq -e '
-  .providers.cliproxy.models[] |
-  select(.id == "experimental/model") |
-  (has("contextWindow") or has("maxTokens") or has("input")) | not
-' "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
-  pass "Pi live discovery leaves unknown capability metadata to client defaults"
-else
-  fail "Pi live discovery leaves unknown capability metadata to client defaults" "live model contains guessed metadata"
-fi
-if jq -e 'all(.providers.cliproxy.models[]; .id != "unrelated-anthropic-model")' \
-  "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
-  pass "Pi live discovery filters models outside Codex and Antigravity ownership"
-else
-  fail "Pi live discovery filters models outside Codex and Antigravity ownership" "unrelated model was injected"
-fi
-assert_contains "$OUTPUT" "arg[4]=<--session>" "launch preserves the session flag"
-assert_contains "$OUTPUT" "arg[5]=<path with spaces>" "launch preserves a spaced session identifier"
+
+OUTPUT="$(run_ax --sandbox codex --resume sandbox-only)"
+assert_contains "$OUTPUT" "nono cwd=" "--sandbox enables Nono"
+assert_not_contains "$OUTPUT" "model_providers.cliproxy" "--sandbox leaves Codex on native authentication"
+
+OUTPUT="$(run_ax -g codex --resume gateway-only)"
+assert_not_contains "$OUTPUT" "nono cwd=" "--gateway does not enable Nono"
+assert_contains "$OUTPUT" "model_providers.cliproxy.wire_api=responses" "--gateway injects CLIProxyAPI"
+
+OUTPUT="$(run_ax -sg codex --resume both)"
+assert_contains "$OUTPUT" "nono cwd=" "-sg enables Nono"
+assert_contains "$OUTPUT" "model_providers.cliproxy.wire_api=responses" "-sg enables CLIProxyAPI"
 
 set +e
 OUTPUT="$(run_ax claude direct 2>&1)"
@@ -375,11 +362,8 @@ OUTPUT="$(AX_MODEL='future-model(preview)' run_ax opencode)"
 assert_contains "$OUTPUT" "<--model> <cliproxy/future-model(preview)>" "OpenCode preserves parenthetical live IDs"
 assert_contains "$OUTPUT" "opencode_parenthetical_model=true" "OpenCode synchronizes the parenthetical live ID"
 
-OUTPUT="$(AX_MODEL=gemini-3.6-flash-high run_ax pi)"
-assert_contains "$OUTPUT" "<--model> <cliproxy/gemini-3.6-flash-high>" "Pi accepts a live Antigravity model by its real name"
-
-OUTPUT="$(run_ax pi)"
-assert_contains "$OUTPUT" "arg[1]=<cliproxy/balanced>" "Pi defaults to clean base model"
+OUTPUT="$(AX_MODEL=gemini-3.6-flash-high run_ax omp)"
+assert_contains "$OUTPUT" "<--model> <cliproxy/gemini-3.6-flash-high>" "OMP accepts a live Antigravity model by its real name"
 
 OUTPUT="$(AX_MODEL=fast run_ax claude)"
 assert_contains "$OUTPUT" "arg[0]=<--model>" "Claude accepts the canonical fast role override"
@@ -398,49 +382,18 @@ STATUS=$?
 set -e
 assert_status 64 "$STATUS" "Claude rejects the raw-model escape hatch"
 
-OUTPUT="$(AX_MODEL='raw:experimental/model' run_ax pi --resume 'native id')"
-assert_contains "$OUTPUT" "<--model> <cliproxy/experimental/model>" "Pi receives an explicit raw-model override"
-assert_contains "$OUTPUT" "<--resume> <native id>" "raw-model selection preserves Pi resume arguments"
-
-OUTPUT="$(AX_MODEL='raw:experimental/model' run_ax crush --continue)"
-assert_contains "$OUTPUT" "crush_model=experimental/model" "Crush receives an explicit raw-model override"
-assert_contains "$OUTPUT" "crush_discovery=true" "Crush enables native live model discovery"
-assert_contains "$OUTPUT" "arg[0]=<--continue>" "raw-model selection preserves Crush continue arguments"
-
-OUTPUT="$(AX_MODEL='experimental/model' run_ax crush)"
-assert_contains "$OUTPUT" "crush_model=experimental/model" "Crush accepts live models by clean base name"
+OUTPUT="$(AX_MODEL='raw:experimental/model' run_ax omp --resume 'native id')"
+assert_contains "$OUTPUT" "<--model> <cliproxy/experimental/model>" "OMP receives an explicit raw-model override"
+assert_contains "$OUTPUT" "<--resume> <native id>" "raw-model selection preserves OMP resume arguments"
 
 set +e
-OUTPUT="$(AX_MODEL='gpt-5.6-sol(garbage)' run_ax pi 2>&1)"
+OUTPUT="$(AX_MODEL='gpt-5.6-sol(garbage)' run_ax omp 2>&1)"
 STATUS=$?
 set -e
 assert_status 64 "$STATUS" "malformed reasoning suffixes are not accepted through a matching base model"
 
-jq '.providers.user = {"baseUrl":"https://example.invalid/v1","models":[]}' \
-  "$HOME_DIR/.pi/agent/models.json" >"$FIXTURE_ROOT/pi-models-with-user.json"
-mv "$FIXTURE_ROOT/pi-models-with-user.json" "$HOME_DIR/.pi/agent/models.json"
-OUTPUT="$(run_ax pi)"
-if jq -e '.providers.user.baseUrl == "https://example.invalid/v1"' \
-  "$HOME_DIR/.pi/agent/models.json" >/dev/null; then
-  pass "PI model sync preserves unrelated user providers"
-else
-  fail "PI model sync preserves unrelated user providers" "user provider was overwritten"
-fi
-
-PI_MODELS_BEFORE="$(shasum -a 256 "$HOME_DIR/.pi/agent/models.json" | awk '{print $1}')"
-CURL_COUNT_FILE="$FIXTURE_ROOT/curl-count"
-printf '0\n' >"$CURL_COUNT_FILE"
-OUTPUT="$(AX_TEST_CURL_COUNT_FILE="$CURL_COUNT_FILE" AX_TEST_MALFORMED_SYNC=1 run_ax pi 2>&1)"
-PI_MODELS_AFTER="$(shasum -a 256 "$HOME_DIR/.pi/agent/models.json" | awk '{print $1}')"
-assert_contains "$OUTPUT" "PI model sync skipped" "malformed live JSON produces an actionable PI sync warning"
-if [[ "$PI_MODELS_BEFORE" == "$PI_MODELS_AFTER" ]]; then
-  pass "malformed live JSON preserves PI's existing models file atomically"
-else
-  fail "malformed live JSON preserves PI's existing models file atomically" "models.json changed"
-fi
-
 set +e
-OUTPUT="$(AX_MODEL=missing run_ax crush 2>&1)"
+OUTPUT="$(AX_MODEL=missing run_ax omp 2>&1)"
 STATUS=$?
 set -e
 assert_status 64 "$STATUS" "an unavailable canonical role fails without fallback"
@@ -489,14 +442,14 @@ assert_contains "$OUTPUT" "gateway: ready" "doctor reports gateway readiness"
 assert_contains "$OUTPUT" "models: valid" "doctor validates the registry"
 assert_contains "$OUTPUT" "agent context layers: ready" "doctor validates the essential universal context"
 
-mkdir -p "$HOME_DIR/.pi/agent/sessions/old_session" "$HOME_DIR/.cache/crush/old_cache"
+mkdir -p "$HOME_DIR/.omp/agent/sessions/old_session" "$HOME_DIR/.cache/crush/old_cache"
 OUTPUT="$(run_ax clear --dry-run)"
 assert_contains "$OUTPUT" "nono prune --dry-run" "ax clear --dry-run previews nono prune"
 assert_contains "$OUTPUT" "Would purge session contents in:" "ax clear --dry-run previews clearing session targets"
 
 OUTPUT="$(run_ax clear)"
 assert_contains "$OUTPUT" "Purged session contents in:" "ax clear purges AI agent sessions"
-if [[ ! -d "$HOME_DIR/.pi/agent/sessions/old_session" && -d "$HOME_DIR/.pi/agent/sessions" ]]; then
+if [[ ! -d "$HOME_DIR/.omp/agent/sessions/old_session" && -d "$HOME_DIR/.omp/agent/sessions" ]]; then
   pass "ax clear cleans session contents while keeping directory structures"
 else
   fail "ax clear cleans session contents while keeping directory structures" "session directory was not cleaned properly"
@@ -529,6 +482,12 @@ else
 fi
 
 OUTPUT="$(AX_PLATFORM=Linux run_ax auth setup codex)"
+assert_contains "$OUTPUT" "interactive-login=codex" "Linux workstation auth uses its configured local gateway"
+assert_contains "$OUTPUT" "brew-service=restart:cliproxyapi" "Linux workstation restarts its local gateway"
+
+REMOTE_REGISTRY="$FIXTURE_ROOT/remote-models.json"
+jq '.proxy.url = "http://cliproxyapi:8317" | .proxy.mode = "sidecar"' "$CONFIG_HOME/ax/models.json" >"$REMOTE_REGISTRY"
+OUTPUT="$(AX_REGISTRY_PATH="$REMOTE_REGISTRY" AX_PLATFORM=Linux run_ax auth setup codex)"
 assert_contains "$OUTPUT" "docker exec -it" "remote auth setup prints the Docker-host login command"
 assert_contains "$OUTPUT" "-codex-login" "remote auth setup names the requested provider login flag"
 
@@ -543,15 +502,13 @@ assert_contains "$OUTPUT" "provider authentication (antigravity): missing" "doct
 rm "$CONFIG_HOME/cli-proxy-api/codex-stale.json"
 mv "$FIXTURE_ROOT/antigravity-test.json" "$CONFIG_HOME/cli-proxy-api/antigravity-test.json"
 
-REMOTE_REGISTRY="$FIXTURE_ROOT/remote-models.json"
-jq '.proxy.url = "http://cliproxyapi:8317" | .proxy.mode = "sidecar"' "$CONFIG_HOME/ax/models.json" >"$REMOTE_REGISTRY"
 mv "$CONFIG_HOME/cli-proxy-api/antigravity-test.json" "$FIXTURE_ROOT/antigravity-remote-test.json"
 OUTPUT="$(AX_REGISTRY_PATH="$REMOTE_REGISTRY" AX_PLATFORM=Linux run_ax doctor)"
 assert_contains "$OUTPUT" "managed by the cliproxyapi sidecar" "sidecar doctor does not require locally owned provider files"
 assert_not_contains "$OUTPUT" "cliproxyapi: missing" "sidecar doctor does not demand a local cliproxyapi binary"
 mv "$FIXTURE_ROOT/antigravity-remote-test.json" "$CONFIG_HOME/cli-proxy-api/antigravity-test.json"
 
-for agent in claude codex pi opencode crush; do
+for agent in claude codex omp opencode crush; do
   shim="$SHIM_DIR/executable_$agent"
   if [[ -e "$shim" ]]; then
     fail "no managed shim shadows $agent" "shim still present: $shim"
@@ -645,9 +602,8 @@ if command -v chezmoi >/dev/null 2>&1; then
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/ax/models.json.tmpl" >"$RENDER_ROOT/models.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_codex/config.toml.tmpl" >"$RENDER_ROOT/codex.toml"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/opencode/opencode.jsonc.tmpl" >"$RENDER_ROOT/opencode.json"
-  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_pi/agent/create_settings.json.tmpl" >"$RENDER_ROOT/pi-settings.json"
-  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_pi/agent/create_private_models.json.tmpl" >"$RENDER_ROOT/pi-models.json"
-  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_pi/agent/AGENTS.md.tmpl" >"$RENDER_ROOT/pi-agents.md"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_omp/agent/APPEND_SYSTEM.md.tmpl" >"$RENDER_ROOT/omp-append-system.md"
+  HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/ax/omp-models.yml.tmpl" >"$RENDER_ROOT/omp-models.yml"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/crush/crush.json.tmpl" >"$RENDER_ROOT/crush.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_config/ai-tools/claude-mcp.json.tmpl" >"$RENDER_ROOT/claude-mcp.json"
   HOME="$HOME_DIR" chezmoi execute-template --config "$MAC_CONFIG" --source "$REPO_ROOT" <"$REPO_ROOT/dot_zed/settings.json.tmpl" >"$RENDER_ROOT/zed.json"
@@ -711,8 +667,8 @@ if command -v chezmoi >/dev/null 2>&1; then
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '/.config/agents/context/base.md"' "OpenCode loads the base context as an instruction file"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"extensions": [".go"]' "OpenCode maps Go files to gopls"
   assert_contains "$(cat "$RENDER_ROOT/opencode.json")" '"extensions": [".ts",".tsx",".js",".jsx",".mjs",".cjs",".mts",".cts"]' "OpenCode maps JavaScript and TypeScript files to vtsls"
-  assert_not_contains "$(cat "$RENDER_ROOT/pi-settings.json")" 'cliproxy' "direct Pi settings do not select the ax-only gateway"
-  assert_contains "$(cat "$RENDER_ROOT/pi-agents.md")" 'Developer Environment — Base Context' "direct Pi receives the shared system context"
+  assert_contains "$(cat "$RENDER_ROOT/omp-append-system.md")" 'Developer Environment — Base Context' "direct OMP receives the shared system context"
+  assert_contains "$(cat "$RENDER_ROOT/omp-models.yml")" 'api: openai-responses' "ax gives OMP a Responses-compatible gateway provider"
   assert_not_contains "$(cat "$RENDER_ROOT/crush.json")" 'cliproxy' "direct Crush config does not select or define the ax-only gateway"
   assert_contains "$(cat "$RENDER_ROOT/crush.json")" '/.config/agents/context/base.md"' "Crush loads the base context through context_paths"
   assert_contains "$(cat "$RENDER_ROOT/claude-mcp.json")" '"@upstash/context7-mcp@2.1.1"' "local Claude MCP uses the supported Context7 server"
@@ -722,8 +678,7 @@ if command -v chezmoi >/dev/null 2>&1; then
   else
     fail "rendered AI platform setup script parses" "invalid shell syntax"
   fi
-  assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" "PI_CODING_AGENT_DIR=\"\$HOME/.pi/agent\" herdr integration install \"\$agent\"" "Herdr installs Pi integration in Pi's documented agent directory"
-  assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" 'del(.defaultProvider, .defaultModel)' "setup removes legacy direct-Pi gateway defaults"
+  assert_contains "$(cat "$RENDER_ROOT/setup-ai-agent-platform.sh")" 'for agent in claude omp opencode' "Herdr installs integrations for the supported direct agents"
   if bash -n "$RENDER_ROOT/sync-nono-packs.sh"; then
     pass "rendered Nono pack synchronization script parses"
   else
@@ -731,7 +686,7 @@ if command -v chezmoi >/dev/null 2>&1; then
   fi
   NONO_PACK_SCRIPT="$(cat "$RENDER_ROOT/sync-nono-packs.sh")"
   assert_contains "$NONO_PACK_SCRIPT" "nolabs-ai/claude" "Nono sync installs the Claude pack from the nolabs-ai namespace"
-  assert_contains "$NONO_PACK_SCRIPT" "nolabs-ai/pi" "Nono sync installs the Pi pack from the nolabs-ai namespace"
+  assert_contains "$NONO_PACK_SCRIPT" "nolabs-ai/omp" "Nono sync installs the OMP pack from the nolabs-ai namespace"
   assert_contains "$NONO_PACK_SCRIPT" "nolabs-ai/codex" "Nono sync installs the Codex pack from the nolabs-ai namespace"
   assert_contains "$NONO_PACK_SCRIPT" "nolabs-ai/opencode" "Nono sync installs the OpenCode pack from the nolabs-ai namespace"
   assert_contains "$NONO_PACK_SCRIPT" "retired_packs=(" "Nono sync declares a retired-pack list"
@@ -776,7 +731,15 @@ else
 fi
 
 if command -v nono >/dev/null 2>&1; then
+  omp_pack_installed=false
+  if nono list --installed 2>/dev/null | grep -qF $'nolabs-ai/omp\t'; then
+    omp_pack_installed=true
+  fi
   for profile_path in "$REPO_ROOT"/dot_config/nono/profiles/*.json; do
+    if [[ "$(basename "$profile_path")" == "default-omp.json" && "$omp_pack_installed" == false ]]; then
+      printf '# skip - nolabs-ai/omp is installed by chezmoi apply before effective validation\n'
+      continue
+    fi
     if nono profile validate "$profile_path" >/dev/null 2>&1; then
       pass "$(basename "$profile_path") passes nono profile validate"
     else
@@ -804,7 +767,7 @@ if command -v nono >/dev/null 2>&1; then
   # before the agent ever starts. macOS misses this: Homebrew's prefix is
   # already covered by the official packs.
   npm_bin_missing=""
-  for profile_path in "$REPO_ROOT"/dot_config/nono/profiles/default-{agent,claude,codex,opencode,pi}.json; do
+  for profile_path in "$REPO_ROOT"/dot_config/nono/profiles/default-{agent,claude,codex,opencode,omp}.json; do
     jq -e '[.filesystem.read[] | if type == "object" then .path else . end] |
       index("$HOME/.npm-global/bin")' "$profile_path" >/dev/null ||
       npm_bin_missing="$npm_bin_missing $(basename "$profile_path")"
@@ -825,16 +788,16 @@ if command -v nono >/dev/null 2>&1; then
     fail "Codex is a thin ax overlay on the nolabs-ai pack" "$(cat "$REPO_ROOT/dot_config/nono/profiles/default-codex.json")"
   fi
   if jq -e '
-    .extends == "nolabs-ai/pi" and .security.capability_elevation == false
-  ' "$REPO_ROOT/dot_config/nono/profiles/default-pi.json" >/dev/null &&
+    .extends == "nolabs-ai/omp" and .security.capability_elevation == false
+  ' "$REPO_ROOT/dot_config/nono/profiles/default-omp.json" >/dev/null &&
     jq -e '
       .extends == "nolabs-ai/opencode" and .security.capability_elevation == false
     ' "$REPO_ROOT/dot_config/nono/profiles/default-opencode.json" >/dev/null; then
-    pass "Pi and OpenCode inherit their official packs without interactive elevation"
+    pass "OMP and OpenCode inherit their official packs without interactive elevation"
   else
-    fail "Pi and OpenCode inherit their official packs without interactive elevation" "official pack inheritance is missing"
+    fail "OMP and OpenCode inherit their official packs without interactive elevation" "official pack inheritance is missing"
   fi
-  for profile in default-claude default-codex default-crush default-opencode default-pi; do
+  for profile in default-claude default-codex default-crush default-opencode default-omp; do
     profile_path="$REPO_ROOT/dot_config/nono/profiles/$profile.json"
     if jq -e '
       .security.signal_mode == "isolated" and
@@ -880,7 +843,7 @@ import os
 from pathlib import PurePosixPath
 
 root = os.environ["REPO_ROOT"]
-profile_names = ["default-agent", "default-claude", "default-crush", "default-opencode", "default-pi"]
+profile_names = ["default-agent", "default-claude", "default-crush", "default-opencode", "default-omp"]
 profiles = {}
 for name in profile_names:
     path = os.path.join(root, "dot_config", "nono", "profiles", f"{name}.json")
@@ -927,14 +890,18 @@ PY
   assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.config/agents/context/ax-context.md\"" "effective policy grants read-only session context access"
   assert_contains "$EFFECTIVE_PROFILE" "\"\$HOME/.npm/_cacache\"" "effective policy permits npm package cache writes"
   assert_contains "$EFFECTIVE_PROFILE" '8317' "effective policy permits the local CLIProxy port"
-  PI_EFFECTIVE="$(nono profile show "$REPO_ROOT/dot_config/nono/profiles/default-pi.json" --json)"
-  if jq -e '
-    (.filesystem.allow | index("$HOME/.pi")) != null and
-    .security.capability_elevation == false
-  ' <<<"$PI_EFFECTIVE" >/dev/null; then
-    pass "Pi inherits complete client state access from the official pack"
+  if [[ "$omp_pack_installed" == true ]]; then
+    OMP_EFFECTIVE="$(nono profile show "$REPO_ROOT/dot_config/nono/profiles/default-omp.json" --json)"
+    if jq -e '
+      (.filesystem.allow | index("$HOME/.omp")) != null and
+      .security.capability_elevation == false
+    ' <<<"$OMP_EFFECTIVE" >/dev/null; then
+      pass "OMP inherits complete client state access from the official pack"
+    else
+      fail "OMP inherits complete client state access from the official pack" "$OMP_EFFECTIVE"
+    fi
   else
-    fail "Pi inherits complete client state access from the official pack" "$PI_EFFECTIVE"
+    printf '# skip - effective OMP policy requires the nolabs-ai/omp pack\n'
   fi
   CLAUDE_EFFECTIVE="$(nono profile show "$REPO_ROOT/dot_config/nono/profiles/default-claude.json" --json)"
   if jq -e '

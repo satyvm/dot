@@ -150,6 +150,10 @@ for os in darwin linux; do
         assert_has "$managed" ".config/agents/context/ax-context.md" "$case_name deploys the ax session context layer"
         assert_has "$managed" ".claude/CLAUDE.md" "$case_name gives Claude its native global context"
         assert_has "$managed" ".codex/AGENTS.md" "$case_name gives Codex its native global context"
+        assert_has "$managed" ".kimi/AGENTS.md" "$case_name gives Kimi its native global context"
+        assert_has "$managed" ".grok/AGENTS.md" "$case_name gives Grok its native global context"
+        assert_has "$managed" ".gemini/GEMINI.md" "$case_name gives Antigravity its native global context"
+        assert_has "$managed" ".cursor/rules/environment.mdc" "$case_name gives Cursor an always-applied user rule"
         assert_has "$managed" ".config/nono/profiles/default-codex.json" "$case_name ships the Codex sandbox profile"
       else
         assert_lacks "$managed" "setup-ai-agent-platform.sh" "$case_name disables AI"
@@ -158,7 +162,7 @@ for os in darwin linux; do
       fi
 
       # The shims are gone: nothing may shadow a real agent binary on PATH.
-      for shimmed in claude codex pi opencode crush; do
+      for shimmed in claude codex omp opencode crush; do
         assert_lacks "$managed" ".local/bin/$shimmed" "$case_name does not shadow the real $shimmed binary"
       done
 
@@ -345,41 +349,17 @@ else
   fail "developer tools render a published cargo-clean-all release"
 fi
 
-pi_home="$fixture_root/pi-home"
-mkdir -p "$pi_home/.pi/agent"
-HOME="$pi_home" chezmoi apply \
-  --config "$mac_config" \
-  --config-format json \
-  --source "$repo_root" \
-  --destination "$pi_home" \
-  --cache "$host_cache" \
-  --exclude=externals \
-  --refresh-externals=never \
-  "$pi_home/.pi/agent/models.json" \
-  "$pi_home/.pi/agent/settings.json"
-jq '.providers.cliproxy.models += [{"id":"pi-live","name":"Pi Live","reasoning":true}]' \
-  "$pi_home/.pi/agent/models.json" >"$pi_home/.pi/agent/models.json.tmp"
-mv "$pi_home/.pi/agent/models.json.tmp" "$pi_home/.pi/agent/models.json"
-jq '.lastChangelogVersion = "test"' \
-  "$pi_home/.pi/agent/settings.json" >"$pi_home/.pi/agent/settings.json.tmp"
-mv "$pi_home/.pi/agent/settings.json.tmp" "$pi_home/.pi/agent/settings.json"
-chmod 0600 "$pi_home/.pi/agent/models.json"
-pi_drift="$(
-  HOME="$pi_home" chezmoi diff \
-    --config "$mac_config" \
-    --config-format json \
-    --source "$repo_root" \
-    --destination "$pi_home" \
-    --cache "$host_cache" \
-    --exclude=externals \
-    --refresh-externals=never \
-    "$pi_home/.pi/agent/models.json" \
-    "$pi_home/.pi/agent/settings.json"
-)"
-if [[ -z "$pi_drift" ]]; then
-  pass "Pi-owned runtime state does not drift after Chezmoi seeds it"
+if grep -qF 'npm install --global "@oh-my-pi/pi-coding-agent@18.2.2"' <<<"$linux_developer"; then
+  pass "Linux installs the pinned Oh My Pi replacement"
 else
-  fail "Pi-owned runtime state does not drift after Chezmoi seeds it" "$pi_drift"
+  fail "Linux installs the pinned Oh My Pi replacement" "$linux_developer"
+fi
+native_ai="$(render_template "$linux_config" run_onchange_after_install-ai-native-tools.sh.tmpl)"
+if grep -qF 'https://cursor.com/install' <<<"$native_ai" &&
+   grep -qF 'https://antigravity.google/cli/install.sh' <<<"$native_ai"; then
+  pass "AI native installer renders Cursor and Antigravity from canonical inventory"
+else
+  fail "AI native installer renders Cursor and Antigravity from canonical inventory" "$native_ai"
 fi
 
 t3_config="$fixture_root/t3.json"

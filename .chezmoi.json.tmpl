@@ -8,6 +8,7 @@
 {{- end -}}
 
 {{- $distro := "macos" -}}
+{{- $isWsl := false -}}
 {{- if eq $os "linux" -}}
   {{- $distro = "unknown" -}}
   {{- if stat "/etc/os-release" -}}
@@ -16,10 +17,14 @@
   {{- if not (has $distro (list "debian" "ubuntu")) -}}
     {{- fail (printf "unsupported Linux distribution %q; only Debian and Ubuntu are supported" $distro) -}}
   {{- end -}}
+  {{- if stat "/proc/sys/kernel/osrelease" -}}
+    {{- $kernelRelease := output "sh" "-c" "cat /proc/sys/kernel/osrelease 2>/dev/null || true" | lower -}}
+    {{- $isWsl = contains "microsoft" $kernelRelease -}}
+  {{- end -}}
 {{- end -}}
 
 {{- $presetDefault := "server" -}}
-{{- if eq $os "darwin" }}{{ $presetDefault = "workstation" }}{{ end -}}
+{{- if or (eq $os "darwin") $isWsl }}{{ $presetDefault = "workstation" }}{{ end -}}
 {{- $preset := promptChoice "Machine preset" (list "minimal" "workstation" "server" "container" "t3") $presetDefault -}}
 {{- $customize := promptBool "Customize preset features" false -}}
 
