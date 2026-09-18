@@ -90,6 +90,11 @@ Only base tooling changes need an image rebuild.
 docker compose --profile gateway up -d
 ```
 
+In Coolify, set `COMPOSE_PROFILES=gateway` on the Compose application to make
+the same opt-in profile start during deploy. Without it, plain agents and
+`ax --sandbox` still work, but gateway launches intentionally have no service
+to contact.
+
 Direct agent commands never touch it. `ax <agent>` keeps the compatibility
 default of Nono plus gateway; the boundaries can also be selected separately:
 
