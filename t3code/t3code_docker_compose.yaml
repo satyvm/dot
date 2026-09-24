@@ -13,6 +13,10 @@ services:
       TS_AUTHKEY: ${TS_AUTHKEY:?}
       TS_STATE_DIR: /var/lib/tailscale
       TS_USERSPACE: "true"
+      # Outbound tailnet traffic in userspace mode must use a proxy. The
+      # OpenSSH sends Docker-context traffic through this listener. The remote
+      # Docker daemon never needs a public TCP API port.
+      TS_SOCKS5_SERVER: 127.0.0.1:1055
       # Docker's embedded resolver at 127.0.0.11 must keep serving Compose
       # service names such as `cliproxyapi`. Accepting tailnet DNS would
       # overwrite /etc/resolv.conf in this shared namespace and break that.

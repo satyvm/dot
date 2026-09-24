@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>T3 Code · Docker architecture and builder decision</title>
+<style>
+  :root{color-scheme:light;--paper:#f1f3f2;--ink:#17201c;--muted:#465850;--line:#b9c5bd;--blue:#1c5d78;--orange:#d2552d;--white:#fff}
+  *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 'IBM Plex Sans',system-ui,sans-serif}
+  main{max-width:1360px;margin:auto;padding:48px 32px 80px}header{max-width:950px;margin-bottom:42px}
+  .eyebrow{font:700 12px/1.4 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--blue)}
+  h1,h2{font-family:'Source Serif 4',Georgia,serif;letter-spacing:-.035em;line-height:1.09}h1{font-size:clamp(42px,5vw,68px);margin:12px 0 18px}h2{font-size:36px;margin:0 0 16px}
+  p{margin:0 0 16px}.lead{font-size:20px;line-height:1.5;max-width:850px;color:var(--muted)}
+  section{margin:52px 0}.figure{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:20px;overflow:auto}
+  svg{display:block;width:100%;min-width:900px;height:auto}svg text{font-family:'IBM Plex Sans',system-ui,sans-serif;fill:var(--ink)}
+  svg .label{font-size:19px;font-weight:700}svg .small{font-size:14px;fill:var(--muted)}svg .tiny{font-size:12px;font-family:'IBM Plex Mono',monospace;fill:var(--muted)}
+  svg .boundary{fill:#f7f9f7;stroke:var(--line);stroke-width:2}svg .node{fill:var(--white);stroke:var(--line);stroke-width:2}svg .selected{stroke:var(--blue);stroke-width:2.5}svg .warning{stroke:var(--orange);stroke-width:2.5}
+  svg .edge{fill:none;stroke:var(--blue);stroke-width:2.5;marker-end:url(#arrow)}svg .edge-dashed{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:7 6;marker-end:url(#arrowMuted)}
+  figcaption{margin-top:14px;color:var(--muted);font-size:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+  .card{background:white;border:1px solid var(--line);border-radius:8px;padding:20px}.card h3{margin:0 0 8px;font-size:18px}.card p{margin:0;color:var(--muted)}
+  table{border-collapse:collapse;width:100%;background:white;font-size:15px}th,td{text-align:left;vertical-align:top;padding:13px 15px;border-bottom:1px solid var(--line)}th{background:#e4ebe6}code{font-family:'IBM Plex Mono',monospace;font-size:.9em;overflow-wrap:anywhere}
+  .note{border-left:4px solid var(--orange);padding:16px 20px;background:#fff7f3}.note p:last-child{margin:0}
+  a{color:var(--blue)}@media(max-width:700px){main{padding:28px 16px 60px}.figure{padding:10px}h2{font-size:30px}}
+</style>
+</head>
+<body><main>
+<header><div class="eyebrow">T3 Code / architecture decision / 2026-09-24</div><h1>Keep Docker off the Coolify host</h1><p class="lead">T3 Code runs on an Oracle-hosted Coolify stack. Its agents need build-and-test capacity, but granting the production host's Docker socket would also grant control over production containers. The chosen path is a native Docker SSH context to a dedicated builder, carried through the Tailscale sidecar's SOCKS5 proxy.</p></header>
+
+<section aria-labelledby="current"><h2 id="current">01 — Current repository stack</h2><p>The T3 application and Tailscale sidecar share one network namespace. T3 serves the browser UI through Tailscale Serve; the Coolify host publishes only the sidecar's UDP transport. There is deliberately no Docker daemon or host socket inside T3.</p>
+<figure class="figure"><svg viewBox="0 0 1280 650" role="img" aria-labelledby="current-title current-desc"><title id="current-title">Current T3 Code stack on Coolify</title><desc id="current-desc">A client enters via a Tailscale sidecar. T3 Code shares its network namespace and accesses a host workspace, persistent volumes, an optional model gateway, and a tea socket. It has no path to the Coolify Docker daemon.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#1c5d78"/></marker><marker id="arrowMuted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#465850"/></marker></defs>
+<rect class="boundary" x="355" y="65" width="875" height="525" rx="20"/><text class="tiny" x="382" y="98">ORACLE VM · COOLIFY COMPOSE</text>
+<!-- Connectors are painted above zones and below nodes. -->
+<path class="edge" d="M245 180H390"/><path class="edge" d="M605 180H660"/><path class="edge" d="M875 230V300"/><path class="edge" d="M875 420V465"/><path class="edge-dashed" d="M740 370H610"/><path class="edge-dashed" d="M1010 370H1070"/>
+<rect class="node" x="50" y="130" width="195" height="100" rx="10"/><text class="label" x="75" y="169">T3 client</text><text class="small" x="75" y="198">tailnet HTTPS</text>
+<rect class="node selected" x="390" y="125" width="215" height="110" rx="10"/><text class="label" x="414" y="160">Tailscale</text><text class="small" x="414" y="187">Serve → :3773</text><text class="tiny" x="414" y="211">tag:t3 · UDP 41642</text>
+<rect class="node selected" x="660" y="125" width="430" height="110" rx="10"/><text class="label" x="684" y="161">t3code container</text><text class="small" x="684" y="188">T3 server · sshd · agents · chezmoi</text><text class="tiny" x="684" y="213">network_mode: service:tailscale</text>
+<rect class="node" x="740" y="300" width="270" height="120" rx="10"/><text class="label" x="764" y="336">Persistent state</text><text class="small" x="764" y="364">t3-home · t3-state</text><text class="small" x="764" y="391">npm · Linuxbrew · SSH keys</text>
+<rect class="node" x="400" y="320" width="210" height="100" rx="10"/><text class="label" x="424" y="355">Workspace</text><text class="small" x="424" y="385">/home/ubuntu/dev</text>
+<rect class="node" x="1070" y="320" width="130" height="100" rx="10"/><text class="label" x="1085" y="355">Sidecars</text><text class="small" x="1085" y="382">gateway / tea</text>
+<rect class="node warning" x="690" y="465" width="370" height="85" rx="10"/><text class="label" x="714" y="500">No host Docker socket</text><text class="small" x="714" y="526">production boundary stays closed</text>
+</svg><figcaption>Current state is defined by <code>t3code_docker_compose.yaml</code>, <code>Dockerfile</code>, the entrypoint, and the <code>t3</code> chezmoi preset. The optional gateway is only started with the Compose profile.</figcaption></figure></section>
+
+<section aria-labelledby="choice"><h2 id="choice">02 — Design comparison</h2><table><thead><tr><th>Design</th><th>Strength</th><th>Long-term cost / risk</th><th>Decision</th></tr></thead><tbody>
+<tr><td>Mount Coolify host <code>docker.sock</code></td><td>Fastest to start</td><td>Agent gains root-equivalent control of the production host and live sites</td><td>Reject</td></tr>
+<tr><td>Docker-in-Docker inside T3</td><td>Self-contained</td><td>Privileged daemon, nested storage, resource contention, difficult persistence</td><td>Reject</td></tr>
+<tr><td>Raw Docker TCP API over tailnet</td><td>Simple client URL</td><td>Another sensitive daemon listener and TLS/auth lifecycle to maintain</td><td>Reject</td></tr>
+<tr><td>Custom SSH/sync wrapper</td><td>Can hide remote path details</td><td>Extra CLI semantics, drift from Docker tooling, opaque sync behavior</td><td>Reject</td></tr>
+<tr><td>Native Docker SSH context via SOCKS5</td><td>Standard Docker/Compose commands; explicit target; no daemon TCP port</td><td>Requires SSH key and careful handling of remote bind mounts</td><td>Choose</td></tr>
+<tr><td>Local workstation / home mini-PC builder</td><td>Potentially lowest recurring cloud cost</td><td>Power, availability, upload speed, physical maintenance</td><td>Viable builder host</td></tr>
+</tbody></table></section>
+
+<section aria-labelledby="target"><h2 id="target">03 — Chosen extension</h2><p>T3 stays on Oracle. A separate persistent VM owns Docker Engine, build cache, containers, and test volumes. Only OpenSSH is reachable from <code>tag:t3</code> over the tailnet; the Docker API itself remains on the builder's Unix socket.</p>
+<figure class="figure"><svg viewBox="0 0 1280 560" role="img" aria-labelledby="target-title target-desc"><title id="target-title">Native Docker context through Tailscale SOCKS5</title><desc id="target-desc">An agent calls docker with an explicit t3-builder context. Docker CLI uses SSH ProxyCommand to connect to a Tailscale SOCKS5 listener. A tailnet grant permits TCP 22 to a dedicated builder VM, whose SSH user invokes its local Docker Unix socket.</desc>
+<defs><marker id="target-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#1c5d78"/></marker></defs>
+<rect class="boundary" x="30" y="80" width="820" height="350" rx="20"/><text class="tiny" x="54" y="113">EXISTING T3 / ORACLE · SHARED NETWORK NAMESPACE</text>
+<rect class="boundary" x="860" y="80" width="390" height="350" rx="20"/><text class="tiny" x="884" y="113">SEPARATE BUILDER VM</text>
+<!-- Connectors are painted above zones and below nodes. -->
+<path class="edge" style="marker-end:url(#target-arrow)" d="M285 260H335"/><path class="edge" style="marker-end:url(#target-arrow)" d="M555 260H605"/><path class="edge" style="marker-end:url(#target-arrow)" d="M825 260H875"/><path class="edge" style="marker-end:url(#target-arrow)" d="M1085 260H1125"/>
+<rect class="node selected" x="70" y="195" width="215" height="130" rx="10"/><text class="label" x="92" y="232">Agent task</text><text class="small" x="92" y="261">docker --context</text><text class="small" x="92" y="286">t3-builder compose</text>
+<rect class="node selected" x="335" y="195" width="220" height="130" rx="10"/><text class="label" x="357" y="232">Docker CLI</text><text class="small" x="357" y="261">ssh://t3-builder</text><text class="tiny" x="357" y="287">ProxyCommand nc -X 5</text>
+<rect class="node selected" x="605" y="195" width="220" height="130" rx="10"/><text class="label" x="627" y="232">Tailscale SOCKS5</text><text class="small" x="627" y="261">127.0.0.1:1055</text><text class="tiny" x="627" y="287">tag:t3</text>
+<rect class="node selected" x="875" y="195" width="210" height="130" rx="10"/><text class="label" x="897" y="232">OpenSSH</text><text class="small" x="897" y="261">docker-builder user</text><text class="tiny" x="897" y="287">tailnet TCP 22 only</text>
+<rect class="node selected" x="1125" y="195" width="100" height="130" rx="10"/><text class="label" x="1140" y="232">Docker</text><text class="small" x="1140" y="261">Engine</text><text class="tiny" x="1140" y="287">socket</text>
+<rect x="90" y="365" width="705" height="38" rx="6" fill="#e8f0f3"/><text class="tiny" x="111" y="390">Tailscale grant: tag:t3 → tag:docker-builder / tcp:22</text>
+<text class="small" x="70" y="490">Build context travels from T3 to Docker Engine.</text><text class="small" x="70" y="520">Bind mounts and published ports live on the builder VM.</text>
+</svg><figcaption>The default Docker context is never changed. Explicit <code>--context t3-builder</code> keeps ordinary commands from accidentally targeting the remote daemon.</figcaption></figure></section>
+
+<section aria-labelledby="contract"><h2 id="contract">04 — Operational contract</h2><div class="grid"><div class="card"><h3>What persists where</h3><p>T3 keeps agent state, SSH identity, Docker context metadata, and source checkout in its home/workspace volumes. The builder keeps image layers, build cache, test containers, and named volumes.</p></div><div class="card"><h3>How a build works</h3><p>Compose reads the project on T3 and sends the build context over SSH. A build can therefore use local uncommitted changes without a sync wrapper.</p></div><div class="card"><h3>How a run works</h3><p>Bind-mount host paths and published ports resolve on the builder. Use named volumes or a checkout on the builder for bind-heavy integration tests.</p></div><div class="card"><h3>Security boundary</h3><p>Docker group membership is root-equivalent on the builder. Isolate it from production, restrict the tailnet grant to TCP 22, and never publish Docker's daemon API.</p></div></div></section>
+<section><div class="note"><p><strong>Implementation status.</strong> Repository changes provide the SOCKS5 listener, Docker CLI/Compose, and a managed Compose plugin link. The VM, tailnet policy, SSH key enrollment, and Docker context require the operator steps in <a href="README.md#isolated-docker-builder">README.md → Isolated Docker builder</a>. Nothing here creates an external VM or alters your tailnet automatically.</p></div></section>
+</main></body></html>

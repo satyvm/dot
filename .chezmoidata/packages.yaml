@@ -281,16 +281,26 @@ packages:
       feature: developer
       providers:
         brew: { darwin: commitizen, linux: commitizen }
+    # Keep the Linux daemon separate from portable clients. The image-provisioned
+    # T3 container skips apt but uses the Brew clients with a remote context.
+    - id: docker-engine
+      feature: developer
+      os: [linux]
+      providers:
+        apt: docker.io
     - id: docker-cli
       feature: developer
       providers:
-        brew: { darwin: docker }
-        apt: docker.io
+        brew: { darwin: docker, linux: docker }
     - id: docker-compose
       feature: developer
       providers:
-        brew: { darwin: docker-compose }
-        apt: docker-compose
+        brew: { darwin: docker-compose, linux: docker-compose }
+    - id: netcat-openbsd
+      feature: developer
+      os: [linux]
+      providers:
+        apt: netcat-openbsd
     - id: colima
       feature: developer
       os: [darwin]
