@@ -31,6 +31,7 @@ RUN apt-get update \
       jq \
       locales \
       make \
+      netcat-openbsd \
       openssh-server \
       pkg-config \
       procps \
