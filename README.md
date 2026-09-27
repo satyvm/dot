@@ -242,12 +242,10 @@ stored in this repository.
 
 - Discord, Telegram, Notion Calendar, Zotero, DockDoor, VeraCrypt, Google
   Drive, Proton VPN, Handy, Zen, and Google Gemini;
-- Zed, Antigravity IDE, Alacritty, Yaak, UTM, OnyX, and BasicTeX.
+- Zed, Antigravity IDE, Yaak, UTM, OnyX, and BasicTeX.
 
-Alacritty is built from its pinned upstream source and installed to
-`~/Applications/Alacritty.app`. Its Homebrew cask is disabled because it fails
-the macOS Gatekeeper check. The source build requires Xcode Command Line Tools
-and may take several minutes on first apply.
+Alacritty's configuration remains managed for existing installations, but its
+Homebrew cask is disabled because it fails the macOS Gatekeeper check.
 
 Mac App Store applications are intentionally not installed during an automatic
 apply. Install the selected App Store apps later with:
