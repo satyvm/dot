@@ -320,6 +320,7 @@ packages:
         installScript:
           command: omp
           url: https://omp.sh/install
+          args: ["--binary", "--ref", "v18.2.2"]
     - id: crush
       feature: ai
       providers:
@@ -347,11 +348,11 @@ packages:
     - id: kimi-code
       feature: ai
       providers:
-        npm: { name: "@moonshot-ai/kimi-code" }
+        npm: { name: "@moonshot-ai/kimi-code", version: "2.1.1" }
     - id: grok-cli
       feature: ai
       providers:
-        npm: { name: "@xai-official/grok" }
+        npm: { name: "@xai-official/grok", version: "1.0.41" }
     - id: cursor-agent
       feature: ai
       providers:

@@ -42,7 +42,8 @@ restore() {
       mv "$dest" "$backup_dest"
     elif [[ -e "$dest" ]] && [[ "$merge_only" == "true" ]]; then
       local contents
-      contents=$(ls -A "$dest" 2>/dev/null | grep -vE '^\.DS_Store$|^\.localized$' || true)
+      contents=$(find "$dest" -mindepth 1 -maxdepth 1 \
+        ! -name '.DS_Store' ! -name '.localized' -print -quit)
       if [[ -n "$contents" ]]; then
         echo "   ⚠️  Directory $dest is not empty. Skipping restore."
         return 0
@@ -62,7 +63,10 @@ restore() {
 # ── 1. Zen Browser ──────────────────────────────────────────────────
 restore "Zen Browser" "zen" "$HOME/Library/Application Support/zen"
 
-# ── 2. Helium Browser ───────────────────────────────────────────────
+# ── 2. Google Chrome ────────────────────────────────────────────────
+restore "Google Chrome" "chrome" "$HOME/Library/Application Support/Google/Chrome"
+
+# ── 3. Helium Browser ───────────────────────────────────────────────
 restore "Helium Browser" "helium" "$HOME/Library/Application Support/net.imput.helium"
 
 # ── 4. Gemini / Antigravity ─────────────────────────────────────────

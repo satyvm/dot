@@ -64,7 +64,12 @@ backup "Zen Browser" \
   "$HOME/Library/Application Support/zen" \
   "zen"
 
-# ── 2. Helium Browser ───────────────────────────────────────────────
+# ── 2. Google Chrome ────────────────────────────────────────────────
+backup "Google Chrome" \
+  "$HOME/Library/Application Support/Google/Chrome" \
+  "chrome"
+
+# ── 3. Helium Browser ───────────────────────────────────────────────
 # Check both known paths
 HELIUM_PATH=""
 for candidate in \

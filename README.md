@@ -8,6 +8,9 @@ Personal dotfiles managed with [Chezmoi](https://www.chezmoi.io/) for:
 
 ## Install or update from anywhere
 
+For a Mac erase and restore, follow the [backup and restore guide](backup/README.md)
+before using the bootstrap command below.
+
 Run this one Bash command from any directory:
 
 ```bash
