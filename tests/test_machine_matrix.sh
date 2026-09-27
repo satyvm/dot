@@ -175,12 +175,15 @@ for os in darwin linux; do
       if [[ "$os" == "darwin" && "$preset" == "minimal" ]]; then
         assert_has "$managed" ".config/ghostty/config.ghostty" "$case_name includes minimum GUI config"
         assert_lacks "$managed" ".config/alacritty/alacritty.toml" "$case_name excludes all-tier GUI config"
+        assert_lacks "$managed" "install-macos-source-apps.sh" "$case_name skips all-tier source apps"
       elif [[ "$os" == "darwin" && "$preset" == "workstation" ]]; then
         assert_has "$managed" ".config/ghostty/config.ghostty" "$case_name includes minimum GUI config"
         assert_has "$managed" ".config/alacritty/alacritty.toml" "$case_name includes all-tier GUI config"
+        assert_has "$managed" "install-macos-source-apps.sh" "$case_name builds all-tier source apps"
       else
         assert_lacks "$managed" ".config/ghostty/config.ghostty" "$case_name excludes GUI config"
         assert_lacks "$managed" ".config/alacritty/alacritty.toml" "$case_name excludes all-tier GUI config"
+        assert_lacks "$managed" "install-macos-source-apps.sh" "$case_name skips macOS source apps"
       fi
 
       if [[ "$os" == "linux" && "$preset" == "server" ]]; then
@@ -297,6 +300,7 @@ mac_config="$fixture_root/mac-workstation.json"
 make_config "$mac_config" workstation darwin arm64
 mac_brew="$(render_template "$mac_config" run_onchange_before_install-homebrew-packages.sh.tmpl)"
 mac_developer="$(render_template "$mac_config" run_onchange_after_install-developer-tools.sh.tmpl)"
+mac_source_apps="$(render_template "$mac_config" run_onchange_after_install-macos-source-apps.sh.tmpl)"
 mac_apps="$(render_template "$mac_config" dot_local/bin/executable_dotfiles-macos-apps.tmpl)"
 if grep -q '^brew "git"$' <<<"$mac_brew"; then
   pass "macOS renders Git through Brew"
@@ -307,6 +311,18 @@ if grep -q '^cask "ghostty"$' <<<"$mac_brew"; then
   pass "macOS workstation renders GUI casks"
 else
   fail "macOS workstation renders GUI casks"
+fi
+if grep -q '^cask "alacritty"$' <<<"$mac_brew"; then
+  fail "macOS workstation skips the disabled Alacritty cask"
+else
+  pass "macOS workstation skips the disabled Alacritty cask"
+fi
+if grep -q '^brew "scdoc"$' <<<"$mac_brew" &&
+   grep -q 'install_source_app "alacritty" "https://github.com/alacritty/alacritty.git" "0.17.0" "94e7c8874e526b1e67b349d9ba30ddf81669119e" "app" "target/release/osx/Alacritty.app" "Alacritty.app"' <<<"$mac_source_apps" &&
+   bash -n <<<"$mac_source_apps"; then
+  pass "macOS builds pinned Alacritty from source with its required tool"
+else
+  fail "macOS builds pinned Alacritty from source with its required tool"
 fi
 if grep -q '^cask "tailscale-app"$' <<<"$mac_brew"; then
   pass "macOS workstation installs standalone Tailscale"
@@ -487,6 +503,7 @@ if jq -e '
     all((.os? // ["darwin", "linux"])[]; IN("darwin", "linux")) and
     all((.arch? // ["amd64", "arm64"])[]; IN("amd64", "arm64")) and
     ((.providers.cask? // {}) | keys | all(.[]; IN("darwin")))
+    and ((.providers | has("sourceApp") | not) or (.os == ["darwin"]))
   )
 ' <<<"$inventory" >/dev/null; then
   pass "package platform and architecture constraints are supported"
@@ -508,6 +525,21 @@ if jq -e '
   pass "secondary package providers use explicit versions"
 else
   fail "secondary package providers use explicit versions"
+fi
+if jq -e '
+  all(
+    .packages.inventory[] | .providers.sourceApp? // empty;
+    (.url | type == "string" and length > 0) and
+    (.version | type == "string" and length > 0) and
+    (.commit | test("^[0-9a-f]{40}$")) and
+    (.target | type == "string" and length > 0) and
+    (.artifact | type == "string" and length > 0) and
+    (.app | type == "string" and endswith(".app"))
+  )
+' <<<"$inventory" >/dev/null; then
+  pass "source app providers pin a version and commit"
+else
+  fail "source app providers pin a version and commit"
 fi
 if jq -e '
   all(

@@ -505,7 +505,14 @@ packages:
     - id: alacritty
       feature: gui-all
       os: [darwin]
-      providers: { cask: { darwin: alacritty } }
+      providers:
+        sourceApp:
+          url: https://github.com/alacritty/alacritty.git
+          version: "0.17.0"
+          commit: 94e7c8874e526b1e67b349d9ba30ddf81669119e
+          target: app
+          artifact: target/release/osx/Alacritty.app
+          app: Alacritty.app
     - id: yaak
       feature: gui-all
       os: [darwin]
@@ -522,6 +529,10 @@ packages:
       feature: gui-all
       os: [darwin]
       providers: { cask: { darwin: basictex } }
+    - id: scdoc
+      feature: gui-all
+      os: [darwin]
+      providers: { brew: { darwin: scdoc } }
 
     # Linux hardening services.
     - id: ufw

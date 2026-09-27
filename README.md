@@ -244,6 +244,11 @@ stored in this repository.
   Drive, Proton VPN, Handy, Zen, and Google Gemini;
 - Zed, Antigravity IDE, Alacritty, Yaak, UTM, OnyX, and BasicTeX.
 
+Alacritty is built from its pinned upstream source and installed to
+`~/Applications/Alacritty.app`. Its Homebrew cask is disabled because it fails
+the macOS Gatekeeper check. The source build requires Xcode Command Line Tools
+and may take several minutes on first apply.
+
 Mac App Store applications are intentionally not installed during an automatic
 apply. Install the selected App Store apps later with:
 
