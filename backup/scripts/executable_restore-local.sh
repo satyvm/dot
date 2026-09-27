@@ -75,20 +75,41 @@ restore "Gemini / Antigravity (~/.gemini)" "gemini" "$HOME/.gemini"
 # ── 5. Zotero ────────────────────────────────────────────────────────
 restore "Zotero (Data Directory)" "zotero/data" "$HOME/Zotero"
 
-# ── 6. Velja ─────────────────────────────────────────────────────────
-echo "📦 Velja (preferences plist)"
-VELJA_PLIST="$BACKUP_DIR/velja/VeljaBackup.plist"
-if [[ -f "$VELJA_PLIST" ]]; then
-  if defaults read com.sindresorhus.Velja &>/dev/null; then
-    local_velja_bak="$HOME/Desktop/Velja_backup_$(date +%Y%m%d_%H%M%S).plist"
-    echo "   ⚠️  Existing Velja preferences found, backing up to $local_velja_bak"
-    defaults export com.sindresorhus.Velja "$local_velja_bak"
+# ── 6. macOS app settings ────────────────────────────────────────────
+restore "Raycast data" "apps/raycast/support" "$HOME/Library/Application Support/com.raycast.macos"
+restore "Raycast shared data" "apps/raycast/shared" "$HOME/Library/Application Support/com.raycast.shared"
+restore "Raycast group data" "apps/raycast/group" "$HOME/Library/Group Containers/SY64MV22J9.com.raycast.macos.shared"
+restore "Velja container" "apps/velja/container" "$HOME/Library/Containers/com.sindresorhus.Velja"
+restore "Shottr container" "apps/shottr/container" "$HOME/Library/Containers/cc.ffitch.shottr"
+restore "Boring Notch container" "apps/boringnotch/container" "$HOME/Library/Containers/theboringteam.boringnotch"
+
+for entry in \
+  "raycast:com.raycast.macos" \
+  "ice:com.jordanbaird.Ice" \
+  "velja:com.sindresorhus.Velja" \
+  "shottr:cc.ffitch.shottr" \
+  "dockdoor:com.ethanbills.DockDoor" \
+  "boringnotch:theboringteam.boringnotch" \
+  "hyperkey:com.knollsoft.Hyperkey"; do
+  app="${entry%%:*}"
+  domain="${entry#*:}"
+  pref="$BACKUP_DIR/apps/preferences/$app.plist"
+  if [[ "$app" == "velja" && ! -f "$pref" ]]; then
+    pref="$BACKUP_DIR/velja/VeljaBackup.plist"
   fi
-  defaults import com.sindresorhus.Velja "$VELJA_PLIST"
-  echo "   ✅ Imported from $VELJA_PLIST"
-else
-  echo "   ⚠️  No Velja preferences backup found, skipping"
-fi
+  if [[ -f "$pref" ]]; then
+    plutil -lint "$pref" >/dev/null
+    if defaults read "$domain" &>/dev/null; then
+      pref_backup="$HOME/Desktop/${app}_preferences_backup_$(date +%Y%m%d_%H%M%S).plist"
+      defaults export "$domain" "$pref_backup"
+      echo "   ⚠️  Existing $app preferences saved to $pref_backup"
+    fi
+    defaults import "$domain" "$pref"
+    echo "   ✅ Imported $app preferences"
+  else
+    echo "   ⚠️  No $app preferences backup found, skipping"
+  fi
+done
 
 # ── 7. Personal Directories ──────────────────────────────────────────
 restore "SSH Keys (~/.ssh)" "ssh" "$HOME/.ssh"

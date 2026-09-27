@@ -397,6 +397,35 @@ packages:
       feature: gui-minimum
       os: [darwin]
       providers: { brew: { darwin: mas } }
+    - id: goodnotes
+      feature: gui-minimum
+      os: [darwin]
+      providers: { mas: { darwin: { id: 1444383602, name: Goodnotes } } }
+    - id: wireguard
+      feature: gui-minimum
+      os: [darwin]
+      providers: { mas: { darwin: { id: 1451685025, name: WireGuard } } }
+    - id: velja
+      feature: gui-minimum
+      os: [darwin]
+      providers: { mas: { darwin: { id: 1607635845, name: Velja } } }
+    - id: kofe-flow
+      feature: gui-minimum
+      os: [darwin]
+      providers: { mas: { darwin: { id: 6762003285, name: Kofe Flow } } }
+    - id: cleanmykeyboard
+      feature: gui-minimum
+      os: [darwin]
+      providers: { mas: { darwin: { id: 6468120888, name: CleanMyKeyboard } } }
+    - id: arpeggi
+      feature: gui-minimum
+      os: [darwin]
+      arch: [arm64]
+      providers: { mas: { darwin: { id: 6503619183, name: Arpeggi } } }
+    - id: tailscale
+      feature: gui-minimum
+      os: [darwin]
+      providers: { cask: { darwin: tailscale-app } }
     - id: helium-browser
       feature: gui-minimum
       os: [darwin]

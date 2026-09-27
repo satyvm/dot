@@ -235,7 +235,7 @@ stored in this repository.
 `minimum` installs:
 
 - Raycast, Ice, Shottr, Hyperkey, Ghostty, Helium, Notion, Boring Notch, IINA,
-  AppCleaner, and WhatsApp;
+  AppCleaner, Tailscale, and WhatsApp;
 - JetBrains Mono Nerd Font and `mas`.
 
 `all` includes everything in `minimum`, plus:
@@ -250,6 +250,9 @@ apply. Install the selected App Store apps later with:
 ```bash
 dotfiles-macos-apps
 ```
+
+The helper includes Kofe Flow and, on Apple Silicon Macs, Arpeggi. Sign in to
+the App Store first. Tailscale still needs account sign-in and macOS VPN approval.
 
 ### OS customization and hardening
 

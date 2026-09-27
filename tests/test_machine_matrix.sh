@@ -297,6 +297,7 @@ mac_config="$fixture_root/mac-workstation.json"
 make_config "$mac_config" workstation darwin arm64
 mac_brew="$(render_template "$mac_config" run_onchange_before_install-homebrew-packages.sh.tmpl)"
 mac_developer="$(render_template "$mac_config" run_onchange_after_install-developer-tools.sh.tmpl)"
+mac_apps="$(render_template "$mac_config" dot_local/bin/executable_dotfiles-macos-apps.tmpl)"
 if grep -q '^brew "git"$' <<<"$mac_brew"; then
   pass "macOS renders Git through Brew"
 else
@@ -306,6 +307,25 @@ if grep -q '^cask "ghostty"$' <<<"$mac_brew"; then
   pass "macOS workstation renders GUI casks"
 else
   fail "macOS workstation renders GUI casks"
+fi
+if grep -q '^cask "tailscale-app"$' <<<"$mac_brew"; then
+  pass "macOS workstation installs standalone Tailscale"
+else
+  fail "macOS workstation installs standalone Tailscale"
+fi
+if grep -q '6762003285:Kofe Flow' <<<"$mac_apps" &&
+  grep -q '6503619183:Arpeggi' <<<"$mac_apps" && bash -n <<<"$mac_apps"; then
+  pass "Apple Silicon Mac App Store helper renders Kofe Flow and Arpeggi"
+else
+  fail "Apple Silicon Mac App Store helper renders Kofe Flow and Arpeggi"
+fi
+intel_config="$fixture_root/mac-intel.json"
+make_config "$intel_config" workstation darwin amd64
+intel_apps="$(render_template "$intel_config" dot_local/bin/executable_dotfiles-macos-apps.tmpl)"
+if ! grep -q '6503619183:Arpeggi' <<<"$intel_apps" && bash -n <<<"$intel_apps"; then
+  pass "Intel Mac App Store helper omits Apple Silicon-only Arpeggi"
+else
+  fail "Intel Mac App Store helper omits Apple Silicon-only Arpeggi"
 fi
 
 # Codex ships as a Homebrew cask, not a formula. Requesting it as a formula
@@ -488,6 +508,19 @@ if jq -e '
   pass "secondary package providers use explicit versions"
 else
   fail "secondary package providers use explicit versions"
+fi
+if jq -e '
+  all(
+    .packages.inventory[];
+    (.providers.mas? == null) or
+    ((.os == ["darwin"]) and
+     (.providers.mas.darwin.id | type == "number" and . > 0) and
+     (.providers.mas.darwin.name | type == "string" and length > 0))
+  )
+' <<<"$inventory" >/dev/null; then
+  pass "Mac App Store entries have IDs and names in the canonical inventory"
+else
+  fail "Mac App Store entries have IDs and names in the canonical inventory"
 fi
 legacy_config="$fixture_root/legacy.json"
 jq -n '{
