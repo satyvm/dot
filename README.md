@@ -242,20 +242,25 @@ stored in this repository.
 
 - Discord, Telegram, Notion Calendar, Zotero, DockDoor, VeraCrypt, Google
   Drive, Proton VPN, Handy, Zen, and Google Gemini;
-- Zed, Antigravity IDE, Yaak, UTM, OnyX, and BasicTeX.
+- Zed, VS Code, T3 Code, Search, Yaak, UTM, OnyX, and BasicTeX.
 
-Alacritty's configuration remains managed for existing installations, but its
-Homebrew cask is disabled because it fails the macOS Gatekeeper check.
+Alacritty's Homebrew cask is disabled. The all-tier setup instead downloads the
+pinned upstream DMG, verifies its SHA-256 checksum, and copies the app to
+`/Applications`. macOS may require a one-time security approval when opening it.
 
-Mac App Store applications are intentionally not installed during an automatic
-apply. Install the selected App Store apps later with:
+Supported Mac App Store applications are included in the Homebrew bundle. Sign
+in to the Mac App Store with the Apple Account that owns them before
+`chezmoi apply`. The `mas` CLI may request authentication during installation.
+To retry only the supported App Store apps, run:
 
 ```bash
 dotfiles-macos-apps
 ```
 
-The helper includes Kofe Flow and, on Apple Silicon Macs, Arpeggi. Sign in to
-the App Store first. Tailscale still needs account sign-in and macOS VPN approval.
+The helper includes Kofe Flow. Arpeggi is an iPhone/iPad app that can run on
+Apple silicon Macs, but `mas` cannot find it in the desktop App Store catalog.
+Install or update Arpeggi in the App Store app; the Dock setup will include it
+when present. Tailscale still needs account sign-in and macOS VPN approval.
 
 ### OS customization and hardening
 
@@ -432,8 +437,8 @@ preferred way to add, remove, or reclassify applications.
 ## Safety boundaries
 
 - Review `chezmoi diff` before applying important changes.
-- Account enrollment, SSH upload, App Store installation, and destructive macOS
-  cleanup are never automatic.
+- Account enrollment, SSH upload, and destructive macOS cleanup are never
+  automatic. App Store apps install after the user signs in to the App Store.
 - Sensitive authentication material is not committed to this repository.
 - Repository-only backup and T3 Code platform files are never deployed.
 - Unsupported operating systems, Linux distributions, architectures, and

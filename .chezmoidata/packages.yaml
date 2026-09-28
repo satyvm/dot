@@ -421,7 +421,7 @@ packages:
       feature: gui-minimum
       os: [darwin]
       arch: [arm64]
-      providers: { mas: { darwin: { id: 6503619183, name: Arpeggi } } }
+      providers: { mas: { darwin: { id: 6503619183, name: Arpeggi, manualInstall: true } } }
     - id: tailscale
       feature: gui-minimum
       os: [darwin]
@@ -490,6 +490,13 @@ packages:
       feature: gui-all
       os: [darwin]
       providers: { cask: { darwin: zen } }
+    - id: search
+      feature: gui-all
+      os: [darwin]
+      providers: { cask: { darwin: driceroland/tap/search } }
+      homebrew:
+        tap: driceroland/tap
+        trust: cask
     - id: google-gemini
       feature: gui-all
       os: [darwin]
@@ -502,6 +509,20 @@ packages:
       feature: gui-all
       os: [darwin]
       providers: { cask: { darwin: visual-studio-code } }
+    - id: t3-code
+      feature: gui-all
+      os: [darwin]
+      providers: { cask: { darwin: t3-code } }
+    - id: alacritty
+      feature: gui-all
+      os: [darwin]
+      providers:
+        dmg:
+          darwin:
+            version: "0.17.0"
+            url: https://github.com/alacritty/alacritty/releases/download/v0.17.0/Alacritty-v0.17.0.dmg
+            sha256: ad8d7de35fb38e43184776cac6dfee05ca325caa0b6639a06a55e54e4b026620
+            app: Alacritty.app
     - id: yaak
       feature: gui-all
       os: [darwin]

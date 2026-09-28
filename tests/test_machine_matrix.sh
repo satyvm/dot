@@ -178,9 +178,13 @@ for os in darwin linux; do
       elif [[ "$os" == "darwin" && "$preset" == "workstation" ]]; then
         assert_has "$managed" ".config/ghostty/config.ghostty" "$case_name includes minimum GUI config"
         assert_has "$managed" ".config/alacritty/alacritty.toml" "$case_name includes all-tier GUI config"
+        assert_has "$managed" "install-macos-dmgs.sh" "$case_name installs all-tier DMG apps"
       else
         assert_lacks "$managed" ".config/ghostty/config.ghostty" "$case_name excludes GUI config"
         assert_lacks "$managed" ".config/alacritty/alacritty.toml" "$case_name excludes all-tier GUI config"
+      fi
+      if [[ "$os" != "darwin" || "$preset" != "workstation" ]]; then
+        assert_lacks "$managed" "install-macos-dmgs.sh" "$case_name omits all-tier DMG installer"
       fi
 
       if [[ "$os" == "linux" && "$preset" == "server" ]]; then
@@ -298,6 +302,8 @@ make_config "$mac_config" workstation darwin arm64
 mac_brew="$(render_template "$mac_config" run_onchange_before_install-homebrew-packages.sh.tmpl)"
 mac_developer="$(render_template "$mac_config" run_onchange_after_install-developer-tools.sh.tmpl)"
 mac_apps="$(render_template "$mac_config" dot_local/bin/executable_dotfiles-macos-apps.tmpl)"
+mac_dmgs="$(render_template "$mac_config" run_onchange_before_install-macos-dmgs.sh.tmpl)"
+mac_defaults="$(render_template "$mac_config" run_onchange_after_configure-macos-defaults.sh.tmpl)"
 if grep -q '^brew "git"$' <<<"$mac_brew"; then
   pass "macOS renders Git through Brew"
 else
@@ -313,24 +319,55 @@ if grep -q '^cask "alacritty"$' <<<"$mac_brew"; then
 else
   pass "macOS workstation skips the disabled Alacritty cask"
 fi
+if grep -q '^cask "t3-code"$' <<<"$mac_brew" &&
+  grep -q '^cask "driceroland/tap/search"$' <<<"$mac_brew" &&
+  grep -q 'brew trust --cask "driceroland/tap/search"' <<<"$mac_brew"; then
+  pass "macOS workstation installs T3 Code and trusted Search cask"
+else
+  fail "macOS workstation installs T3 Code and trusted Search cask"
+fi
+if grep -q '^mas "Goodnotes", id: 1444383602$' <<<"$mac_brew" &&
+  grep -q '^mas "Kofe Flow", id: 6762003285$' <<<"$mac_brew" &&
+  ! grep -q '^mas "Arpeggi", id:' <<<"$mac_brew"; then
+  pass "macOS Brew bundle installs supported App Store apps and omits iPad app Arpeggi"
+else
+  fail "macOS Brew bundle installs supported App Store apps and omits iPad app Arpeggi"
+fi
+if grep -q 'install_dmg "alacritty"' <<<"$mac_dmgs" && bash -n <<<"$mac_dmgs"; then
+  pass "macOS workstation installs checksum-verified Alacritty DMG"
+else
+  fail "macOS workstation installs checksum-verified Alacritty DMG"
+fi
+if grep -q '"Arpeggi"' <<<"$mac_defaults" &&
+  grep -q 'persistent-others' <<<"$mac_defaults" && bash -n <<<"$mac_defaults"; then
+  pass "macOS defaults render current Dock including Downloads"
+else
+  fail "macOS defaults render current Dock including Downloads"
+fi
 if grep -q '^cask "tailscale-app"$' <<<"$mac_brew"; then
   pass "macOS workstation installs standalone Tailscale"
 else
   fail "macOS workstation installs standalone Tailscale"
 fi
 if grep -q '6762003285:Kofe Flow' <<<"$mac_apps" &&
-  grep -q '6503619183:Arpeggi' <<<"$mac_apps" && bash -n <<<"$mac_apps"; then
-  pass "Apple Silicon Mac App Store helper renders Kofe Flow and Arpeggi"
+  ! grep -q '6503619183:Arpeggi' <<<"$mac_apps" && bash -n <<<"$mac_apps"; then
+  pass "Apple Silicon Mac App Store helper excludes iPad app Arpeggi"
 else
-  fail "Apple Silicon Mac App Store helper renders Kofe Flow and Arpeggi"
+  fail "Apple Silicon Mac App Store helper excludes iPad app Arpeggi"
 fi
 intel_config="$fixture_root/mac-intel.json"
 make_config "$intel_config" workstation darwin amd64
 intel_apps="$(render_template "$intel_config" dot_local/bin/executable_dotfiles-macos-apps.tmpl)"
+intel_brew="$(render_template "$intel_config" run_onchange_before_install-homebrew-packages.sh.tmpl)"
 if ! grep -q '6503619183:Arpeggi' <<<"$intel_apps" && bash -n <<<"$intel_apps"; then
   pass "Intel Mac App Store helper omits Apple Silicon-only Arpeggi"
 else
   fail "Intel Mac App Store helper omits Apple Silicon-only Arpeggi"
+fi
+if ! grep -q '^mas "Arpeggi", id:' <<<"$intel_brew"; then
+  pass "Intel Mac Brew bundle omits Apple Silicon-only Arpeggi"
+else
+  fail "Intel Mac Brew bundle omits Apple Silicon-only Arpeggi"
 fi
 
 # Codex ships as a Homebrew cask, not a formula. Requesting it as a formula
@@ -363,10 +400,11 @@ if grep -q '^brew "codex"$' <<<"$mac_brew" || grep -q '^brew "codex"$' <<<"$linu
 else
   pass "Codex is never requested as a Homebrew formula"
 fi
-if grep -qF 'npm install --global "@openai/codex@latest"' <<<"$linux_developer"; then
-  pass "Linux installs Codex from npm, its only provider there"
+if grep -qF 'npm install --global "@openai/codex@latest"' <<<"$linux_developer" &&
+   grep -qF 'npm install --global "@anthropic-ai/claude-code@latest"' <<<"$linux_developer"; then
+  pass "Linux installs Codex and Claude from npm"
 else
-  fail "Linux installs Codex from npm, its only provider there"
+  fail "Linux installs Codex and Claude from npm"
 fi
 if grep -qxF 'cargo install "cargo-clean-all" --version "0.6.4" --locked' <<<"$mac_developer"; then
   pass "developer tools render a published cargo-clean-all release"
@@ -439,10 +477,12 @@ else
   pass "AI npm packages are withheld from AI-disabled machines"
 fi
 workstation_devtools="$(render_template "$fixture_root/darwin-arm64-workstation.json" run_onchange_after_install-developer-tools.sh.tmpl)"
-if grep -q 'npm install --global "@openai/codex' <<<"$workstation_devtools"; then
-  pass "AI npm packages reach AI-enabled machines"
+if ! grep -q 'npm install --global "@openai/codex' <<<"$workstation_devtools" &&
+   ! grep -q 'npm install --global "@anthropic-ai/claude-code' <<<"$workstation_devtools" &&
+   grep -q 'npm install --global "@moonshot-ai/kimi-code' <<<"$workstation_devtools"; then
+  pass "macOS uses casks for Codex and Claude while retaining npm-only AI tools"
 else
-  fail "AI npm packages reach AI-enabled machines" "$workstation_devtools"
+  fail "macOS uses casks for Codex and Claude while retaining npm-only AI tools" "$workstation_devtools"
 fi
 
 tmux_linux="$(render_template "$linux_config" dot_config/tmux/tmux.conf.tmpl)"
@@ -520,12 +560,27 @@ if jq -e '
     (.providers.mas? == null) or
     ((.os == ["darwin"]) and
      (.providers.mas.darwin.id | type == "number" and . > 0) and
-     (.providers.mas.darwin.name | type == "string" and length > 0))
+     (.providers.mas.darwin.name | type == "string" and length > 0) and
+     ((.providers.mas.darwin.manualInstall? // false) | type == "boolean"))
   )
 ' <<<"$inventory" >/dev/null; then
   pass "Mac App Store entries have IDs and names in the canonical inventory"
 else
   fail "Mac App Store entries have IDs and names in the canonical inventory"
+fi
+if jq -e '
+  all(.packages.inventory[];
+    (.providers.dmg? == null) or
+    ((.os == ["darwin"]) and
+     (.providers.dmg.darwin.version | type == "string" and length > 0) and
+     (.providers.dmg.darwin.url | type == "string" and startswith("https://")) and
+     (.providers.dmg.darwin.sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
+     (.providers.dmg.darwin.app | type == "string" and endswith(".app")))
+  )
+' <<<"$inventory" >/dev/null; then
+  pass "macOS DMG entries are pinned and checksum-verified"
+else
+  fail "macOS DMG entries are pinned and checksum-verified"
 fi
 legacy_config="$fixture_root/legacy.json"
 jq -n '{

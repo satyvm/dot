@@ -141,6 +141,24 @@ ensure_t3_cli() {
   fi
 }
 
+refresh_t3_cli() {
+  local installed latest
+  installed="$(run_as_ubuntu npm list -g --depth=0 --json t3 | jq -r '.dependencies.t3.version // empty')" || return 1
+  latest="$(run_as_ubuntu npm view t3 version)" || return 1
+  [[ -n "$latest" ]] || { die "npm did not report a T3 Code version"; return 1; }
+  if [[ "$installed" == "$latest" ]]; then
+    log "T3 Code is current ($latest)"
+    return 0
+  fi
+
+  log "updating T3 Code from ${installed:-missing} to $latest"
+  run_as_ubuntu npm install -g "t3@$latest" || return 1
+  if ! supervisorctl -c /etc/supervisor/conf.d/t3code.conf restart t3code; then
+    supervisorctl -c /etc/supervisor/conf.d/t3code.conf start t3code || return 1
+  fi
+  log "T3 Code is running version $latest"
+}
+
 bootstrap_dotfiles() {
   local repository="${REMOTE_DOTFILES_REPO:-https://github.com/satyvm/dot.git}"
   if [[ ! -d "$chezmoi_source/.git" ]]; then
@@ -218,6 +236,7 @@ boot() {
 # you out while it runs. Re-runs on every restart and is idempotent.
 provision() {
   log "provisioning from the dotfiles catalog; sshd and t3 serve are already up"
+  attempt "refresh T3 Code CLI" refresh_t3_cli
   attempt "bootstrap dotfiles" bootstrap_dotfiles
   attempt "register projects" register_projects
   report "PROVISIONING"

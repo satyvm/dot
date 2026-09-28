@@ -1,0 +1,60 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+{{- $enabled := list "base" -}}
+{{- if $machine.features.cli }}{{ $enabled = append $enabled "cli" }}{{ end -}}
+{{- if $machine.features.developer }}{{ $enabled = append $enabled "developer" }}{{ end -}}
+{{- if $machine.features.ai }}{{ $enabled = append $enabled "ai" }}{{ end -}}
+{{- if or (eq $machine.features.guiTier "minimum") (eq $machine.features.guiTier "all") }}{{ $enabled = append $enabled "gui-minimum" }}{{ end -}}
+{{- if eq $machine.features.guiTier "all" }}{{ $enabled = append $enabled "gui-all" }}{{ end -}}
+{{- if eq $machine.os "darwin" -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+install_dmg() {
+  local name="$1" url="$2" checksum="$3" app="$4"
+  if [[ -d "/Applications/$app" ]]; then
+    printf '%s is already installed.\n' "$name"
+    return
+  fi
+
+  local workdir mountpoint actual_checksum
+  workdir="$(mktemp -d)"
+  mountpoint="$workdir/mounted"
+  mkdir -p "$mountpoint"
+  if ! curl -fL --retry 3 -o "$workdir/app.dmg" "$url"; then
+    rm -rf "$workdir"
+    return 1
+  fi
+  actual_checksum="$(shasum -a 256 "$workdir/app.dmg" | awk '{print $1}')"
+  if [[ "$actual_checksum" != "$checksum" ]]; then
+    printf 'Checksum mismatch for %s\n' "$name" >&2
+    rm -rf "$workdir"
+    return 1
+  fi
+  if ! hdiutil attach -readonly -nobrowse -mountpoint "$mountpoint" "$workdir/app.dmg"; then
+    rm -rf "$workdir"
+    return 1
+  fi
+  if [[ ! -d "$mountpoint/$app" ]]; then
+    printf '%s is missing from the downloaded disk image\n' "$app" >&2
+    hdiutil detach "$mountpoint"
+    rm -rf "$workdir"
+    return 1
+  fi
+  if ! ditto "$mountpoint/$app" "/Applications/$app"; then
+    hdiutil detach "$mountpoint"
+    rm -rf "$workdir"
+    return 1
+  fi
+  hdiutil detach "$mountpoint"
+  rm -rf "$workdir"
+}
+
+{{- range $pkg := .packages.inventory }}
+  {{- $oses := index $pkg "os" | default (list "darwin" "linux") }}
+  {{- $arches := index $pkg "arch" | default (list "amd64" "arm64") }}
+  {{- $dmg := index (index (index $pkg "providers" | default dict) "dmg" | default dict) "darwin" | default dict }}
+  {{- if and (has $pkg.feature $enabled) (has "darwin" $oses) (has $machine.arch $arches) $dmg }}
+install_dmg {{ $pkg.id | quote }} {{ $dmg.url | quote }} {{ $dmg.sha256 | quote }} {{ $dmg.app | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -19,6 +19,9 @@ if [[ ! -d "$BACKUP_DIR" ]]; then
   echo "❌ Backup directory not found: $BACKUP_DIR"
   exit 1
 fi
+if [[ ! -f "$BACKUP_DIR/BACKUP_COMPLETE" ]]; then
+  printf '⚠️  No completion marker in %s. This may be a partial or older backup.\n' "$BACKUP_DIR" >&2
+fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Restore source: $BACKUP_DIR"
@@ -40,20 +43,20 @@ restore() {
       local backup_dest="${dest}.bak_${timestamp}"
       echo "   ⚠️  Original exists, backing up to $backup_dest"
       mv "$dest" "$backup_dest"
-    elif [[ -e "$dest" ]] && [[ "$merge_only" == "true" ]]; then
-      local contents
-      contents=$(find "$dest" -mindepth 1 -maxdepth 1 \
-        ! -name '.DS_Store' ! -name '.localized' -print -quit)
-      if [[ -n "$contents" ]]; then
-        echo "   ⚠️  Directory $dest is not empty. Skipping restore."
-        return 0
-      else
-        echo "   ℹ️  Directory $dest is empty. Restoring into it."
-      fi
     fi
     echo "   $src → $dest"
     mkdir -p "$(dirname "$dest")"
-    rsync -aP "$src/" "$dest/"
+    if [[ "$merge_only" == "true" ]]; then
+      mkdir -p "$dest"
+      local conflicts
+      conflicts=$(rsync -aicn --existing --out-format='%n' "$src/" "$dest/")
+      if [[ -n "$conflicts" ]]; then
+        printf '   ⚠️  Existing files differ; kept local copies in %s:\n%s\n' "$dest" "$conflicts"
+      fi
+      rsync -aP --ignore-existing "$src/" "$dest/"
+    else
+      rsync -aP "$src/" "$dest/"
+    fi
     echo "   ✅ Done"
   else
     echo "⚠️  $label — backup not found, skipping: $src"
@@ -69,22 +72,25 @@ restore "Google Chrome" "chrome" "$HOME/Library/Application Support/Google/Chrom
 # ── 3. Helium Browser ───────────────────────────────────────────────
 restore "Helium Browser" "helium" "$HOME/Library/Application Support/net.imput.helium"
 
-# ── 4. Gemini / Antigravity ─────────────────────────────────────────
-restore "Gemini / Antigravity (~/.gemini)" "gemini" "$HOME/.gemini"
+# ── 4. T3 Code ───────────────────────────────────────────────────────
+if [[ -d "$BACKUP_DIR/t3" ]]; then
+  restore "T3 Code (~/.t3)" "t3" "$HOME/.t3"
+elif [[ -d "$BACKUP_DIR/../common/.t3" ]]; then
+  echo "ℹ️  Using legacy T3 Code backup in ../common/.t3"
+  restore "T3 Code (~/.t3)" "../common/.t3" "$HOME/.t3"
+else
+  echo "⚠️  T3 Code backup not found"
+fi
 
 # ── 5. Zotero ────────────────────────────────────────────────────────
 restore "Zotero (Data Directory)" "zotero/data" "$HOME/Zotero"
 
 # ── 6. macOS app settings ────────────────────────────────────────────
-restore "Raycast data" "apps/raycast/support" "$HOME/Library/Application Support/com.raycast.macos"
-restore "Raycast shared data" "apps/raycast/shared" "$HOME/Library/Application Support/com.raycast.shared"
-restore "Raycast group data" "apps/raycast/group" "$HOME/Library/Group Containers/SY64MV22J9.com.raycast.macos.shared"
 restore "Velja container" "apps/velja/container" "$HOME/Library/Containers/com.sindresorhus.Velja"
 restore "Shottr container" "apps/shottr/container" "$HOME/Library/Containers/cc.ffitch.shottr"
 restore "Boring Notch container" "apps/boringnotch/container" "$HOME/Library/Containers/theboringteam.boringnotch"
 
 for entry in \
-  "raycast:com.raycast.macos" \
   "ice:com.jordanbaird.Ice" \
   "velja:com.sindresorhus.Velja" \
   "shottr:cc.ffitch.shottr" \
@@ -100,7 +106,8 @@ for entry in \
   if [[ -f "$pref" ]]; then
     plutil -lint "$pref" >/dev/null
     if defaults read "$domain" &>/dev/null; then
-      pref_backup="$HOME/Desktop/${app}_preferences_backup_$(date +%Y%m%d_%H%M%S).plist"
+      pref_backup="$HOME/Library/Application Support/dotfiles-restore/preferences/${app}_$(date +%Y%m%d_%H%M%S).plist"
+      mkdir -p "$(dirname "$pref_backup")"
       defaults export "$domain" "$pref_backup"
       echo "   ⚠️  Existing $app preferences saved to $pref_backup"
     fi
@@ -126,6 +133,11 @@ restore "Study Directory" "Study" "$HOME/Study" true
 restore "Work Directory" "Work" "$HOME/Work" true
 restore "Documents Directory" "Documents" "$HOME/Documents" true
 restore "Desktop Directory" "Desktop" "$HOME/Desktop" true
+restore "Music Directory" "Music" "$HOME/Music" true
+restore "Movies Directory" "Movies" "$HOME/Movies" true
+restore "Screenshots Directory" "Screenshots" "$HOME/Screenshots" true
+
+echo "ℹ️  Import Raycast settings from its manual .rayconfig export."
 
 # ── Summary ──────────────────────────────────────────────────────────
 echo ""

@@ -41,11 +41,15 @@ eval "$("$brew_bin" shellenv)"
   {{- $providers := index $pkg "providers" | default dict -}}
   {{- $brewByOs := index $providers "brew" | default dict -}}
   {{- $formula := index $brewByOs $machine.os | default "" -}}
+  {{- $caskByOs := index $providers "cask" | default dict -}}
+  {{- $cask := index $caskByOs $machine.os | default "" -}}
   {{- $homebrew := index $pkg "homebrew" | default dict -}}
   {{- $tap := index $homebrew "tap" | default "" -}}
-  {{- if and (has $pkg.feature $enabled) (has $machine.os $oses) (has $machine.arch $arches) $formula $tap }}
+  {{- if and (has $pkg.feature $enabled) (has $machine.os $oses) (has $machine.arch $arches) (or $formula $cask) $tap }}
     {{- if eq (index $homebrew "trust" | default "") "formula" }}
 brew trust --formula {{ $formula | quote }}
+    {{- else if eq (index $homebrew "trust" | default "") "cask" }}
+brew trust --cask {{ $cask | quote }}
     {{- else if eq (index $homebrew "trust" | default "") "tap" }}
 brew trust {{ $tap | quote }}
     {{- end }}
@@ -68,6 +72,11 @@ brew {{ $formula | quote }}
     {{- end }}
     {{- if $cask }}
 cask {{ $cask | quote }}
+    {{- end }}
+    {{- $masByOs := index $providers "mas" | default dict }}
+    {{- $mas := index $masByOs $machine.os | default dict }}
+    {{- if and $mas (not (index $mas "manualInstall" | default false)) }}
+mas {{ $mas.name | quote }}, id: {{ $mas.id }}
     {{- end }}
   {{- end }}
 {{- end }}

@@ -21,6 +21,7 @@ docs
 # convergent provisioning pipeline.
 {{- if $machine.legacy }}
 install-homebrew-packages.sh
+install-macos-dmgs.sh
 install-system-packages.sh
 install-developer-tools.sh
 install-ai-native-tools.sh
@@ -57,6 +58,10 @@ install-ai-native-tools.sh
 
 {{- if not $machine.predicates.manageHostPackages }}
 install-homebrew-packages.sh
+install-macos-dmgs.sh
+{{- end }}
+{{- if or (ne $machine.os "darwin") (ne $machine.features.guiTier "all") }}
+install-macos-dmgs.sh
 {{- end }}
 {{- if not $machine.predicates.manageSystemPackages }}
 install-system-packages.sh

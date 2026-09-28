@@ -77,9 +77,18 @@ T3 Code — is what limits agents to the workspace.
 
 ## Upgrading without a rebuild
 
+On each container start, provisioning checks the npm `latest` release against
+the version in the persistent npm volume. When a newer release exists, it
+installs that version and restarts only the T3 server. An unavailable registry
+leaves the installed server running and records a provisioning failure. Updates
+can interrupt active threads, so enable **Settings → General → Continue threads
+after restarts** if you want supported threads to resume.
+
+For an immediate update without restarting the container:
+
 ```bash
 docker exec -u ubuntu <t3code> npm i -g t3@latest
-docker restart <t3code>
+docker exec <t3code> supervisorctl -c /etc/supervisor/conf.d/t3code.conf restart t3code
 ```
 
 Only base tooling changes need an image rebuild.

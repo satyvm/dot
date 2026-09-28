@@ -9,14 +9,13 @@ fi
 command -v mas >/dev/null 2>&1 ||
   { printf 'mas is missing; enable a macOS GUI tier and run chezmoi apply.\n' >&2; exit 1; }
 
-export MAS_NO_AUTO_INDEX=1
 apps=(
 {{- range $pkg := .packages.inventory }}
   {{- $oses := index $pkg "os" | default (list "darwin" "linux") }}
   {{- $arches := index $pkg "arch" | default (list "amd64" "arm64") }}
   {{- $app := index (index $pkg "providers" | default dict) "mas" | default dict }}
   {{- $macApp := index $app "darwin" | default dict }}
-  {{- if and (has $pkg.feature (list "gui-minimum" "gui-all")) (has "darwin" $oses) (has $machine.arch $arches) $macApp }}
+  {{- if and (has $pkg.feature (list "gui-minimum" "gui-all")) (has "darwin" $oses) (has $machine.arch $arches) $macApp (not (index $macApp "manualInstall" | default false)) }}
   {{ printf "%v:%s" $macApp.id $macApp.name | quote }}
   {{- end }}
 {{- end }}

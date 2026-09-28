@@ -5,6 +5,11 @@ set -uo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 compose="$repo_root/t3code/t3code_docker_compose.yaml"
+if docker compose version >/dev/null 2>&1; then
+  compose_cmd=(docker compose)
+else
+  compose_cmd=(docker-compose)
+fi
 pass_count=0
 fail_count=0
 
@@ -83,7 +88,7 @@ while read -r svc cpus; do
   fi
 done < <(TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" \
          CLIPROXY_CLIENT_KEY=x CLIPROXY_MANAGEMENT_KEY=x \
-           docker compose -f "$compose" --profile gateway config 2>/dev/null \
+           "${compose_cmd[@]}" -f "$compose" --profile gateway config 2>/dev/null \
          | awk '/^  [a-z][a-z0-9-]*:$/{svc=$1; sub(":","",svc)} /cpus:/{gsub(/[",]/,"",$2); print svc, $2}')
 check "the workspace limits can be raised without editing the file" 'T3CODE_CPUS' "$compose"
 
@@ -120,6 +125,8 @@ check "every bootstrap step runs through attempt" 'attempt "bootstrap dotfiles" 
 check "the entrypoint always reaches supervisord" 'exec /usr/bin/supervisord' "$entrypoint"
 check "failures are recorded where they can be read later" 'bootstrap-failures.log' "$entrypoint"
 refute "no bootstrap step aborts the entrypoint outright" 'exit 1' "$entrypoint"
+check "provisioning refreshes T3 from the npm registry" 'attempt "refresh T3 Code CLI" refresh_t3_cli' "$entrypoint"
+check "Supervisor exposes a local control socket" 'file=/run/supervisor.sock' "$repo_root/t3code/supervisord.conf"
 
 # Every attempt target must name a function that exists.
 while read -r fn; do
@@ -152,6 +159,39 @@ if [[ "$probe_out" == *"reached_end:1"* && "$probe_out" != *RAN_ON* ]]; then
 else
   fail "attempt records a failed step and still reaches the end" "got: $probe_out"
 fi
+
+update_probe="$(mktemp "${TMPDIR:-/tmp}/t3-update.XXXXXX")"
+{
+  printf 'set -euo pipefail\n'
+  sed -n '/^refresh_t3_cli() {/,/^}/p' "$entrypoint"
+  cat <<'PROBE'
+run_as_ubuntu() {
+  case "$*" in
+    'npm list -g --depth=0 --json t3') printf '{"dependencies":{"t3":{"version":"%s"}}}\n' "$NPM_CURRENT" ;;
+    'npm view t3 version') [[ "${NPM_FAIL_LOOKUP:-0}" == 0 ]] || return 1; printf '%s\n' "$NPM_LATEST" ;;
+    "npm install -g t3@$NPM_LATEST") printf 'installed\n' ;;
+    *) return 1 ;;
+  esac
+}
+supervisorctl() { printf 'restarted\n'; }
+log() { :; }
+die() { :; }
+refresh_t3_cli
+PROBE
+} > "$update_probe"
+same_out="$(NPM_CURRENT=1.2.3 NPM_LATEST=1.2.3 bash "$update_probe" 2>&1)"
+new_out="$(NPM_CURRENT=1.2.3 NPM_LATEST=1.2.4 bash "$update_probe" 2>&1)"
+if [[ -z "$same_out" && "$new_out" == *installed* && "$new_out" == *restarted* ]]; then
+  pass "T3 refresh restarts only when npm latest changes"
+else
+  fail "T3 refresh restarts only when npm latest changes" "same: $same_out; newer: $new_out"
+fi
+if NPM_CURRENT=1.2.3 NPM_LATEST=1.2.4 NPM_FAIL_LOOKUP=1 bash "$update_probe" >/dev/null 2>&1; then
+  fail "a failed npm lookup leaves the running T3 server alone"
+else
+  pass "a failed npm lookup leaves the running T3 server alone"
+fi
+rm -f "$update_probe"
 
 # --- chezmoi owns the packages, the image owns the bootstrap ---------------
 # The image must not carry a second copy of the package catalog: that is what
@@ -209,10 +249,10 @@ if [[ "${T3_CHECK_RUNTIME:-0}" == "1" ]]; then
   # unexpanded, so tailscaled can substitute the node's own cert domain.
   served=$(TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" \
            CLIPROXY_CLIENT_KEY=x CLIPROXY_MANAGEMENT_KEY=x \
-           docker compose -f "$compose" run --rm --no-deps --entrypoint sh tailscale \
+           "${compose_cmd[@]}" -f "$compose" run --rm --no-deps --entrypoint sh tailscale \
              -c 'test -f /config/tailscale-serve.json && cat /config/tailscale-serve.json' 2>/dev/null)
   TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" CLIPROXY_CLIENT_KEY=x \
-    CLIPROXY_MANAGEMENT_KEY=x docker compose -f "$compose" down -v --remove-orphans >/dev/null 2>&1
+    CLIPROXY_MANAGEMENT_KEY=x "${compose_cmd[@]}" -f "$compose" down -v --remove-orphans >/dev/null 2>&1
   if grep -qF '${TS_CERT_DOMAIN}' <<<"$served"; then
     pass "the serve config lands as a file with the cert domain unexpanded"
   else
@@ -254,7 +294,7 @@ fi
 # --- compose is syntactically valid ---------------------------------------
 if TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" \
    CLIPROXY_CLIENT_KEY=a CLIPROXY_MANAGEMENT_KEY=b \
-   docker compose --project-directory "$repo_root" -f "$compose" config >/dev/null 2>&1; then
+   "${compose_cmd[@]}" --project-directory "$repo_root" -f "$compose" config >/dev/null 2>&1; then
   pass "docker compose config parses the stack"
 else
   fail "docker compose config parses the stack"
@@ -271,7 +311,7 @@ if command -v python3 >/dev/null 2>&1 && python3 -c "import yaml" 2>/dev/null; t
     local key="$1" out="$2" script
     script=$(TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" \
       CLIPROXY_CLIENT_KEY=a CLIPROXY_MANAGEMENT_KEY=b OPENROUTER_API_KEY="$key" \
-      docker compose --project-directory "$repo_root" -f "$compose" --profile gateway config 2>/dev/null |
+      "${compose_cmd[@]}" --project-directory "$repo_root" -f "$compose" --profile gateway config 2>/dev/null |
       python3 -c 'import sys, yaml; print(yaml.safe_load(sys.stdin)["services"]["cliproxyapi"]["command"][-1])')
     mkdir -p "$work/secrets"
     # docker compose config leaves the literal "$$" escaping in place (that

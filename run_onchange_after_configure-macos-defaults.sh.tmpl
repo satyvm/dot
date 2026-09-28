@@ -21,7 +21,7 @@ killall Dock
 
 echo "🧹 Configuring Dock apps"
 dock_apps=()
-for app in "Helium" "Zen" "Alacritty" "Ghostty" "Zed" "Notion"; do
+for app in "Zen" "Helium" "Alacritty" "Ghostty" "Zed" "Notion" "Arpeggi"; do
   if [[ -d "/Applications/${app}.app" ]]; then
     dock_apps+=("$app")
   else
@@ -38,6 +38,8 @@ if ((${#dock_apps[@]} > 0)); then
 else
   echo "  ⚠️  No target apps installed; leaving Dock unchanged"
 fi
+defaults write com.apple.dock persistent-others -array \
+  "<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>file://$HOME/Downloads/</string><key>_CFURLStringType</key><integer>15</integer></dict><key>file-label</key><string>Downloads</string><key>displayas</key><integer>0</integer><key>showas</key><integer>1</integer><key>arrangement</key><integer>2</integer></dict><key>tile-type</key><string>directory-tile</string></dict>"
 
 echo "🔍 Tuning Spotlight (keeping indexing enabled)"
 plutil -replace AppleSymbolicHotKeys.64.enabled -bool NO ~/Library/Preferences/com.apple.symbolichotkeys.plist 2>/dev/null || true
@@ -78,7 +80,7 @@ defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadRightC
 defaults write com.apple.AppleMultitouchTrackpad TrackpadRightClick -bool true
 defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool true
 defaults write com.apple.AppleMultitouchTrackpad Clicking -bool true
-defaults write NSGlobalDomain com.apple.mouse.tapBehavior -int 1
+defaults write -g com.apple.mouse.tapBehavior -int 1
 defaults -currentHost write NSGlobalDomain com.apple.mouse.tapBehavior -int 1
 defaults write -g com.apple.trackpad.scaling -float 1.0
 
@@ -106,6 +108,7 @@ mkdir -p "$HOME/Screenshots"
 # --- Show ~/Library ---
 chflags nohidden ~/Library
 
+killall cfprefsd &> /dev/null || true
 for app in "Dock" "Finder" "SystemUIServer"; do
   killall "$app" &> /dev/null || true
 done
