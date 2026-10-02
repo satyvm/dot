@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-unset HERDR_SOCKET_PATH
+unset HERDR_SOCKET_PATH TEA_SOCKET_PATH
+export T3_SHARE_SOCKET_PATH=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
@@ -311,6 +312,8 @@ assert_contains "$OUTPUT" "<--session> <herdr session>" "Herdr restore arguments
 
 OUTPUT="$(TEA_SOCKET_PATH="$FIXTURE_ROOT/tea.sock" run_ax opencode)"
 assert_contains "$OUTPUT" "<--allow-unix-socket> <$FIXTURE_ROOT/tea.sock>" "Tea socket is granted dynamically when configured"
+OUTPUT="$(T3_SHARE_SOCKET_PATH="$FIXTURE_ROOT/t3 share.sock" run_ax opencode)"
+assert_contains "$OUTPUT" "<--allow-unix-socket> <$FIXTURE_ROOT/t3 share.sock>" "T3 sharing socket is granted dynamically when configured"
 
 OUTPUT="$(run_ax omp --session 'path with spaces')"
 assert_contains "$OUTPUT" "agent=omp" "ax resolves the real OMP binary from PATH"
