@@ -40,8 +40,12 @@ if grep -nE '^\s+- \.{1,2}/' "$compose"; then
 else
   pass "no volume binds a path relative to the compose file"
 fi
-check "the serve config is delivered inline, not bind-mounted" 'source: tailscale-serve' "$compose"
-check "the cert domain survives Compose interpolation" '$${TS_CERT_DOMAIN}' "$compose"
+refute "the broker is the only Serve configuration writer" 'TS_SERVE_CONFIG:' "$compose"
+check "the daemon socket is shared only with the control broker" 'tailscale-socket:/run/tailscale:ro' "$compose"
+check "T3 gets the narrow control socket" 't3-share-socket:/run/t3-share:ro' "$compose"
+check "app routes persist across broker restarts" 't3-share-state:/var/lib/t3-share' "$compose"
+check "the broker image is built from repository code" 'dockerfile: Dockerfile.tailscale-control' "$compose"
+check "the broker checks applied routes in its healthcheck" '["CMD", "t3-share", "list"]' "$compose"
 
 # --- the DNS setting that keeps Compose service names resolvable -----------
 check "tailnet DNS is not accepted inside the shared namespace" 'TS_ACCEPT_DNS: "false"' "$compose"
@@ -101,6 +105,7 @@ dockerfile="$repo_root/t3code/Dockerfile"
 check "the image provides the build toolchain T3 Code compiles against" 'g++' "$dockerfile"
 check "Node is new enough for T3 Code"   'node:22.19.0' "$dockerfile"
 refute "the image no longer carries the Hermes runtime" 'hermes' "$dockerfile"
+check "the image ships the agent sharing command" 'COPY t3_share_cli.py /usr/local/bin/t3-share' "$dockerfile"
 
 # --- build context ---------------------------------------------------------
 # Compose resolves a relative build context against the project directory, which
@@ -245,19 +250,6 @@ if [[ "${T3_CHECK_RUNTIME:-0}" == "1" ]]; then
   ts_log=$(docker logs "$name" 2>&1)
   docker rm -f "$name" >/dev/null 2>&1
 
-  # The serve config must arrive as a regular file with ${TS_CERT_DOMAIN}
-  # unexpanded, so tailscaled can substitute the node's own cert domain.
-  served=$(TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" \
-           CLIPROXY_CLIENT_KEY=x CLIPROXY_MANAGEMENT_KEY=x \
-           "${compose_cmd[@]}" -f "$compose" run --rm --no-deps --entrypoint sh tailscale \
-             -c 'test -f /config/tailscale-serve.json && cat /config/tailscale-serve.json' 2>/dev/null)
-  TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" CLIPROXY_CLIENT_KEY=x \
-    CLIPROXY_MANAGEMENT_KEY=x "${compose_cmd[@]}" -f "$compose" down -v --remove-orphans >/dev/null 2>&1
-  if grep -qF '${TS_CERT_DOMAIN}' <<<"$served"; then
-    pass "the serve config lands as a file with the cert domain unexpanded"
-  else
-    fail "the serve config lands as a file with the cert domain unexpanded" "got: ${served:-<not a file>}"
-  fi
   if grep -qF "flag provided but not defined" <<<"$ts_log"; then
     fail "tailscale accepts every flag the compose file passes it" \
          "$(grep -F 'flag provided but not defined' <<<"$ts_log" | head -1)"
@@ -299,6 +291,33 @@ if TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" \
 else
   fail "docker compose config parses the stack"
 fi
+
+resolved=$(mktemp)
+if TS_AUTHKEY=x DEV_SSH_PUBLIC_KEY="ssh-ed25519 AAAA t" \
+   CLIPROXY_CLIENT_KEY=a CLIPROXY_MANAGEMENT_KEY=b \
+   "${compose_cmd[@]}" --project-directory "$repo_root" -f "$compose" config --format json >"$resolved" 2>/dev/null \
+   && python3 - "$resolved" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    services = json.load(handle)["services"]
+for name in ("t3code", "tailscale-control"):
+    assert services[name]["network_mode"] == "service:tailscale"
+    assert not services[name].get("ports")
+assert services["t3code"]["depends_on"]["tailscale-control"]["condition"] == "service_healthy"
+assert not any(v["source"] == "tailscale-socket" for v in services["t3code"]["volumes"])
+assert not any(v["source"] == "ts-state" for v in services["tailscale-control"]["volumes"])
+assert any(v["source"] == "t3-share-socket" and v["read_only"] for v in services["t3code"]["volumes"])
+assert services["tailscale-control"]["read_only"]
+assert "--socket=/run/tailscale/tailscaled.sock" in services["tailscale"]["healthcheck"]["test"]
+PY
+then
+  pass "resolved Compose isolates control sockets and waits for the protected T3 route"
+else
+  fail "resolved Compose isolates control sockets and waits for the protected T3 route"
+fi
+rm -f "$resolved"
 
 # --- OPENROUTER_API_KEY is optional and, when set, produces valid config ---
 # The cliproxyapi command script appends an openai-compatibility block only

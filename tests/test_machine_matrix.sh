@@ -117,6 +117,18 @@ for os in darwin linux; do
 
       assert_lacks "$managed" "backup/scripts/backup-local.sh" "$case_name excludes repository-only backup scripts"
       assert_lacks "$managed" "t3code/t3code_docker_compose.yaml" "$case_name excludes the repository-only T3 Code platform"
+      environment_context="$(render_template "$config" .chezmoitemplates/context-environment)"
+      if [[ "$preset" == "t3" ]]; then
+        if grep -qF 't3-share hostname' <<<"$environment_context"; then
+          pass "$case_name teaches agents to discover and share apps"
+        else
+          fail "$case_name teaches agents to discover and share apps"
+        fi
+      elif grep -qF 't3-share' <<<"$environment_context"; then
+        fail "$case_name excludes T3-only sharing instructions"
+      else
+        pass "$case_name excludes T3-only sharing instructions"
+      fi
 
       if [[ "$preset" == "container" ]]; then
         assert_lacks "$managed" "install-homebrew-packages.sh" "$case_name skips host Brew packages"

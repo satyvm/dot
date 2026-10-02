@@ -920,6 +920,13 @@ launch_agent() {
   if [[ -n "${TEA_SOCKET_PATH:-}" ]]; then
     socket_args+=(--allow-unix-socket "$TEA_SOCKET_PATH")
   fi
+  local t3_share_socket="${T3_SHARE_SOCKET_PATH:-}"
+  if [[ ! ${T3_SHARE_SOCKET_PATH+x} && -S /run/t3-share/control.sock ]]; then
+    t3_share_socket=/run/t3-share/control.sock
+  fi
+  if [[ -n "$t3_share_socket" ]]; then
+    socket_args+=(--allow-unix-socket "$t3_share_socket")
+  fi
   if sandbox_requested && [[ "${AX_PLATFORM:-$(uname -s)}" != "Darwin" && "$PWD" -ef "$HOME" && -d "$HOME/dev" ]]; then
     cd "$HOME/dev"
   fi

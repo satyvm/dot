@@ -52,3 +52,34 @@ running directly and none of it applies to you.
   branch-protected on both forges: work on a branch and open a pull request.
 - Never attempt to read, print, or exfiltrate a forge token.
 {{- end }}
+{{- if eq $machine.preset "t3" }}
+
+## Tailscale app sharing
+
+Tailscale runs in a separate container sharing this container's network
+namespace. Use `t3-share` through its private sidecar socket; Docker access and
+the Tailscale daemon socket are not needed. Do not guess the MagicDNS hostname.
+
+- `t3-share hostname` / `t3-share ip`: discover the current node identity.
+- `t3-share status`: connection state and Tailscale health warnings.
+- `t3-share ports`: discover listening TCP ports.
+- `t3-share check 3000`: check whether an app accepts connections on localhost.
+- `t3-share 3000`: share a local HTTP app over tailnet HTTPS and print its URL.
+  Equivalent: `t3-share share 3000`; use `--listen 8444` for a specific external
+  port, or `--tcp` for a raw TCP service. UDP sharing is not supported.
+- `t3-share list` / `t3-share url 3000`: list routes or retrieve an app URL.
+- `t3-share remove 3000`: remove that app's route when sharing is no longer needed.
+- `t3-share peers`: visible peers with connection addresses and relay regions.
+- `t3-share doctor`: check node state, applied routes, and local backends.
+- `t3-share --json <command>`: machine-readable output for automation.
+
+Start the app listening on `127.0.0.1` or `0.0.0.0`, check its port, share it,
+and report the returned URL. URLs are private to permitted tailnet clients;
+local checks do not prove that remote ACLs allow the selected listener port.
+Web apps must allow their returned hostname for host checks and WebSocket/HMR.
+Route registration checks TCP reachability, not HTTP correctness.
+Routes persist across restarts, so remove routes for stopped or abandoned apps.
+T3's HTTPS route on port 443 is reserved, as are platform backend ports.
+Keep Docker DNS enabled (`TS_ACCEPT_DNS=false`). Use the helper for routing;
+do not enable Funnel, change tailnet enrollment, or modify the platform route.
+{{- end }}

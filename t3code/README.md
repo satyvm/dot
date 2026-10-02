@@ -34,6 +34,7 @@ intentionally left to `tailscale up` and T3's one-time pairing flow.
 | `t3code` | `t3 serve` on :3773, `sshd`, chezmoi toolset, agents | via the sidecar's namespace | 8G / 4.0 |
 | `cliproxyapi` | Model gateway for `ax`, **opt-in** | none | 512M / 0.5 |
 | `tea-sidecar` | Gitea API over a unix socket | none | 256M / 0.25 |
+| `tailscale-control` | Node discovery, private app routes, and diagnostics over a Unix socket | none | 128M / 0.25 |
 
 **No Coolify domain is assigned to this application.** T3 Code's only
 authentication is a pairing token, and upstream advises against exposing a
@@ -60,11 +61,66 @@ Three settings make this work, and all three are load-bearing:
 - `--port=41642` — the host's tailscaled already uses 41641; a distinct port
   lets this node negotiate direct connections instead of falling back to DERP.
 
+## Sharing development apps
+
+Inside T3, start an HTTP app on `127.0.0.1:3000` (or `0.0.0.0:3000`), then run:
+
+```bash
+t3-share hostname
+t3-share check 3000
+t3-share 3000
+```
+
+The last command prints the actual URL, such as
+`https://t3-dev.example.ts.net:8443`. It discovers the hostname from Tailscale
+rather than assuming the requested node name was available. The first free
+listener from 8443–8499 is assigned; repeated sharing returns the same URL.
+Up to 57 app routes can be registered at once.
+`t3-share share 3000 --listen 9443` selects an external port explicitly.
+The backend stays HTTP while Tailscale terminates HTTPS. Configure the app's
+allowed hosts and WebSocket/HMR origin for the returned hostname and port.
+
+| Command | Purpose |
+|---|---|
+| `t3-share status` | Connection state, actual hostname, IPs, certificate domains, and health warnings |
+| `t3-share hostname` / `t3-share ip` | Print the discovered hostname or tailnet addresses |
+| `t3-share ports` | List listening TCP ports in the shared network namespace |
+| `t3-share check 3000` | Test TCP reachability at localhost; exits nonzero when unavailable |
+| `t3-share list` / `t3-share url 3000` | List the platform and app routes, or print one app URL |
+| `t3-share share 5432 --tcp` | Forward raw TCP to a local service; prints a `tcp://` endpoint |
+| `t3-share remove 3000` | Remove an app route without stopping the app |
+| `t3-share peers` | List visible peers, online state, relay region, and current direct address |
+| `t3-share doctor` | Check node health, applied routes, T3 backend, and shared app backends |
+| `t3-share --json <command>` | Return JSON for agent automation |
+
+Routes are private to the tailnet and require ACL/grant access to their external
+listener ports. Backend checks verify TCP reachability only; test the returned
+URL from a permitted tailnet device to verify HTTP, HTTPS, and access rules.
+UDP and HTTPS backends are not supported by this helper. Remove routes when an
+app is stopped or abandoned: routes survive restarts and a reused local port
+would otherwise become reachable through its previous route.
+
+The control broker shares the sidecar's network namespace and owns the entire
+Serve configuration, including the protected `443 → localhost:3773` T3 route.
+It reconciles routes at startup and every five seconds, using the discovered
+certificate domain, and checks them in its healthcheck. HTTPS must be enabled
+in the tailnet. Only the broker and Tailscale mount the daemon socket; T3 mounts
+a separate control socket with group access matching `REMOTE_GID`.
+The broker allows localhost targets, reserves platform ports, never enables
+Funnel, and accepts no arbitrary Tailscale or Docker commands. It does not mount
+the node identity state or Docker socket. Existing agent context sources teach
+the T3-only workflow, and `ax` grants the helper socket to sandboxed agents.
+
+Validate changes with `python3 -m unittest discover -s t3code/tests -p 'test_*.py'`
+and `bash t3code/tests/test_stack.sh`. A deployment rebuild is required to ship
+the command and broker; chezmoi provisioning updates the shared agent context.
+
 ## Persistence
 
 | Volume | Path | Losing it costs |
 |---|---|---|
 | `ts-state` | `/var/lib/tailscale` | node identity — a new MagicDNS name every redeploy |
+| `t3-share-state` | `/var/lib/t3-share` | registered app routes |
 | `t3-state` | `/home/ubuntu/.t3` | every T3 session, pairing, and the state database |
 | `t3-home` | `/home/ubuntu` | shell, chezmoi, and agent state |
 | `npm-global` | `/home/ubuntu/.npm-global` | rebuild-free `t3` upgrades |

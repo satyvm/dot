@@ -142,7 +142,7 @@ Located in `dot_config/nono/profiles/`. Each agent has a profile:
 - `run_after_sync-nono-packs.sh.tmpl` installs the `nolabs-ai` packs for
   Codex, Claude, OMP, and OpenCode; stale `always-further` packs are retired
   first; pack names are verified against registry.nono.sh
-- `ax` grants resolved Herdr and Tea sockets dynamically at launch
+- `ax` grants resolved Herdr, Tea, and T3 app-sharing sockets dynamically at launch
 - context layers: `base.md` + `environment.md` reach every agent through its own
   native global config; `ax-context.md` is injected by `ax` alone, because the
   sandbox it describes is only true for `ax` launches
