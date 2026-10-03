@@ -62,7 +62,7 @@ services:
     depends_on:
       tailscale:
         condition: service_healthy
-      tailscale-control:
+      t3-control:
         condition: service_healthy
     environment:
       DEV_SSH_PUBLIC_KEY: ${DEV_SSH_PUBLIC_KEY:?}
@@ -101,10 +101,10 @@ services:
           memory: ${T3CODE_MEMORY:-4G}
           cpus: "${T3CODE_CPUS:-1.5}"
 
-  tailscale-control:
+  t3-control:
     build:
       context: ./t3code
-      dockerfile: Dockerfile.tailscale-control
+      dockerfile: Dockerfile.control
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]
@@ -118,13 +118,17 @@ services:
     environment:
       TS_SOCKET: /run/tailscale/tailscaled.sock
       T3_SHARE_SOCKET_PATH: /run/t3-share/control.sock
+      TEA_SOCKET_PATH: /run/tea/tea.sock
+      GITEA_TOKEN: ${GITEA_TOKEN:-}
+      GITEA_URL: ${GITEA_URL:-https://gitea.satyvm.com}
       REMOTE_GID: ${REMOTE_GID:-1000}
     volumes:
       - tailscale-socket:/run/tailscale:ro
       - t3-share-socket:/run/t3-share
       - t3-share-state:/var/lib/t3-share
+      - tea-socket:/run/tea
     healthcheck:
-      test: ["CMD", "t3-share", "list"]
+      test: ["CMD", "python3", "/usr/local/lib/t3-control/t3_control.py", "--healthcheck"]
       interval: 30s
       timeout: 15s
       start_period: 30s
@@ -249,39 +253,6 @@ services:
         limits:
           memory: 512M
           cpus: "0.5"
-
-  tea-sidecar:
-    build:
-      context: ./t3code
-      dockerfile: Dockerfile.tea
-    restart: unless-stopped
-    read_only: true
-    cap_drop: [ALL]
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      GITEA_TOKEN: ${GITEA_TOKEN:-}
-      GITEA_URL: ${GITEA_URL:-https://gitea.satyvm.com}
-      TEA_SOCKET_PATH: /run/tea/tea.sock
-    volumes:
-      - tea-socket:/run/tea
-    networks:
-      - t3-net
-    healthcheck:
-      test:
-        - CMD
-        - python3
-        - -c
-        - import socket; s = socket.socket(socket.AF_UNIX); s.settimeout(2); s.connect("/run/tea/tea.sock"); s.close()
-      interval: 10s
-      timeout: 5s
-      start_period: 10s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.25"
 
 networks:
   t3-net:

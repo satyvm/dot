@@ -29,6 +29,39 @@ refute "the T3 server port is never published to the host" '3773:3773' "$compose
 check   "the only published port is the Tailscale UDP endpoint" '41642:41642/udp' "$compose"
 check   "t3code shares the Tailscale network namespace" 'network_mode: service:tailscale' "$compose"
 
+# CLI defaults can change across the automatic T3 upgrade. Require the server
+# to select the same port explicitly as the real broker and healthcheck.
+if PYTHONDONTWRITEBYTECODE=1 python3 - "$repo_root" <<'PY'
+import configparser
+import re
+import shlex
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / "t3code"))
+from tailscale_sidecar import Broker
+
+config = configparser.ConfigParser(interpolation=None)
+config.read(root / "t3code/supervisord.conf")
+command = shlex.split(config["program:t3code"]["command"])
+assert "--port" in command, "T3 must explicitly select its backend port"
+port = int(command[command.index("--port") + 1])
+broker = Broker.__new__(Broker)
+broker.routes = []
+proxy = broker.config("test.example.ts.net")["Web"]["test.example.ts.net:443"]["Handlers"]["/"]["Proxy"]
+assert port == urlparse(proxy).port, "T3 launch port differs from proxy target"
+compose = (root / "t3code/t3code_docker_compose.yaml").read_text()
+health_port = int(re.search(r"/dev/tcp/127\.0\.0\.1/(\d+)", compose)[1])
+assert port == health_port, "T3 launch port differs from healthcheck target"
+PY
+then
+  pass "T3 explicitly binds the proxy and healthcheck backend port"
+else
+  fail "T3 explicitly binds the proxy and healthcheck backend port"
+fi
+
 # --- no relative host bind mounts ------------------------------------------
 # Coolify runs `docker compose` inside a helper container while the host daemon
 # resolves bind sources, so a relative path does not exist from the daemon's
@@ -44,8 +77,8 @@ refute "the broker is the only Serve configuration writer" 'TS_SERVE_CONFIG:' "$
 check "the daemon socket is shared only with the control broker" 'tailscale-socket:/run/tailscale:ro' "$compose"
 check "T3 gets the narrow control socket" 't3-share-socket:/run/t3-share:ro' "$compose"
 check "app routes persist across broker restarts" 't3-share-state:/var/lib/t3-share' "$compose"
-check "the broker image is built from repository code" 'dockerfile: Dockerfile.tailscale-control' "$compose"
-check "the broker checks applied routes in its healthcheck" '["CMD", "t3-share", "list"]' "$compose"
+check "the control image is built from repository code" 'dockerfile: Dockerfile.control' "$compose"
+check "the control service checks both socket APIs" '["CMD", "python3", "/usr/local/lib/t3-control/t3_control.py", "--healthcheck"]' "$compose"
 
 # --- the DNS setting that keeps Compose service names resolvable -----------
 check "tailnet DNS is not accepted inside the shared namespace" 'TS_ACCEPT_DNS: "false"' "$compose"
@@ -302,14 +335,22 @@ import sys
 
 with open(sys.argv[1], encoding="utf-8") as handle:
     services = json.load(handle)["services"]
-for name in ("t3code", "tailscale-control"):
+assert {"tailscale", "t3code", "t3-control"} <= set(services) <= {
+    "tailscale", "t3code", "t3-control", "cliproxyapi"
+}
+for name in ("t3code", "t3-control"):
     assert services[name]["network_mode"] == "service:tailscale"
     assert not services[name].get("ports")
-assert services["t3code"]["depends_on"]["tailscale-control"]["condition"] == "service_healthy"
+assert services["t3code"]["depends_on"]["t3-control"]["condition"] == "service_healthy"
 assert not any(v["source"] == "tailscale-socket" for v in services["t3code"]["volumes"])
-assert not any(v["source"] == "ts-state" for v in services["tailscale-control"]["volumes"])
+assert not any(v["source"] == "ts-state" for v in services["t3-control"]["volumes"])
 assert any(v["source"] == "t3-share-socket" and v["read_only"] for v in services["t3code"]["volumes"])
-assert services["tailscale-control"]["read_only"]
+assert services["t3-control"]["read_only"]
+assert {"tea-socket", "t3-share-socket", "t3-share-state"} <= {
+    v["source"] for v in services["t3-control"]["volumes"]
+}
+assert "GITEA_TOKEN" in services["t3-control"]["environment"]
+assert "GITEA_TOKEN" not in services["t3code"]["environment"]
 assert "--socket=/run/tailscale/tailscaled.sock" in services["tailscale"]["healthcheck"]["test"]
 PY
 then
