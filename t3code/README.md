@@ -31,15 +31,27 @@ intentionally left to `tailscale up` and T3's one-time pairing flow.
 | Service | Role | Ingress | Limits |
 |---|---|---|---|
 | `tailscale` | Own tailnet node (`t3-dev`), terminates HTTPS on :443 | UDP 41642 only | 256M / 0.5 |
-| `t3code` | `t3 serve` on :3773, `sshd`, chezmoi toolset, agents | via the sidecar's namespace | 8G / 4.0 |
+| `t3code` | `t3 serve` on :3773, `sshd`, chezmoi toolset, agents | via the sidecar's namespace | 4G / 1.5 |
 | `cliproxyapi` | Model gateway for `ax`, **opt-in** | none | 512M / 0.5 |
-| `tea-sidecar` | Gitea API over a unix socket | none | 256M / 0.25 |
-| `tailscale-control` | Node discovery, private app routes, and diagnostics over a Unix socket | none | 128M / 0.25 |
+| `t3-control` | Tailscale discovery, private app routes, diagnostics, and Gitea API over Unix sockets | none | 128M / 0.25 |
 
 **No Coolify domain is assigned to this application.** T3 Code's only
 authentication is a pairing token, and upstream advises against exposing a
 development server to the public internet on that basis. The Tailscale sidecar
 is the entire ingress surface.
+
+`t3-control` runs the Tailscale and Gitea APIs in one Python process. Its
+healthcheck verifies the protected T3 route and the Gitea socket; failure of
+either API stops the process so Docker can restart it. Gitea requests run in
+worker threads so they cannot block route management. The development container
+receives both client sockets, while the Gitea token and Tailscale daemon socket
+stay inside the control service.
+
+When upgrading from the separate `tailscale-control` and `tea-sidecar` services,
+redeploy the complete Compose stack and remove the obsolete service containers.
+The existing `tea-socket`, `t3-share-socket`, and `t3-share-state` volumes are
+reused; keep the volumes when removing old containers. Stop the old helpers
+before starting `t3-control` so they cannot compete for the shared sockets.
 
 ## Why the sidecar owns its own tailnet node
 

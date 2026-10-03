@@ -133,7 +133,8 @@ async def handle_client(reader, writer):
             req = json.loads(data.decode("utf-8"))
             action = req.get("action")
             payload = req.get("payload", {})
-            result = handle_action(action, payload)
+            # Gitea HTTP calls must not block the shared T3 control event loop.
+            result = await asyncio.to_thread(handle_action, action, payload)
             response = {"success": True, "data": result}
         except Exception as e:
             response = {"success": False, "error": str(e)}
@@ -162,7 +163,7 @@ async def main():
     # Set socket permissions to 0666 so container users in mounted volume can connect
     os.chmod(SOCKET_PATH, 0o666)
     
-    print(f"Tea sidecar running on Unix socket: {SOCKET_PATH}", flush=True)
+    print(f"Gitea API listening on Unix socket: {SOCKET_PATH}", flush=True)
     async with server:
         await server.serve_forever()
 

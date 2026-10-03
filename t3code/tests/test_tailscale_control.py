@@ -82,6 +82,8 @@ class DaemonHandler(http.server.BaseHTTPRequestHandler):
 
 
 class ControlIntegrationTests(unittest.TestCase):
+    BROKER_SCRIPT = "tailscale_sidecar.py"
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -110,7 +112,7 @@ class ControlIntegrationTests(unittest.TestCase):
     def start_broker(self):
         (self.directory / "control.sock").unlink(missing_ok=True)
         self.process = subprocess.Popen(
-            [sys.executable, str(ROOT / "tailscale_sidecar.py")],
+            [sys.executable, str(ROOT / self.BROKER_SCRIPT)],
             env=self.env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

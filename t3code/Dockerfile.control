@@ -1,0 +1,13 @@
+FROM python:3.11-alpine
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+COPY t3_control.py /usr/local/lib/t3-control/
+COPY tailscale_sidecar.py /usr/local/lib/t3-control/
+COPY tea_sidecar.py /usr/local/lib/t3-control/
+COPY t3_share_cli.py /usr/local/lib/t3-control/
+COPY t3_share_cli.py /usr/local/bin/t3-share
+RUN chmod 0555 /usr/local/bin/t3-share
+
+ENTRYPOINT ["python3", "/usr/local/lib/t3-control/t3_control.py"]
