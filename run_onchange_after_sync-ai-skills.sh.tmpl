@@ -1,0 +1,12 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+#!/usr/bin/env bash
+set -euo pipefail
+# Registry: {{ .aiSkills | toJson | sha256sum }}
+# Selection: {{ dict "preset" $machine.preset "ai" $machine.features.ai | toJson | sha256sum }}
+# Manager: {{ include "dot_local/lib/ax/skills.py" | sha256sum }}
+{{ range $path := glob (joinPath .chezmoi.sourceDir "skills/owned/**") -}}
+{{ if not (stat $path).isDir -}}
+# Owned payload: {{ include $path | sha256sum }}
+{{ end -}}
+{{ end -}}
+"$HOME/.local/bin/ax" skills sync

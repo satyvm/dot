@@ -1,0 +1,445 @@
+{
+  "aiSkills": {
+    "version": 1,
+    "skills": {
+      "add-dotfiles-app": {
+        "source": {
+          "type": "owned",
+          "path": "add-dotfiles-app"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "440fad2d2e82ed3329cf21090f81b1e777a0ab4555ad8fbe58d9f0e78471b124"
+        ]
+      },
+      "grilling": {
+        "source": {
+          "type": "owned",
+          "path": "grilling"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "fc29ad34154273a8b7139bb896beb11540594f030e7a4abada06ab1f122a7a33"
+        ]
+      },
+      "handoff": {
+        "source": {
+          "type": "owned",
+          "path": "handoff"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "840ec89182c1539c9cd96bd671fe96a65ea73d4509fb54b3028a961b716327a6"
+        ]
+      },
+      "implement": {
+        "source": {
+          "type": "owned",
+          "path": "implement"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "520c47ac1feaea69f6917f295528b699a49b0282fd0c35c841a7871219cb8b5a"
+        ]
+      },
+      "improve-codebase-architecture": {
+        "source": {
+          "type": "owned",
+          "path": "improve-codebase-architecture"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "4593188e2ce2b30d70e6419b01b062adb1c38550d29eb3f1b276c588e81f2a20"
+        ]
+      },
+      "nono-init": {
+        "source": {
+          "type": "owned",
+          "path": "nono-init"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "41e533ba9b605acf5f3b20bbd815cd247622c5b78ab1623bace30141576b52c1"
+        ]
+      },
+      "prototype": {
+        "source": {
+          "type": "owned",
+          "path": "prototype"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "9d21bd59e06419b442c4a572a1d098763c370962e48226e57994df0d51d95207"
+        ]
+      },
+      "resolving-merge-conflicts": {
+        "source": {
+          "type": "owned",
+          "path": "resolving-merge-conflicts"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "181815dedbfc946ff02fea8042d30448bab2e28e8d8e0959496a488bc95f4c4c"
+        ]
+      },
+      "skill-creator": {
+        "source": {
+          "type": "owned",
+          "path": "skill-creator"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "0762752a28dc989500e72f0da51a0b7bceb7f3dfb042189ae480a780c751009d"
+        ]
+      },
+      "tdd": {
+        "source": {
+          "type": "owned",
+          "path": "tdd"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "5a76ad06d6fbd59c625dac1acd499ab88037fb7ec6487330f9b7ed308cf0d506"
+        ]
+      },
+      "to-spec": {
+        "source": {
+          "type": "owned",
+          "path": "to-spec"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "1bbced53d7a00d95fd5c9267bc3c1f5fb9ce9164135b93df76c07b208cfb1c3c"
+        ]
+      },
+      "to-tickets": {
+        "source": {
+          "type": "owned",
+          "path": "to-tickets"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "156954565a192e132e21bdb7c37e18f55b743efb15d778e6fba623335869f8d1"
+        ]
+      },
+      "triage": {
+        "source": {
+          "type": "owned",
+          "path": "triage"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "702e4661d3045183bae9835ecb4014d695bb084818cc0f2fee6fb05cca180d99"
+        ]
+      },
+      "what-skill": {
+        "source": {
+          "type": "owned",
+          "path": "what-skill"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "bea65fa30c5a1a48c9968b19491dd908fc166032a815efcf894b2b3909389b8d"
+        ]
+      },
+      "writing-fragments": {
+        "source": {
+          "type": "owned",
+          "path": "writing-fragments"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "0170cd033f2b4ec58f6ccb36c1f42c46c0381945ee318e59e355ac521202b44a"
+        ]
+      },
+      "writing-shape": {
+        "source": {
+          "type": "owned",
+          "path": "writing-shape"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "c03057196a0d2d55ebd6e6ed781e31c07ddffe796356eeac54d4a9339c5a5121"
+        ]
+      },
+      "frontend-design": {
+        "source": {
+          "type": "git",
+          "url": "https://github.com/anthropics/claude-code.git",
+          "path": "plugins/frontend-design/skills/frontend-design",
+          "revision": "2bfb629dfaff0c8318047a4beb93cf1dc5b58b18"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        }
+      },
+      "vercel-react-best-practices": {
+        "source": {
+          "type": "git",
+          "url": "https://github.com/vercel-labs/agent-skills.git",
+          "path": "skills/react-best-practices",
+          "revision": "063bee94c3f4df8453406c830b0a7df0f2860278"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        }
+      },
+      "diagnosing-bugs": {
+        "source": {
+          "type": "owned",
+          "path": "diagnose"
+        },
+        "enabled": true,
+        "agents": [
+          "claude",
+          "codex",
+          "omp",
+          "opencode"
+        ],
+        "presets": [
+          "*"
+        ],
+        "requires": {
+          "commands": [],
+          "mcp": []
+        },
+        "legacyDigests": [
+          "75148af431d3907db4988b088665cdd6de407a6764057cfb09b0fa2729f3c6b8"
+        ],
+        "legacyNames": [
+          "diagnose"
+        ]
+      }
+    }
+  }
+}
