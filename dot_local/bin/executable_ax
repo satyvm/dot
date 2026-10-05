@@ -36,6 +36,7 @@ Usage:
   ax --gateway <agent> [arguments...]                    # -g
   ax --sandbox --gateway <agent> [arguments...]          # -sg
   ax models [show|edit|validate|sync|live]
+  ax skills <list|new|save|import|enable|disable|sync|update|doctor> [options]
   ax auth setup [antigravity|codex]
   ax clear [--dry-run]
   ax doctor
@@ -713,6 +714,10 @@ prepare_omp_gateway() {
     die "$AX_EXIT_CONFIG" "OMP gateway config is missing: $source_file; run: chezmoi apply"
   mkdir -p "$agent_dir/sessions"
   install -m 0600 "$source_file" "$agent_dir/models.yml"
+  local skills_dir="$config_home/agents/skills"
+  if [[ -d "$skills_dir" && ! -e "$agent_dir/skills" && ! -L "$agent_dir/skills" ]]; then
+    ln -s "$skills_dir" "$agent_dir/skills"
+  fi
   export PI_CODING_AGENT_DIR="$agent_dir"
 }
 
@@ -964,6 +969,12 @@ case "${1:-}" in
   models)
     shift
     models_command "$@"
+    ;;
+  skills)
+    shift
+    need python3
+    ax_bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    exec python3 "$ax_bin_dir/../lib/ax/skills.py" "$@"
     ;;
   auth)
     shift

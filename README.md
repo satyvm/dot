@@ -224,8 +224,16 @@ ax auth setup codex       # authenticate one provider channel
 ax models show            # show the role-to-model mapping
 ax models validate        # validate the model registry
 ax models live            # compare it with models advertised by the proxy
+ax skills list            # show managed skills and their pinned sources
+ax skills save ./my-skill # save an authored skill in the dotfiles source
+ax skills sync --source  # install reviewed source changes
+ax skills doctor         # check installed bundles and discovery links
 ax doctor                 # check authentication and the complete agent setup
 ```
+
+See [the skill management guide](docs/ai-skills.md) for saving, pinned updates,
+migration, and local/T3 Code discovery.
+
 
 Credentials, OAuth state, private SSH keys, and mutable agent sessions are not
 stored in this repository.

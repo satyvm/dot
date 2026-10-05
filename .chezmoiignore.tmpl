@@ -13,7 +13,7 @@ t3code
 examples
 tests
 docs
-.config/agents/skills/add-dotfiles-app/evals
+skills
 
 # Existing pre-machine-model configs are a compatibility lane. This prevents
 # renamed run_onchange scripts from being treated as new provisioning work on
@@ -29,6 +29,7 @@ configure-macos-defaults.sh
 configure-linux-hardening.sh
 setup-shell.sh
 setup-ai-agent-platform.sh
+sync-ai-skills.sh
 sync-nono-packs.sh
 .local/bin/dotfiles-macos-apps
 .local/bin/dotfiles-macos-cleanup
@@ -87,6 +88,8 @@ install-system-packages.sh
 .kimi
 .omp
 .local/bin/ax
+.local/lib/ax
+sync-ai-skills.sh
 setup-ai-agent-platform.sh
 sync-nono-packs.sh
 {{- end }}

@@ -228,3 +228,15 @@ or chezmoi-only way to add that thread type without maintaining code.
 ```bash
 bash t3code/tests/test_stack.sh
 ```
+
+### Shared skills
+
+The `t3` machine preset installs the same `ax skills` registry and authored
+library as a local AI workstation. Chez moi runs skill synchronization during
+provisioning; all skill files and ownership state persist in the `t3-home`
+volume. Agent processes discover skills through their native home directories,
+including Codex instances with a provider-specific `CODEX_HOME`.
+
+Use `ax skills save <directory>`, review and commit the source changes, then
+update the dotfiles on the other host. See [skill management](../docs/ai-skills.md)
+for pinned imports, preserving local edits, and discovery checks.

@@ -167,10 +167,17 @@ for os in darwin linux; do
         assert_has "$managed" ".gemini/GEMINI.md" "$case_name gives Antigravity its native global context"
         assert_has "$managed" ".cursor/rules/environment.mdc" "$case_name gives Cursor an always-applied user rule"
         assert_has "$managed" ".config/nono/profiles/default-codex.json" "$case_name ships the Codex sandbox profile"
+        assert_has "$managed" ".config/ax/skills.json" "$case_name deploys the skill registry"
+        assert_lacks "$managed" "skills/owned/skill-creator/scripts/run_eval.py" "$case_name keeps skill payloads repository-only"
+        assert_has "$managed" ".local/lib/ax/skills.py" "$case_name deploys the skills manager"
+        assert_has "$managed" "sync-ai-skills.sh" "$case_name synchronizes skills"
+        assert_has "$managed" ".omp/agent/skills" "$case_name gives OMP native skill discovery"
       else
         assert_lacks "$managed" "setup-ai-agent-platform.sh" "$case_name disables AI"
         assert_lacks "$managed" ".config/agents/context/base.md" "$case_name omits agent context layers"
         assert_lacks "$managed" ".codex/AGENTS.md" "$case_name omits Codex context"
+        assert_lacks "$managed" ".local/lib/ax/skills.py" "$case_name omits the skills manager"
+        assert_lacks "$managed" "sync-ai-skills.sh" "$case_name omits skill synchronization"
       fi
 
       # The shims are gone: nothing may shadow a real agent binary on PATH.
