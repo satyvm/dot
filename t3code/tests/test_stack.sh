@@ -82,6 +82,7 @@ check "the control service checks both socket APIs" '["CMD", "python3", "/usr/lo
 
 # --- the DNS setting that keeps Compose service names resolvable -----------
 check "tailnet DNS is not accepted inside the shared namespace" 'TS_ACCEPT_DNS: "false"' "$compose"
+check "userspace Tailscale exposes an outbound SOCKS5 proxy" 'TS_SOCKS5_SERVER: 127.0.0.1:1055' "$compose"
 
 # --- node identity durability ---------------------------------------------
 check "tailscale state is persisted"        'ts-state:/var/lib/tailscale' "$compose"
@@ -136,6 +137,7 @@ refute "no port 8787 ingress remains"     '8787' "$compose"
 # --- image ----------------------------------------------------------------
 dockerfile="$repo_root/t3code/Dockerfile"
 check "the image provides the build toolchain T3 Code compiles against" 'g++' "$dockerfile"
+check "the image can proxy SSH through userspace Tailscale" 'netcat-openbsd' "$dockerfile"
 check "Node is new enough for T3 Code"   'node:22.19.0' "$dockerfile"
 refute "the image no longer carries the Hermes runtime" 'hermes' "$dockerfile"
 check "the image ships the agent sharing command" 'COPY t3_share_cli.py /usr/local/bin/t3-share' "$dockerfile"
@@ -260,6 +262,10 @@ check "t3 serve inherits the chezmoi-managed bin directory" 'PATH="/home/ubuntu/
 # for interactive shells, so without SetEnv an `ssh t3-dev <cmd>` finds nothing
 # and even an interactive login misses the npm-installed agents.
 check "sshd sessions get the full PATH" 'SetEnv PATH=/home/ubuntu/.local/bin:/home/ubuntu/.npm-global/bin:' "$dockerfile"
+
+# --- isolated remote Docker builder ---------------------------------------
+check "Docker finds Homebrew Compose through a managed plugin link" '/home/linuxbrew/.linuxbrew/lib/docker/cli-plugins/docker-compose' "$repo_root/dot_docker/cli-plugins/symlink_docker-compose"
+check "the default context is not switched by the setup documentation" 'docker --context t3-builder' "$repo_root/t3code/README.md"
 
 # --- the sidecar's flags are actually accepted by the binaries -------------
 # The string checks above cannot prove tailscaled and `tailscale up` accept

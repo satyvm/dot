@@ -17,6 +17,13 @@ You are running on the **`{{ $machine.preset }}`** machine profile
 - Durable configuration changes belong in the chezmoi source repository or the
   image build, not in live edits to the running container.
 {{- end }}
+{{- if eq $machine.preset "t3" }}
+- The Docker CLI targets an isolated VM through the named `t3-builder` SSH
+  context. Use `docker --context t3-builder ...` explicitly; the default context
+  is not changed. Compose builds send the local build context to the VM, while
+  bind mounts refer to paths on the VM. Check the Docker host and bind sources
+  before running `compose up`; see `t3code/README.md` in the dotfiles source.
+{{- end }}
 
 ## Where work belongs
 

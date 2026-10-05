@@ -173,6 +173,12 @@ for os in darwin linux; do
         assert_lacks "$managed" ".codex/AGENTS.md" "$case_name omits Codex context"
       fi
 
+      if [[ "$preset" == "t3" ]]; then
+        assert_has "$managed" ".docker/cli-plugins/docker-compose" "$case_name exposes the Brew Compose plugin to Docker"
+      else
+        assert_lacks "$managed" ".docker/cli-plugins/docker-compose" "$case_name omits the T3-only Compose plugin link"
+      fi
+
       # The shims are gone: nothing may shadow a real agent binary on PATH.
       for shimmed in claude codex omp opencode crush; do
         assert_lacks "$managed" ".local/bin/$shimmed" "$case_name does not shadow the real $shimmed binary"
@@ -259,13 +265,19 @@ if grep -q '^brew "git"$' <<<"$linux_brew" || grep -q '^brew "curl"$' <<<"$linux
 else
   pass "Linux does not duplicate system Git and curl through Brew"
 fi
-for package in git curl zsh docker.io; do
+for package in git curl zsh docker.io netcat-openbsd; do
   if grep -q "^  \"$package\"$" <<<"$linux_apt"; then
     pass "Linux apt inventory includes $package"
   else
     fail "Linux apt inventory includes $package"
   fi
 done
+if grep -q '^brew "docker"$' <<<"$linux_brew" &&
+   grep -q '^brew "docker-compose"$' <<<"$linux_brew"; then
+  pass "Linux renders portable remote Docker clients through Brew"
+else
+  fail "Linux renders portable remote Docker clients through Brew"
+fi
 if grep -q '^brew trust --formula "charmbracelet/tap/crush"$' <<<"$linux_brew"; then
   pass "Crush formula is trusted before Brew bundle evaluation"
 else

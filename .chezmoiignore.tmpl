@@ -121,3 +121,6 @@ configure-linux-hardening.sh
 {{- if not $machine.features.ssh }}
 .local/bin/dotfiles-ssh-enroll
 {{- end }}
+{{- if ne $machine.preset "t3" }}
+.docker
+{{- end }}
