@@ -4,6 +4,19 @@
 shared library for local agents and remote T3 Code. Agents still launch using
 their real upstream binaries. Skills do not require the ax sandbox or gateway.
 
+## Why this layer exists
+
+Native skill discovery already loads the files; ax manages their lifecycle across
+machines. The extra layer provides a reviewable save/import workflow, exact
+upstream pins, and ownership checks before updating or removing installed files.
+If all skills were authored locally and deployed unchanged, ordinary chezmoi
+files and discovery links would be sufficient. The manager is useful for the
+mixed authored/downloaded library and preserving edits made to installed copies.
+
+Keep this boundary narrow: one registry and sync command, with native agent
+discovery. It does not manage plugins, MCP authentication, agent sessions, or
+remote execution. Compatibility is advisory metadata, not an access restriction.
+
 ## Everyday workflow
 
 ```bash
@@ -48,8 +61,9 @@ Use `AX_SKILLS_REGISTRY_PATH` only when explicitly testing another rendered regi
 Each registry entry declares `enabled`, `agents`, `presets`, `source`, and
 `requires.commands`/`requires.mcp`. `presets: ["*"]` selects all machines with
 the existing AI feature enabled. An explicit preset list further restricts
-selection; it does not turn on the machine's AI feature. `agents` documents
-tested compatibility; the common library is advertised to every linked agent.
+selection; it does not turn on the machine's AI feature. `agents` declares
+intended compatibility; it does not establish that live agent loading has been
+tested. The common library is advertised to every linked agent.
 Agent-specific filtering is not performed.
 
 ```json
@@ -87,7 +101,8 @@ must be downloaded by a regular sync/import first. Import/update dry runs may
 resolve remote refs, but require the resolved bundle to be cached for validation.
 
 Sync preflights every managed destination. It preserves unregistered skills and
-refuses to replace modified bundles, symlinks, or unrelated files. Disabling a
+refuses to replace modified bundles, symlinks, or unrelated files. It also rejects
+a selected manifest name already exposed by an unmanaged directory. Disabling a
 skill removes only an unchanged bundle previously installed by ax. When an
 installed skill was edited, preserve it explicitly:
 
@@ -97,10 +112,16 @@ ax skills sync --source
 ```
 
 `--replace` overwrites that skill's authored source, so review existing source
-edits first. Saving an imported skill converts it to an owned skill; subsequent
+edits first. Source replacement is staged on the same filesystem and rolled back
+if the replacement or registry write fails. This protects against ordinary I/O
+errors; it is not a crash-atomic transaction across the bundle and registry.
+Saving an imported skill converts it to an owned skill; subsequent
 upstream updates no longer apply. Migration adopts exact known former dotfiles
 bundles and exact matches to the desired bundle. Unknown/older downloaded or
 edited bundles are preserved and reported for an explicit save decision.
+The generated `what-skill/references/catalog.md` is tracked separately so saving
+an authored description edit can regenerate it. Keep personal notes outside that
+file; direct catalog edits still block replacement to avoid discarding them.
 
 ## Agent and T3 Code discovery
 
@@ -143,3 +164,5 @@ bash t3code/tests/test_stack.sh
 The skill suite uses temporary homes and local Git remotes to cover saving,
 selection, pinning, updates, tamper detection, collision protection, and safe
 migration without touching an installed user library.
+The historical migration test deploys commit `17dede9` through chezmoi first; a
+shallow checkout without that commit skips this test until history is fetched.

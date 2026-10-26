@@ -273,6 +273,15 @@ for package in git curl zsh docker.io; do
     fail "Linux apt inventory includes $package"
   fi
 done
+ai_only_config="$fixture_root/linux-ai-only.json"
+make_config "$ai_only_config" minimal linux amd64
+jq '.data.machine.customize = true | .data.machine.overrides = {cli: false, developer: false, ai: true}' \
+  "$ai_only_config" >"$ai_only_config.tmp"
+mv "$ai_only_config.tmp" "$ai_only_config"
+ai_only_apt="$(render_template "$ai_only_config" run_onchange_before_install-system-packages.sh.tmpl)"
+assert_has "$ai_only_apt" '  "python3"' "AI-only Linux installs the skills interpreter without developer tooling"
+minimal_apt="$(render_template "$fixture_root/linux-amd64-minimal.json" run_onchange_before_install-system-packages.sh.tmpl)"
+assert_lacks "$minimal_apt" '  "python3"' "AI-disabled Linux does not install the skills interpreter"
 if grep -q '^brew trust --formula "charmbracelet/tap/crush"$' <<<"$linux_brew"; then
   pass "Crush formula is trusted before Brew bundle evaluation"
 else

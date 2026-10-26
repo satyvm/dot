@@ -30,6 +30,7 @@ packages=(
 {{- $enabled := list "base" -}}
 {{- if $machine.features.cli }}{{ $enabled = append $enabled "cli" }}{{ end -}}
 {{- if $machine.features.developer }}{{ $enabled = append $enabled "developer" }}{{ end -}}
+{{- if $machine.features.ai }}{{ $enabled = append $enabled "ai" }}{{ end -}}
 {{- if $machine.features.hardening }}{{ $enabled = append $enabled "hardening" }}{{ end -}}
 {{- range $pkg := .packages.inventory }}
   {{- $oses := index $pkg "os" | default (list "darwin" "linux") }}

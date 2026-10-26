@@ -1,12 +1,15 @@
 """Exercise the public ax skills CLI in isolated homes and Git repositories."""
 
 import json
+import argparse
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import types
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
 AX = ROOT / "dot_local/bin/executable_ax"
@@ -94,6 +97,58 @@ class SkillCommands(unittest.TestCase):
         self.assertFalse((self.library / "another").exists())
         self.assertIn("User edit", original.read_text())
 
+    def test_sync_rejects_duplicate_manifest_before_installing(self):
+        shutil.copytree(self.owned / "example", self.library / "personal-copy")
+        self.assertIn("duplicate manifest name", self.cli("sync", ok=False))
+        self.assertFalse((self.library / "example").exists())
+        self.assertTrue((self.library / "personal-copy/SKILL.md").exists())
+
+    def test_save_rolls_back_source_when_registry_write_fails(self):
+        self.cli("sync")
+        installed = self.library / "example/SKILL.md"
+        original = (self.owned / "example/SKILL.md").read_text()
+        installed.write_text(original + "Preserved user edit\n")
+        registry_path = self.source / ".chezmoidata/ai-skills.yaml"
+        before_registry = registry_path.read_text()
+        # Compile directly to avoid writing Python cache files into the source tree.
+        manager_path = ROOT / "dot_local/lib/ax/skills.py"
+        manager_module = types.ModuleType("ax_skills")
+        exec(compile(manager_path.read_text(), str(manager_path), "exec"), manager_module.__dict__)
+        args = argparse.Namespace(command="save", directory=str(installed.parent), replace=True, dry_run=False)
+        with patch.dict(os.environ, self.env), patch.object(manager_module, "write_json", side_effect=OSError("disk full")):
+            with self.assertRaisesRegex(OSError, "disk full"):
+                manager_module.Skills(args).mutate()
+        self.assertEqual((self.owned / "example/SKILL.md").read_text(), original)
+        self.assertEqual(registry_path.read_text(), before_registry)
+        self.assertIn("Preserved user edit", installed.read_text())
+
+    def render_sync_hook(self):
+        shutil.copytree(ROOT / ".chezmoitemplates", self.source / ".chezmoitemplates", dirs_exist_ok=True)
+        shutil.copy2(ROOT / ".chezmoidata/machine.yaml", self.source / ".chezmoidata/machine.yaml")
+        manager = self.source / "dot_local/lib/ax/skills.py"
+        manager.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "dot_local/lib/ax/skills.py", manager)
+        result = subprocess.run(["chezmoi", "--source", str(self.source), "--config",
+                                 str(ROOT / "examples/configs/linux-t3-arm64.json"), "execute-template"],
+                                input=(ROOT / "run_onchange_after_sync-ai-skills.sh.tmpl").read_text(),
+                                env=self.env, text=True, capture_output=True, check=True)
+        return result.stdout
+
+    def test_sync_hook_changes_for_payload_rename(self):
+        asset = self.owned / "example/old.txt"
+        asset.write_text("literal asset")
+        before = self.render_sync_hook()
+        asset.rename(asset.with_name("new.txt"))
+        self.assertNotEqual(self.render_sync_hook(), before)
+
+    def test_sync_hook_changes_for_executable_mode(self):
+        asset = self.owned / "example/tool.sh"
+        asset.write_text("#!/bin/sh\nexit 0\n")
+        asset.chmod(0o644)
+        before = self.render_sync_hook()
+        asset.chmod(0o755)
+        self.assertNotEqual(self.render_sync_hook(), before)
+
     def test_save_replace_preserves_edit_then_syncs(self):
         self.cli("sync")
         installed = self.library / "example/SKILL.md"
@@ -102,6 +157,27 @@ class SkillCommands(unittest.TestCase):
         self.assertIn("User edit", (self.owned / "example/SKILL.md").read_text())
         self.cli("sync", "--source")
         self.assertIn("User edit", installed.read_text())
+
+    def test_save_what_skill_description_then_regenerates_catalog(self):
+        self.skill("what-skill")
+        self.persist()
+        self.cli("sync")
+        installed = self.library / "what-skill/SKILL.md"
+        installed.write_text(installed.read_text().replace("Example workflow.", "Choose useful workflows."))
+        self.cli("save", str(installed.parent), "--replace")
+        self.cli("sync", "--source")
+        self.assertIn("Choose useful workflows.", (installed.parent / "references/catalog.md").read_text())
+
+    def test_save_does_not_silently_discard_edited_generated_catalog(self):
+        self.skill("what-skill")
+        self.persist()
+        self.cli("sync")
+        installed = self.library / "what-skill"
+        catalog = installed / "references/catalog.md"
+        catalog.write_text(catalog.read_text() + "Personal annotations\n")
+        self.cli("save", str(installed), "--replace")
+        self.cli("sync", "--source", ok=False)
+        self.assertIn("Personal annotations", catalog.read_text())
 
     def test_disable_preserves_modified_skill_until_saved(self):
         self.cli("sync")
@@ -241,6 +317,34 @@ class SkillCommands(unittest.TestCase):
         managed = subprocess.run([*arguments, "managed", "--refresh-externals=never"], env=self.env,
                                  capture_output=True, text=True, check=True).stdout.splitlines()
         self.assertFalse(any(path.startswith("skills/") for path in managed))
+
+    def test_migration_from_actual_pre_manager_deployment(self):
+        if subprocess.run(["git", "-C", str(ROOT), "cat-file", "-e", "17dede9^{commit}"],
+                          capture_output=True).returncode:
+            self.skipTest("fetch pre-manager commit 17dede9 to exercise historical migration")
+        legacy_source = self.root / "legacy-source"
+        legacy_source.mkdir()
+        # The historical source includes literal_ names and an empty __init__.py;
+        # use chezmoi itself rather than assuming the deployed tree matches Git.
+        archive = subprocess.run(["git", "-C", str(ROOT), "archive", "17dede9", "dot_config/agents/skills"],
+                                 capture_output=True, check=True).stdout
+        subprocess.run(["tar", "-xf", "-", "-C", str(legacy_source)], input=archive, check=True)
+        subprocess.run(["chezmoi", "--source", str(legacy_source), "--destination", str(self.home),
+                        "--config", str(ROOT / "examples/configs/linux-t3-arm64.json"),
+                        "--cache", str(self.root / "legacy-cache"),
+                        "--persistent-state", str(self.root / "legacy-state.boltdb"), "apply"],
+                       env=self.env, capture_output=True, text=True, check=True)
+        self.assertFalse((self.library / "skill-creator/scripts/__init__.py").exists())
+        self.registry = json.loads((ROOT / ".chezmoidata/ai-skills.yaml").read_text())["aiSkills"]
+        self.registry.update(machine={"preset": "t3", "ai": True}, ownedRoot=str(ROOT / "skills/owned"))
+        for item in self.registry["skills"].values():
+            if item["source"]["type"] == "git":
+                item["enabled"] = False
+        self.persist()
+        self.cli("sync")
+        self.assertTrue((self.library / "skill-creator/scripts/__init__.py").exists())
+        self.assertTrue((self.library / "diagnosing-bugs/SKILL.md").exists())
+        self.assertFalse((self.library / "diagnose").exists())
 
     def fixture_remote(self):
         repo = self.root / "upstream"

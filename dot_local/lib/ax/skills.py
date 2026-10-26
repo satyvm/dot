@@ -113,11 +113,12 @@ def files(directory):
             yield path.relative_to(root), path
 
 
-def digest(directory):
+def digest(directory, exclude=()):
     checksum = hashlib.sha256()
     entries = []
     for relative_path, path in files(directory):
-        entries.append((relative_path, path))
+        if relative_path.as_posix() not in exclude:
+            entries.append((relative_path, path))
     for relative_path, path in sorted(entries, key=lambda entry: str(entry[0])):
         checksum.update(str(relative_path).encode() + b"\0")
         checksum.update(str(path.stat().st_mode & 0o111).encode() + b"\0")
@@ -130,6 +131,27 @@ def copy_bundle(source, target):
         destination = target / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path, destination)
+
+
+@contextlib.contextmanager
+def replace_bundle(source, target):
+    """Stage on the destination filesystem and keep the old bundle until commit."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".ax-save-", dir=target.parent) as temporary:
+        prepared = Path(temporary) / "skill"
+        backup = Path(temporary) / "previous"
+        copy_bundle(source, prepared)
+        if target.exists():
+            target.rename(backup)
+        try:
+            prepared.rename(target)
+            yield
+        except BaseException:
+            if target.exists():
+                shutil.rmtree(target)
+            if backup.exists():
+                backup.rename(target)
+            raise
 
 
 class Skills:
@@ -252,6 +274,8 @@ class Skills:
                     reference.parent.mkdir(parents=True, exist_ok=True)
                     reference.write_text(catalog)
                 desired[name] = {"digest": digest(staging / name), "bundleDigest": digest(path), "source": selected[name]["source"]}
+                if name == "what-skill":
+                    desired[name]["catalogDigest"] = hashlib.sha256(catalog.encode()).hexdigest()
             actions = []
             for name, item in selected.items():
                 for legacy_name in item.get("legacyNames", []):
@@ -264,6 +288,19 @@ class Skills:
                         if digest(target) not in item.get("legacyDigests", []) + [desired[name]["bundleDigest"]]:
                             raise ValueError(f"edited legacy skill: {target}; save it with ax skills save --replace before syncing")
                         actions.append((legacy_name, "remove"))
+            # Native agents identify skills by manifest name, not directory name.
+            removed = {name for name, action in actions if action == "remove"}
+            if self.library.exists():
+                for directory in sorted(self.library.iterdir()):
+                    if directory.name in desired or directory.name in removed:
+                        continue
+                    if directory.is_dir() and (directory / "SKILL.md").is_file():
+                        try:
+                            identity = manifest(directory)["name"]
+                        except (ValueError, TypeError, subprocess.CalledProcessError):
+                            continue  # Unrelated invalid bundles remain untouched.
+                        if identity in desired:
+                            raise ValueError(f"duplicate manifest name {identity}: {directory} and {self.library / identity}")
             # Preflight everything before changing any installed bundle.
             for name in sorted(set(previous["skills"]) | set(desired)):
                 if not NAME.fullmatch(name):
@@ -278,7 +315,14 @@ class Skills:
                     # Migration may adopt the exact former chezmoi bundle before adding its catalog.
                     original = digest(bundles[name][0]) if name in bundles else None
                     legacy = selected.get(name, {}).get("legacyDigests", [])
-                    if before is not None or (current != original and current not in legacy):
+                    saved = False
+                    if name == "what-skill" and name in desired and before is not None:
+                        generated = target / "references/catalog.md"
+                        saved = (digest(target, exclude={"references/catalog.md"}) == desired[name]["bundleDigest"]
+                                 and generated.is_file()
+                                 and hashlib.sha256(generated.read_bytes()).hexdigest()
+                                 == previous["skills"][name].get("catalogDigest"))
+                    if not saved and (before is not None or (current != original and current not in legacy)):
                         raise ValueError(f"edited or unmanaged skill: {target}; save it with ax skills save before syncing")
                 if current != after:
                     actions.append((name, "install" if after else "remove"))
@@ -357,6 +401,7 @@ class Skills:
             if source["type"] == "owned" and target.exists() and not (command == "save" and self.args.replace):
                 raise ValueError(f"source directory already exists: {target}")
             items[name] = {**items.get(name, self.entry(source)), "source": source}
+            validate(registry)
             if not self.args.dry_run and source["type"] == "owned":
                 with tempfile.TemporaryDirectory(prefix="ax-save-") as temporary:
                     prepared = Path(temporary) / "skill"
@@ -369,11 +414,11 @@ class Skills:
                         prepared.mkdir()
                         (prepared / "SKILL.md").write_text(
                             f"---\nname: {name}\ndescription: Describe when to use this skill.\n---\n\n# {name}\n\nDescribe the workflow.\n")
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    if target.exists():
-                        shutil.rmtree(target)
-                    shutil.copytree(prepared, target)
+                    with replace_bundle(prepared, target):
+                        write_json(registry_path, document)
                     print(f"source: {target}")
+                print(f"registered: {command}; review git diff, then run chezmoi apply")
+                return
         validate(registry)
         if not self.args.dry_run:
             write_json(registry_path, document)
