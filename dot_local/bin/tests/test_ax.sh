@@ -616,11 +616,7 @@ if command -v chezmoi >/dev/null 2>&1; then
   SKILL_SCRIPT_ROOT="$RENDER_ROOT/skill-creator/scripts"
   mkdir -p "$SKILL_SCRIPT_ROOT"
   for script_name in generate_report improve_description quick_validate run_eval run_loop utils; do
-    if [[ -f "$HOME/.config/agents/skills/skill-creator/scripts/$script_name.py" ]]; then
-      cp "$HOME/.config/agents/skills/skill-creator/scripts/$script_name.py" "$SKILL_SCRIPT_ROOT/$script_name.py"
-    else
-      touch "$SKILL_SCRIPT_ROOT/$script_name.py"
-    fi
+    cp "$REPO_ROOT/skills/owned/skill-creator/scripts/$script_name.py" "$SKILL_SCRIPT_ROOT/$script_name.py"
   done
   if jq -e . "$RENDER_ROOT"/*.json >/dev/null; then
     pass "all rendered client JSON documents parse"
@@ -704,8 +700,8 @@ if command -v chezmoi >/dev/null 2>&1; then
   else
     fail "Nono sync leaves Codex unmanaged" "$NONO_PACK_SCRIPT"
   fi
-  assert_contains "$(chezmoi target-path --config "$MAC_CONFIG" --source "$REPO_ROOT" "$REPO_ROOT/dot_config/agents/skills/skill-creator/scripts/literal_run_eval.py")" "/run_eval.py" "chezmoi preserves the run_eval.py payload basename"
-  assert_contains "$(chezmoi target-path --config "$MAC_CONFIG" --source "$REPO_ROOT" "$REPO_ROOT/dot_config/agents/skills/skill-creator/scripts/literal_run_loop.py")" "/run_loop.py" "chezmoi preserves the run_loop.py payload basename"
+  [[ -f "$REPO_ROOT/skills/owned/skill-creator/scripts/run_eval.py" ]] && pass "owned skills preserve the run_eval.py payload basename" || fail "owned run_eval.py is missing" ""
+  [[ -f "$REPO_ROOT/skills/owned/skill-creator/scripts/run_loop.py" ]] && pass "owned skills preserve the run_loop.py payload basename" || fail "owned run_loop.py is missing" ""
   if (cd "$FIXTURE_ROOT" && PYTHONDONTWRITEBYTECODE=1 python3 "$SKILL_SCRIPT_ROOT/run_eval.py" --help >/dev/null); then
     pass "rendered run_eval.py resolves its sibling scripts package"
   else

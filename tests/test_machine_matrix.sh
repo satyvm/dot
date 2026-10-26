@@ -167,10 +167,17 @@ for os in darwin linux; do
         assert_has "$managed" ".gemini/GEMINI.md" "$case_name gives Antigravity its native global context"
         assert_has "$managed" ".cursor/rules/environment.mdc" "$case_name gives Cursor an always-applied user rule"
         assert_has "$managed" ".config/nono/profiles/default-codex.json" "$case_name ships the Codex sandbox profile"
+        assert_has "$managed" ".config/ax/skills.json" "$case_name deploys the skill registry"
+        assert_lacks "$managed" "skills/owned/skill-creator/scripts/run_eval.py" "$case_name keeps skill payloads repository-only"
+        assert_has "$managed" ".local/lib/ax/skills.py" "$case_name deploys the skills manager"
+        assert_has "$managed" "sync-ai-skills.sh" "$case_name synchronizes skills"
+        assert_has "$managed" ".omp/agent/skills" "$case_name gives OMP native skill discovery"
       else
         assert_lacks "$managed" "setup-ai-agent-platform.sh" "$case_name disables AI"
         assert_lacks "$managed" ".config/agents/context/base.md" "$case_name omits agent context layers"
         assert_lacks "$managed" ".codex/AGENTS.md" "$case_name omits Codex context"
+        assert_lacks "$managed" ".local/lib/ax/skills.py" "$case_name omits the skills manager"
+        assert_lacks "$managed" "sync-ai-skills.sh" "$case_name omits skill synchronization"
       fi
 
       # The shims are gone: nothing may shadow a real agent binary on PATH.
@@ -266,6 +273,15 @@ for package in git curl zsh docker.io; do
     fail "Linux apt inventory includes $package"
   fi
 done
+ai_only_config="$fixture_root/linux-ai-only.json"
+make_config "$ai_only_config" minimal linux amd64
+jq '.data.machine.customize = true | .data.machine.overrides = {cli: false, developer: false, ai: true}' \
+  "$ai_only_config" >"$ai_only_config.tmp"
+mv "$ai_only_config.tmp" "$ai_only_config"
+ai_only_apt="$(render_template "$ai_only_config" run_onchange_before_install-system-packages.sh.tmpl)"
+assert_has "$ai_only_apt" '  "python3"' "AI-only Linux installs the skills interpreter without developer tooling"
+minimal_apt="$(render_template "$fixture_root/linux-amd64-minimal.json" run_onchange_before_install-system-packages.sh.tmpl)"
+assert_lacks "$minimal_apt" '  "python3"' "AI-disabled Linux does not install the skills interpreter"
 if grep -q '^brew trust --formula "charmbracelet/tap/crush"$' <<<"$linux_brew"; then
   pass "Crush formula is trusted before Brew bundle evaluation"
 else

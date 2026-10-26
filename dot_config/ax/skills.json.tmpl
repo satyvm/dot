@@ -1,0 +1,5 @@
+{{- $machine := includeTemplate "machine" . | fromJson -}}
+{{- $registry := deepCopy .aiSkills -}}
+{{- $_ := set $registry "machine" (dict "preset" $machine.preset "ai" $machine.features.ai) -}}
+{{- $_ := set $registry "ownedRoot" (joinPath .chezmoi.sourceDir "skills/owned") -}}
+{{- $registry | toPrettyJson }}

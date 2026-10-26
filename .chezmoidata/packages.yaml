@@ -137,6 +137,11 @@ packages:
       feature: cli
       providers:
         brew: { darwin: jq, linux: jq }
+    - id: ax-skills-python
+      feature: ai
+      providers:
+        brew: { darwin: python@3.13 }
+        apt: python3
     - id: glow
       feature: cli
       providers:

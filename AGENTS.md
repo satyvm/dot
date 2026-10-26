@@ -39,7 +39,7 @@ and Debian/Ubuntu on `amd64` and `arm64`.
 │   ├── nono/profiles/           #   Nono sandbox profiles for AI agents
 │   ├── agents/context/          #   base / environment / ax-context layers
 │   ├── ax/models.json.tmpl      #   Rendered canonical agent/model registry
-│   ├── agents/skills/           #   AI agent skills (downloaded via external archives)
+│   ├── ax/skills.json.tmpl      #   Rendered skill registry
 │   └── ...                      #   alacritty, herdr, pet, cli-proxy-api
 ├── dot_local/bin/               # → ~/.local/bin/ (`ax` + managed agent shims)
 ├── run_onchange_*.sh.tmpl       # Providers and convergent setup
@@ -97,18 +97,24 @@ Path mapping: `dot_config/nvim/init.lua` → `~/.config/nvim/init.lua`. The dire
 Listed in `.chezmoiignore.tmpl`. These files stay in the source directory only:
 
 - `README.md`, `AGENTS.md`, `.setup.sh`
-- `examples/`, `tests/`, `docs/`, `backup/`, and `t3code/`
+- `examples/`, `tests/`, `docs/`, `skills/`, `backup/`, and `t3code/`
 
 ## AI Agent Infrastructure
 
 ### Agent Skills
-Skills are downloaded from GitHub archives via `.chezmoiexternal.toml`:
-- **mattpocock/skills**: code-review, codebase-design, diagnose, domain-modeling, grill-with-docs, implement, prototype, research, resolving-merge-conflicts, setup-pre-commit, skill-creator, tdd, triage, wayfinder, and writing/content skills
-- **anthropics/claude-code**: frontend-design (from plugins/frontend-design)
-- **anthropics/skills**: skill-creator
-- **vercel-labs/agent-skills**: vercel-react-best-practices
+Skills are registered in `.chezmoidata/ai-skills.yaml` and managed with
+`ax skills`. Authored skills live in repository-only `skills/owned/`; third-party
+skills pin exact Git commits and download to the user's ax cache. Chez moi
+renders `~/.config/ax/skills.json` and runs `sync-ai-skills.sh` for modern
+AI-enabled presets. The assembled `~/.config/agents/skills/` library is owned by
+ax, not chezmoi.
 
-Skills are refreshed every 168h (7 days) and symlinked from `dot_agents/symlink_skills` → `private_dot_claude/symlink_skills`.
+Codex (`~/.agents/skills`), Claude (`~/.claude/skills`), and OMP
+(`~/.omp/agent/skills`) link to that library; OpenCode also discovers the shared
+Agents path. `ax` links skills into its alternate OMP gateway directory.
+Agent compatibility is declared in the registry; selection is by the existing
+AI feature and optional preset list. See `docs/ai-skills.md` for commands,
+migration, dependencies, and T3 Code behavior.
 
 ### AI CLI Tools & Sandboxing
 These AI CLI tools are all installed:
@@ -220,9 +226,10 @@ Backups are timestamped (`local_DDMMYY`). Auto-detects first non-system volume i
    `crush` are the real binaries. Only `ax <agent>` adds the sandbox and
    gateway. Never reintroduce a file in `~/.local/bin` that shadows an agent
    name; T3 Code spawns these CLIs off `PATH` and a wrapper breaks it.
-4. **External skills are refreshed weekly** — repo-owned skills such as
-   `add-dotfiles-app` are tracked here; upstream archive targets may be replaced
-   on external refresh.
+4. **Skill updates are explicit** — use `ax skills update <name>` and review
+   the pinned revision. Use `ax skills save <directory> --replace` to preserve
+   an edited installed skill. Sync refuses to overwrite changed or unrelated
+   bundles; skill payload files stay outside chezmoi deployment.
 5. **Sensitive data is not in this repo** — SSH keys, browser profiles, personal docs are backed up separately to external SSD.
 6. **Platform-sensitive files** may not be present (e.g., macOS scripts are ignored entirely on Linux via `.chezmoiignore.tmpl`).
 7. **Platform tests are shell-based** — run `bash tests/test_machine_matrix.sh`,
