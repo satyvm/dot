@@ -33,7 +33,6 @@ check   "t3code shares the Tailscale network namespace" 'network_mode: service:t
 # to select the same port explicitly as the real broker and healthcheck.
 if PYTHONDONTWRITEBYTECODE=1 python3 - "$repo_root" <<'PY'
 import configparser
-import re
 import shlex
 import sys
 from pathlib import Path
@@ -42,6 +41,7 @@ from urllib.parse import urlparse
 root = Path(sys.argv[1])
 sys.path.insert(0, str(root / "t3code"))
 from tailscale_sidecar import Broker
+from server import Settings
 
 config = configparser.ConfigParser(interpolation=None)
 config.read(root / "t3code/supervisord.conf")
@@ -53,7 +53,8 @@ broker.routes = []
 proxy = broker.config("test.example.ts.net")["Web"]["test.example.ts.net:443"]["Handlers"]["/"]["Proxy"]
 assert port == urlparse(proxy).port, "T3 launch port differs from proxy target"
 compose = (root / "t3code/t3code_docker_compose.yaml").read_text()
-health_port = int(re.search(r"/dev/tcp/127\.0\.0\.1/(\d+)", compose)[1])
+assert '["CMD", "/usr/local/bin/t3code-server", "--healthcheck"]' in compose
+health_port = urlparse(Settings().url).port
 assert port == health_port, "T3 launch port differs from healthcheck target"
 PY
 then

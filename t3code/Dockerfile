@@ -126,9 +126,10 @@ RUN install -d /var/run/sshd /etc/ssh/host-keys \
 
 COPY supervisord.conf /etc/supervisor/conf.d/t3code.conf
 COPY entrypoint.sh /usr/local/bin/t3code-entrypoint
+COPY server.py /usr/local/bin/t3code-server
 COPY gitea_ai_cli.py /usr/local/bin/gitea-ai
 COPY t3_share_cli.py /usr/local/bin/t3-share
-RUN chmod 0555 /usr/local/bin/t3code-entrypoint /usr/local/bin/gitea-ai /usr/local/bin/t3-share
+RUN chmod 0555 /usr/local/bin/t3code-server /usr/local/bin/t3code-entrypoint /usr/local/bin/gitea-ai /usr/local/bin/t3-share
 
 EXPOSE 22 3773
 ENTRYPOINT ["/usr/local/bin/t3code-entrypoint"]
