@@ -55,40 +55,80 @@ before starting `t3-control` so they cannot compete for the shared sockets.
 
 ## T3 health and recovery
 
-The container healthcheck requires a complete HTTP 200 response from
-`http://127.0.0.1:3773/` within five seconds. It bypasses HTTP proxies and does
-not follow redirects. T3 currently serves its web application there; this
-checks that its HTTP handler can respond, rather than just accepting TCP.
-It does not certify provider connectivity, provisioning, or agent progress.
+### Container entrypoint and process roles
 
-Supervisor runs T3 through `t3code-server`, using the same HTTP probe every
-30 seconds. The runner allows 180 seconds for startup, ending the allowance on
-the first successful response. Three consecutive failures trigger a restart;
-a successful response clears the failure count. An unexpected T3 process exit
-also triggers recovery. Before replacement, the runner sends SIGTERM to T3's
-process group, waits up to 20 seconds, and kills remaining group members.
-It refuses to launch another T3 process if the previous one cannot be reaped.
-Recovery interrupts active sessions and terminal processes in that group;
-SSH and the independent provisioning and control services remain available.
+The existing Docker entrypoint is `/usr/local/bin/t3code-entrypoint`.
+It prepares the container and starts Supervisor.
+Supervisor manages SSH, provisioning, and the T3 runner as separate programs.
+This container needs these programs to operate independently.
+Stopping the T3 runner does not stop SSH or provisioning.
 
-Each runner lifetime permits three automatic restarts, separated by five
-seconds. After the next failure it stops T3 and exits with status 78.
-Supervisor deliberately does not restart the runner, so it cannot reset the
-budget and create a restart loop. Docker then reports an unhealthy container;
-`restart: unless-stopped` does not restart a container whose Supervisor is
-still running. Restarting only T3 also leaves the Tailscale network namespace
-and private app routes intact.
+The Dockerfile copies `server.py` to `/usr/local/bin/t3code-server`.
+This instruction installs the T3 runner in the image.
+Supervisor calls this path to start the runner with the `t3 serve` command.
+The runner starts T3, checks its HTTP response, and restarts T3 after repeated failures.
+It does not restart the Docker container.
 
-Read the `t3code-server:` messages in the container logs. After investigating
-resource pressure or provider failures, reset the budget and start T3 with:
+Docker calls the same program with `--healthcheck` to check HTTP responsiveness.
+This mode returns a status code and exits.
+It never starts or restarts T3.
+
+### HTTP checks and restart limits
+
+The HTTP check requires a complete HTTP 200 response from
+`http://127.0.0.1:3773/` within five seconds.
+It bypasses HTTP proxies and does not follow redirects.
+T3 serves its web application at this address.
+The check detects an HTTP handler that cannot respond, even when the port accepts TCP connections.
+It does not check provider connectivity, provisioning, or agent progress.
+
+The runner applies these recovery rules:
+
+1. Check the HTTP response every 30 seconds.
+2. Allow 180 seconds for startup. End this allowance after the first successful HTTP response.
+3. Restart T3 after three consecutive HTTP failures. Clear the failure count after a successful HTTP response.
+4. Restart T3 after an unexpected T3 process exit.
+5. Allow three automatic restarts during each runner lifetime. Wait five seconds before each restart.
+
+Before a restart, the runner sends SIGTERM to T3's process group.
+A process group contains T3 and child processes that remain in that group.
+The runner allows 20 seconds for the group to stop.
+It then sends SIGKILL to remaining group members.
+It refuses to start another T3 process if it cannot collect the previous process's exit status.
+Recovery interrupts active sessions and terminal processes in that group.
+The Tailscale network namespace and private app routes remain intact.
+
+After three automatic restarts, the next failure stops T3 and the runner exits with status 78.
+Supervisor does not restart the runner, which prevents an unlimited restart loop.
+Docker subsequently reports the container as unhealthy.
+The `unless-stopped` policy does not restart the container while Supervisor remains alive.
+
+### Checks before deployment
+
+`tests/test_stack.sh` checks the deployment files without starting T3.
+It reads Supervisor's command, the proxy target, and the HTTP check settings.
+It checks that these three components use the same port.
+It also checks that Compose calls `t3code-server --healthcheck`.
+Other checks cover image files, access controls, volumes, and Compose syntax.
+
+`tests/test_server.py` checks runtime behavior with local HTTP servers, child processes, and Supervisor.
+These tests check HTTP hangs, startup delays, restart limits, and process shutdown.
+They do not reproduce the original Docker freeze.
+
+### Manual recovery and deployment
+
+Read the `t3code-server:` messages in the container logs.
+Investigate resource pressure or provider failures before a manual restart.
+Use this command to restart T3 and reset the automatic restart count:
 
 ```bash
 docker compose -f t3code/t3code_docker_compose.yaml exec t3code \
   supervisorctl -c /etc/supervisor/conf.d/t3code.conf restart t3code
 ```
 
-Rebuild and redeploy the T3 image to install the runner; `chezmoi apply` alone
-does not update these image-owned files.
+Rebuild the T3 image to install the runner.
+Redeploy the T3 service with the rebuilt image.
+The `chezmoi apply` command does not update these files inside the image.
 
 ## Why the sidecar owns its own tailnet node
 
