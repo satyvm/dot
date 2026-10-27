@@ -53,6 +53,43 @@ The existing `tea-socket`, `t3-share-socket`, and `t3-share-state` volumes are
 reused; keep the volumes when removing old containers. Stop the old helpers
 before starting `t3-control` so they cannot compete for the shared sockets.
 
+## T3 health and recovery
+
+The container healthcheck requires a complete HTTP 200 response from
+`http://127.0.0.1:3773/` within five seconds. It bypasses HTTP proxies and does
+not follow redirects. T3 currently serves its web application there; this
+checks that its HTTP handler can respond, rather than just accepting TCP.
+It does not certify provider connectivity, provisioning, or agent progress.
+
+Supervisor runs T3 through `t3code-server`, using the same HTTP probe every
+30 seconds. The runner allows 180 seconds for startup, ending the allowance on
+the first successful response. Three consecutive failures trigger a restart;
+a successful response clears the failure count. An unexpected T3 process exit
+also triggers recovery. Before replacement, the runner sends SIGTERM to T3's
+process group, waits up to 20 seconds, and kills remaining group members.
+It refuses to launch another T3 process if the previous one cannot be reaped.
+Recovery interrupts active sessions and terminal processes in that group;
+SSH and the independent provisioning and control services remain available.
+
+Each runner lifetime permits three automatic restarts, separated by five
+seconds. After the next failure it stops T3 and exits with status 78.
+Supervisor deliberately does not restart the runner, so it cannot reset the
+budget and create a restart loop. Docker then reports an unhealthy container;
+`restart: unless-stopped` does not restart a container whose Supervisor is
+still running. Restarting only T3 also leaves the Tailscale network namespace
+and private app routes intact.
+
+Read the `t3code-server:` messages in the container logs. After investigating
+resource pressure or provider failures, reset the budget and start T3 with:
+
+```bash
+docker compose -f t3code/t3code_docker_compose.yaml exec t3code \
+  supervisorctl -c /etc/supervisor/conf.d/t3code.conf restart t3code
+```
+
+Rebuild and redeploy the T3 image to install the runner; `chezmoi apply` alone
+does not update these image-owned files.
+
 ## Why the sidecar owns its own tailnet node
 
 Coolify's Traefik binds `0.0.0.0:443`, which includes the host's Tailscale

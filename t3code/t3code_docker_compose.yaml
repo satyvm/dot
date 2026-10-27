@@ -85,7 +85,7 @@ services:
       - tea-socket:/run/tea
       - t3-share-socket:/run/t3-share:ro
     healthcheck:
-      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/3773'"]
+      test: ["CMD", "/usr/local/bin/t3code-server", "--healthcheck"]
       interval: 30s
       timeout: 8s
       start_period: 180s
